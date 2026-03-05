@@ -1,0 +1,195 @@
+
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the St. Martin De Porres Parish Hub application.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the user entity." },
+        "googleId": { "type": "string", "description": "The Google ID of the user, obtained during Google OAuth." },
+        "email": { "type": "string", "description": "The email address of the user.", "format": "email" },
+        "firstName": { "type": "string", "description": "The first name of the user." },
+        "lastName": { "type": "string", "description": "The last name of the user." },
+        "photoURL": { "type": "string", "description": "URL of the user's profile photo.", "format": "uri" },
+        "role": { "type": "string", "description": "The role of the user in the application (e.g., 'admin', 'user')." },
+        "isAdmin": { "type": "boolean", "description": "Indicates if the user has admin privileges." },
+        "createdAt": { "type": "string", "description": "The date and time the user was created.", "format": "date-time" },
+        "updatedAt": { "type": "string", "description": "The date and time the user was last updated.", "format": "date-time" }
+      },
+      "required": ["id", "email", "role", "createdAt", "updatedAt", "isAdmin"]
+    },
+    "Mass": {
+      "title": "Mass",
+      "type": "object",
+      "description": "Represents a single mass schedule.",
+      "properties": {
+        "day": { "type": "string", "enum": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
+        "title": { "type": "string" },
+        "startTime": { "type": "string", "format": "time" },
+        "endTime": { "type": "string", "format": "time" },
+        "description": { "type": "string" }
+      },
+      "required": ["day", "title", "startTime", "endTime"]
+    },
+    "CommunityGroup": {
+      "title": "Community Group",
+      "type": "object",
+      "description": "Represents a Small Christian Community, group, or choir.",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string", "enum": ["Small Christian Community", "Group", "Choir", "Ministry"] },
+        "leader": { "type": "string" },
+        "contact": { "type": "string", "format": "email" },
+        "schedule": { "type": "string" },
+        "imageUrl": { "type": "string", "format": "uri" },
+        "memberCount": { "type": "number" },
+        "familyCount": { "type": "number" },
+        "goals": { "type": "string", "description": "Specific mission goals or objectives for the group." }
+      },
+      "required": ["name", "type", "leader"]
+    },
+    "MemberProfile": {
+      "title": "Member Profile",
+      "type": "object",
+      "description": "Represents a parish member's professional and church life details.",
+      "properties": {
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "age": { "type": "number" },
+        "maritalStatus": { "type": "string", "enum": ["Single", "Married", "Widowed", "Other"] },
+        "location": { "type": "string" },
+        "phone": { "type": "string" },
+        "profession": { "type": "string" },
+        "employmentStatus": { "type": "string", "enum": ["Student", "Job Seeker", "Employed", "Self-Employed"] },
+        "groupType": { "type": "string", "enum": ["YCS", "YCA", "Families", "Other"] },
+        "sundayMassPreference": { "type": "string", "enum": ["1st Mass", "2nd Mass"] },
+        "sccId": { "type": "string" },
+        "parishGroupId": { "type": "string", "description": "ID of the parish group (non-SCC) the member belongs to." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "baptism": { "type": "boolean" },
+        "confirmation": { "type": "boolean" },
+        "eucharist": { "type": "boolean" },
+        "penance": { "type": "boolean" },
+        "anointing": { "type": "boolean" },
+        "matrimony": { "type": "boolean" },
+        "holyOrders": { "type": "boolean" },
+        "fatherInfo": {
+          "type": "object",
+          "properties": { "name": { "type": "string" }, "phone": { "type": "string" } }
+        },
+        "motherInfo": {
+          "type": "object",
+          "properties": { "name": { "type": "string" }, "phone": { "type": "string" } }
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "age": { "type": "number" },
+              "baptism": { "type": "boolean" },
+              "eucharist": { "type": "boolean" },
+              "confirmation": { "type": "boolean" },
+              "parishGroupId": { "type": "string", "description": "ID of the parish group the child belongs to." }
+            }
+          }
+        }
+      },
+      "required": ["userId", "fullName", "profession", "employmentStatus"]
+    },
+    "SiteSettings": {
+      "title": "Site Settings",
+      "type": "object",
+      "description": "Global settings for the website.",
+      "properties": {
+        "officeHours": {
+          "type": "object",
+          "properties": {
+            "monday_friday": { "$ref": "#/entities/OfficeHours" },
+            "saturday": { "$ref": "#/entities/OfficeHours" },
+            "sunday": { "$ref": "#/entities/OfficeHours" }
+          }
+        },
+        "socialLinks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "platform": { "type": "string", "enum": ["Facebook", "Twitter", "YouTube", "Instagram", "LinkedIn"] },
+              "url": { "type": "string", "format": "uri" }
+            },
+            "required": ["platform", "url"]
+          }
+        },
+        "developerCredit": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "url": { "type": "string", "format": "uri" }
+          }
+        },
+        "parishDescription": { "type": "string" },
+        "copyrightYear": { "type": "number" }
+      }
+    },
+    "OfficeHours": {
+      "title": "Office Hours",
+      "type": "object",
+      "properties": {
+        "open": { "type": "string", "format": "time" },
+        "close": { "type": "string", "format": "time" }
+      }
+    }
+  },
+  "auth": {
+    "providers": ["password", "anonymous"]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": { "$ref": "#/entities/User" },
+          "description": "Stores user profiles. Access is restricted to the user identified by userId. Includes standard user profile information."
+        }
+      },
+      {
+        "path": "/masses/{massId}",
+        "definition": {
+          "entityName": "Mass",
+          "schema": { "$ref": "#/entities/Mass" },
+          "description": "Stores individual mass times and details."
+        }
+      },
+      {
+        "path": "/community_groups/{groupId}",
+        "definition": {
+          "entityName": "CommunityGroup",
+          "schema": { "$ref": "#/entities/CommunityGroup" },
+          "description": "Stores details for SCCs, groups, and choirs."
+        }
+      },
+      {
+        "path": "/members/{userId}",
+        "definition": {
+          "entityName": "MemberProfile",
+          "schema": { "$ref": "#/entities/MemberProfile" },
+          "description": "Stores professional and church life details for a member, keyed by their auth UID."
+        }
+      },
+      {
+        "path": "/site_settings/{settingsId}",
+        "definition": {
+          "entityName": "SiteSettings",
+          "schema": { "$ref": "#/entities/SiteSettings" },
+          "description": "Stores global site settings. Should only contain one document, e.g., 'main'."
+        }
+      }
+    ]
+  }
+}
