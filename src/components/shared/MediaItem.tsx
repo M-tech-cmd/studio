@@ -14,6 +14,10 @@ interface MediaItemProps {
   showIconOverlay?: boolean;
 }
 
+/**
+ * Enhanced Media Item with strict conditional rendering.
+ * Prevents "ghost" broken images by verifying url before mounting Image tags.
+ */
 export function MediaItem({ 
   url, 
   onRemove, 
@@ -22,7 +26,10 @@ export function MediaItem({
   className,
   showIconOverlay = true
 }: MediaItemProps) {
-  if (!url || url.trim() === '') return null;
+  // STRICT GUARD: Return null if url is invalid to prevent ghosting
+  if (!url || typeof url !== 'string' || url.trim() === '' || url === 'undefined' || url === 'null') {
+    return null;
+  }
 
   const isVideo = url.toLowerCase().match(/\.(mp4|webm|mov|video)/) || url.startsWith('data:video');
   const isAudio = url.toLowerCase().match(/\.(mp3|wav|ogg|audio)/) || url.startsWith('data:audio');
@@ -49,18 +56,17 @@ export function MediaItem({
           )}
         </div>
       ) : (
-        url && (
-          <Image
-            src={url}
-            alt="Media item"
-            fill
-            className={cn(
-              "object-cover transition-transform duration-700 group-hover:scale-110",
-              isLoading && "opacity-40 grayscale"
-            )}
-            unoptimized
-          />
-        )
+        /* Image rendering - Strictly conditional */
+        <Image
+          src={url}
+          alt="Media item"
+          fill
+          className={cn(
+            "object-cover transition-transform duration-700 group-hover:scale-110",
+            isLoading && "opacity-40 grayscale"
+          )}
+          unoptimized
+        />
       )}
 
       {isLoading && (
