@@ -1,6 +1,2 @@
-/**
- * DEPRECATED: This file has been consolidated into src/proxy.ts.
- * To resolve the "Both middleware and proxy detected" conflict in Next.js 16,
- * this file is intentionally left inert without function exports.
- */
-export const _deprecated = true;
+// This file is intentionally empty to resolve the conflict with src/proxy.ts in Next.js 16.
+// The routing logic has been moved to src/proxy.ts as requested by the platform.

@@ -1,10 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* Clean config for Next.js 16 */
-  experimental: {
-    // Removed invalid 'turbo' key
-  },
-  // Removed deprecated 'eslint' key to prevent startup errors
+  // Configured for Next.js 16 compatibility
+  // Invalid experimental keys like 'turbo' or 'eslint' have been removed
 };
 
 export default nextConfig;
