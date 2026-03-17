@@ -24,7 +24,7 @@ function MaintenanceShield({ message }: { message?: string }) {
             </p>
             <div className="flex items-center gap-2 text-sm font-bold text-primary/60 uppercase tracking-widest border-t pt-8">
                 <AlertTriangle className="h-4 w-4" />
-                St. Martin De Porres Parish Hub
+                St. Martin De Porres Portal
             </div>
         </div>
     );

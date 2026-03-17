@@ -5,7 +5,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user of the St. Martin De Porres Parish Hub application.",
+      "description": "Represents a user of the St. Martin De Porres Portal application.",
       "properties": {
         "id": { "type": "string", "description": "Unique identifier for the user entity." },
         "googleId": { "type": "string", "description": "The Google ID of the user, obtained during Google OAuth." },

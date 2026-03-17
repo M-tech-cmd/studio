@@ -1,4 +1,4 @@
-# **App Name**: St. Martin De Porres Parish Hub
+# **App Name**: St. Martin De Porres Portal
 
 ## Core Features:
 

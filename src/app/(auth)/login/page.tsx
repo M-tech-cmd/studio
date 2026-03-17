@@ -164,7 +164,7 @@ export default function LoginPage() {
         <div className="flex justify-center">
             <Logo url={settings?.logoUrl} className="h-20 w-20" />
         </div>
-        <CardTitle className="text-3xl font-black tracking-tight uppercase">PARISH HUB</CardTitle>
+        <CardTitle className="text-3xl font-black tracking-tight uppercase">St. Martin De Porres Portal</CardTitle>
         <CardDescription>Sign in to your member account</CardDescription>
       </CardHeader>
       <CardContent>
