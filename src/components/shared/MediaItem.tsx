@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { X, Play, Video, Music, AlertCircle } from 'lucide-react';
+import { X, Play, Video, Music } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MediaItemProps {
@@ -13,8 +13,8 @@ interface MediaItemProps {
 }
 
 /**
- * High-Performance Media Item — ZERO BLOCKING UI
- * Features absolute non-blocking rendering and a local-blob sync indicator.
+ * Zero-Ghost Media Item
+ * Renders instantly at 100% quality without blocking spinners or blurs.
  */
 export function MediaItem({ 
   url, 
@@ -62,15 +62,6 @@ export function MediaItem({
           )}
           unoptimized
         />
-      )}
-
-      {/* SYNC INDICATOR - SUBTLE & NON-BLOCKING (Gemini Style) */}
-      {!isError && url.startsWith('blob:') && (
-        <div className="absolute bottom-2 left-2 z-20">
-            <span className="bg-black/60 backdrop-blur-md text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-tighter animate-pulse">
-                Syncing...
-            </span>
-        </div>
       )}
 
       {/* REMOVE ACTION */}

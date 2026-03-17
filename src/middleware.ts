@@ -3,8 +3,8 @@ import type { NextRequest } from 'next/server';
 
 /**
  * Next.js Middleware.
- * This acts as a 'green light' to ensure requests reach Firebase without loops.
- * Optimised to bypass static chunks and blob streams to prevent Runtime Errors.
+ * Optimized to bypass static assets, JSON chunks, and Firebase internal streams.
+ * This prevents ChunkLoadError and 504 Timeouts during heavy media sync.
  */
 export default function middleware(request: NextRequest) {
   return NextResponse.next();
@@ -21,7 +21,8 @@ export const config = {
      * - firebase (Firebase SDK endpoints)
      * - firebase-storage (Storage interactions)
      * - blob (local media streams)
+     * - Any path ending in .js or .json (Static chunks)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|firebase|blob).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|firebase|blob|.*\\.js$|.*\\.json$).*)',
   ],
 };

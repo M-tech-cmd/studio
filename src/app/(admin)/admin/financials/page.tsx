@@ -100,11 +100,20 @@ export default function AdminFinancialsPage() {
     if (!firestore) return;
     setIsSaving(true);
 
-    const dataToAdd = {
-        ...values,
-        date: Timestamp.fromDate(new Date(values.date)),
-        createdAt: serverTimestamp(),
-    };
+    // SAFE SERIALIZATION
+    let dataToAdd = {};
+    try {
+        dataToAdd = {
+            ...values,
+            date: Timestamp.fromDate(new Date(values.date)),
+            createdAt: serverTimestamp(),
+        };
+    } catch (e) {
+        console.error("Data prep failed", e);
+        toast({ variant: 'destructive', title: "Data Error", description: "Malformed entry data." });
+        setIsSaving(false);
+        return;
+    }
 
     try {
         await addDoc(collection(firestore, 'financial_ledger'), dataToAdd);

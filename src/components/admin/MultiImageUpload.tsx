@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Loader2, AlertCircle, RefreshCcw } from 'lucide-react';
+import { Upload, Loader2, RefreshCcw, Info } from 'lucide-react';
 import { ref, getDownloadURL, uploadBytes } from 'firebase/storage';
 import { useStorage } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -30,7 +30,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
   const storage = useStorage();
   const { toast } = useToast();
   
-  // Use ref to maintain the list of URLs for the background workers
+  // Use ref to maintain the latest list of URLs for the parallel workers
   const imagesRef = useRef<string[]>(images || []);
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
     const files = e.target.files;
     if (!files || files.length === 0 || !storage) return;
 
-    // Hard-cap at 10 to ensure stability
+    // Hard-cap at 10 to ensure stability and match Gemini behavior
     const selectedFiles = Array.from(files).slice(0, 10);
     if (files.length > 10) {
       toast({ 
@@ -71,9 +71,14 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
 
     const storageRef = ref(storage, `${folder}/${Date.now()}_${item.id}_${item.file.name}`);
     
-    // No 'await' in the loop: let workers run independently
-    uploadBytes(storageRef, item.file)
-      .then(async (snapshot) => {
+    // Using uploadBytes (faster for multi-batches) with a 60s fail-safe race
+    const uploadPromise = uploadBytes(storageRef, item.file);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Sync Timeout')), 60000)
+    );
+
+    Promise.race([uploadPromise, timeoutPromise])
+      .then(async (snapshot: any) => {
         const downloadURL = await getDownloadURL(snapshot.ref);
         
         // 3. Silent State Swap
@@ -128,7 +133,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {/* Cloud Images */}
+        {/* Cloud Images (Finished) */}
         {images.map((url, index) => (
           <MediaItem 
             key={`cloud-${index}-${url}`} 
@@ -137,7 +142,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
           />
         ))}
 
-        {/* Instant Previews (Gemini Method) */}
+        {/* Instant Previews (Syncing) */}
         {activeUploads.map((item) => (
           <div key={item.id} className="relative group isolate">
             <MediaItem 
@@ -146,6 +151,14 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
               onRemove={() => removePendingUpload(item.id, item.preview)} 
             />
             
+            {item.status === 'syncing' && (
+                <div className="absolute bottom-2 left-2 z-20">
+                    <span className="bg-black/60 backdrop-blur-md text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-tighter animate-pulse">
+                        Syncing...
+                    </span>
+                </div>
+            )}
+
             {item.status === 'failed' && (
               <button
                 type="button"

@@ -304,7 +304,15 @@ export default function BrandingPage() {
     const onSubmitBranding = (values: z.infer<typeof brandingSchema>) => {
         if (!settingsRef) return;
         setIsSaving(true);
-        const sanitizedData = JSON.parse(JSON.stringify(values));
+        // SAFE SERIALIZATION WRAPPER
+        let sanitizedData = {};
+        try {
+            sanitizedData = JSON.parse(JSON.stringify(values));
+        } catch (e) {
+            console.error("Serialization failed", e);
+            sanitizedData = values;
+        }
+        
         setDoc(settingsRef, sanitizedData, { merge: true })
             .then(() => { toast({ title: 'Success!', description: 'Visual settings updated.' }); router.refresh(); })
             .finally(() => setIsSaving(false));
