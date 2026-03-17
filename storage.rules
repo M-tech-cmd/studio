@@ -1,8 +1,21 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    // Standard access rules for parish hub media
     match /{allPaths=**} {
+      allow read;
+      allow write: if request.auth != null;
+    }
+    
+    // Explicit permission block for key application folders
+    match /events/{allPaths=**} {
+      allow read;
+      allow write: if request.auth != null;
+    }
+    
+    match /bulletin-gallery/{allPaths=**} {
       allow read;
       allow write: if request.auth != null;
     }

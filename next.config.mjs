@@ -1,7 +1,8 @@
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Configured for Next.js 16 compatibility
-  // Invalid experimental keys like 'turbo' or 'eslint' have been removed
+  // Removing invalid keys (eslint, turbo) causing compilation failures in Next.js 16
+  reactStrictMode: true,
 };
 
 export default nextConfig;

@@ -1,9 +1,10 @@
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * Standard Next.js 16 Proxy.
- * The function name MUST be 'proxy' to match the filename.
+ * Standard Proxy Export for Next.js 16.
+ * The function name MUST match the filename to satisfy platform requirements.
  */
 export function proxy(request: NextRequest) {
   return NextResponse.next();
