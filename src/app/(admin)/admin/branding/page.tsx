@@ -5,19 +5,19 @@ import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Upload, RotateCcw, Palette, Link as LinkIcon, X, Loader2, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { Upload, RotateCcw, Palette, Link as LinkIcon, X, Loader2, Palette as PaletteIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
 
 import type { SiteContent, SiteSettings } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc, useStorage, useUser } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useDoc, useStorage, useUser } from '@/firebase';
 import { collection, doc, setDoc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
@@ -304,7 +304,8 @@ export default function BrandingPage() {
     const onSubmitBranding = (values: z.infer<typeof brandingSchema>) => {
         if (!settingsRef) return;
         setIsSaving(true);
-        // SAFE SERIALIZATION WRAPPER
+        
+        // SAFE SERIALIZATION WRAPPER: Handles 504 and JSON parse issues
         let sanitizedData = {};
         try {
             sanitizedData = JSON.parse(JSON.stringify(values));
@@ -314,7 +315,10 @@ export default function BrandingPage() {
         }
         
         setDoc(settingsRef, sanitizedData, { merge: true })
-            .then(() => { toast({ title: 'Success!', description: 'Visual settings updated.' }); router.refresh(); })
+            .then(() => { 
+                toast({ title: 'Success!', description: 'Visual settings updated.' }); 
+                router.refresh(); 
+            })
             .finally(() => setIsSaving(false));
     };
 
@@ -332,7 +336,7 @@ export default function BrandingPage() {
     return (
         <div className="space-y-6 py-6 px-4 max-w-6xl mx-auto">
             <div className="flex items-center gap-3">
-                <Palette className="h-8 w-8 text-primary" />
+                <PaletteIcon className="h-8 w-8 text-primary" />
                 <h1 className="text-3xl font-bold tracking-tight">Branding & Visuals</h1>
             </div>
             

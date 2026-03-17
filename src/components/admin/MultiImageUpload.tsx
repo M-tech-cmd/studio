@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Loader2, RefreshCcw, Info } from 'lucide-react';
+import { Upload, Loader2, RefreshCcw } from 'lucide-react';
 import { ref, getDownloadURL, uploadBytes } from 'firebase/storage';
 import { useStorage } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -30,7 +30,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
   const storage = useStorage();
   const { toast } = useToast();
   
-  // Use ref to maintain the latest list of URLs for the parallel workers
+  // Use ref to maintain the latest list of URLs for the parallel workers to avoid stale closures
   const imagesRef = useRef<string[]>(images || []);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       });
     }
 
-    // 1. Instant UI Render (Gemini Method)
+    // 1. Instant UI Render
     selectedFiles.forEach(file => {
       const id = Math.random().toString(36).substring(7);
       const preview = URL.createObjectURL(file);
@@ -82,8 +82,9 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
         const downloadURL = await getDownloadURL(snapshot.ref);
         
         // 3. Silent State Swap
-        const currentList = imagesRef.current;
-        onChange([...currentList, downloadURL]);
+        // Get the latest images from ref to ensure we don't drop other parallel uploads
+        const currentList = [...imagesRef.current, downloadURL];
+        onChange(currentList);
 
         // Cleanup local UI item and memory
         setActiveUploads(prev => prev.filter(u => u.id !== item.id));
