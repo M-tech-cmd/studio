@@ -7,16 +7,14 @@ import { cn } from '@/lib/utils';
 interface MediaItemProps {
   url: string;
   onRemove?: () => void;
-  isLoading?: boolean; // Prop kept for API compatibility but functionally ignored
   isError?: boolean;
-  progress?: number; // Prop kept for API compatibility but functionally ignored
   className?: string;
   showIconOverlay?: boolean;
 }
 
 /**
  * High-Performance Media Item — ZERO BLOCKING UI
- * Instant UX: image shows immediately at full opacity, no spinner, no blur.
+ * Features absolute non-blocking rendering and a local-blob sync indicator.
  */
 export function MediaItem({ 
   url, 
@@ -26,10 +24,7 @@ export function MediaItem({
   showIconOverlay = true
 }: MediaItemProps) {
 
-  // Prevent broken image rendering
-  if (!url || typeof url !== 'string' || url.trim() === '' || url === 'undefined' || url === 'null') {
-    return null;
-  }
+  if (!url || url === 'undefined' || url === 'null') return null;
 
   const isVideo = url.toLowerCase().match(/\.(mp4|webm|mov|video)/) || url.startsWith('data:video');
   const isAudio = url.toLowerCase().match(/\.(mp3|wav|ogg|audio)/) || url.startsWith('data:audio');
@@ -41,18 +36,13 @@ export function MediaItem({
       className
     )}>
       
-      {/* AUDIO UI */}
       {isAudio ? (
         <div className="h-full w-full flex items-center justify-center bg-slate-100">
           <Music className="h-10 w-10 text-primary/40" />
         </div>
-
       ) : isVideo ? (
-
-        /* VIDEO UI */
         <div className="h-full w-full bg-slate-900 flex items-center justify-center">
           <Video className="h-10 w-10 text-white/20" />
-
           {showIconOverlay && !isError && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="h-12 w-12 rounded-full bg-primary text-white flex items-center justify-center shadow-lg scale-90 group-hover:scale-100 transition-transform">
@@ -61,10 +51,7 @@ export function MediaItem({
             </div>
           )}
         </div>
-
       ) : (
-
-        /* IMAGE UI - ALWAYS 100% OPACITY, NEVER DIMMED */
         <Image
           src={url}
           alt="Media item"
@@ -77,20 +64,10 @@ export function MediaItem({
         />
       )}
 
-      {/* ERROR FEEDBACK ONLY (Visible on actual failure) */}
-      {isError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-destructive/40 backdrop-blur-[2px]">
-          <AlertCircle className="h-8 w-8 text-white mb-2" />
-          <p className="text-[9px] font-black text-white uppercase tracking-widest text-center px-4">
-            Upload Failed
-          </p>
-        </div>
-      )}
-
-      {/* SYNC INDICATOR - SUBTLE & NON-BLOCKING */}
+      {/* SYNC INDICATOR - SUBTLE & NON-BLOCKING (Gemini Style) */}
       {!isError && url.startsWith('blob:') && (
         <div className="absolute bottom-2 left-2 z-20">
-            <span className="bg-black/60 backdrop-blur-md text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-tighter">
+            <span className="bg-black/60 backdrop-blur-md text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-tighter animate-pulse">
                 Syncing...
             </span>
         </div>

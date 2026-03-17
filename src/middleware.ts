@@ -18,7 +18,9 @@ export const config = {
      * - _next/static (static files - CRITICAL for ChunkLoadError)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - firebase/blob (media sync streams)
+     * - firebase (Firebase SDK endpoints)
+     * - firebase-storage (Storage interactions)
+     * - blob (local media streams)
      */
     '/((?!api|_next/static|_next/image|favicon.ico|firebase|blob).*)',
   ],

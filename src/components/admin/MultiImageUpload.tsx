@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Loader2 } from 'lucide-react';
-import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { Upload, Loader2, AlertCircle, RefreshCcw } from 'lucide-react';
+import { ref, getDownloadURL, uploadBytes } from 'firebase/storage';
 import { useStorage } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -17,41 +17,31 @@ interface MultiImageUploadProps {
 interface UploadingItem {
   id: string;
   preview: string;
-  status: 'pending' | 'syncing' | 'failed';
+  status: 'syncing' | 'failed';
   file: File;
 }
 
 /**
- * INSTANT MULTI-UPLOAD SYSTEM (FIXED)
- * 1. Shows local previews IMMEDIATELY using URL.createObjectURL.
- * 2. Uses parallel workers to upload in background (non-blocking).
- * 3. Updates parent state as each file completes.
+ * INSTANT MULTI-UPLOAD (GEMINI METHOD)
+ * Features parallel non-blocking workers and immediate UI feedback.
  */
 export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
   const [activeUploads, setActiveUploads] = useState<UploadingItem[]>([]);
   const storage = useStorage();
   const { toast } = useToast();
   
-  const objectUrlRegistry = useRef<Set<string>>(new Set());
+  // Use ref to maintain the list of URLs for the background workers
   const imagesRef = useRef<string[]>(images || []);
 
-  // Keep ref in sync with prop for background worker access
   useEffect(() => {
     imagesRef.current = images || [];
   }, [images]);
-
-  // Clean up Object URLs on unmount
-  useEffect(() => {
-    return () => {
-      objectUrlRegistry.current.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !storage) return;
 
-    // Hard-cap at 10 to keep browser stable
+    // Hard-cap at 10 to ensure stability
     const selectedFiles = Array.from(files).slice(0, 10);
     if (files.length > 10) {
       toast({ 
@@ -61,66 +51,50 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       });
     }
 
-    // 1. Create UI previews immediately (non-blocking)
-    const newItems: UploadingItem[] = selectedFiles.map(file => {
+    // 1. Instant UI Render (Gemini Method)
+    selectedFiles.forEach(file => {
+      const id = Math.random().toString(36).substring(7);
       const preview = URL.createObjectURL(file);
-      objectUrlRegistry.current.add(preview);
-      return {
-        id: Math.random().toString(36).substring(7),
-        preview,
-        status: 'pending',
-        file
-      };
+      
+      const newItem: UploadingItem = { id, preview, status: 'syncing', file };
+      setActiveUploads(prev => [...prev, newItem]);
+
+      // 2. Parallel Background Sync (Non-blocking)
+      triggerBackgroundUpload(newItem);
     });
 
-    setActiveUploads(prev => [...prev, ...newItems]);
-
-    // 2. Fire and forget parallel workers
-    newItems.forEach(item => {
-      uploadWorker(item);
-    });
-
-    // Reset input so user can select same files again if they want
     if (e.target) e.target.value = '';
   };
 
-  const uploadWorker = (item: UploadingItem) => {
+  const triggerBackgroundUpload = (item: UploadingItem) => {
     if (!storage) return;
 
     const storageRef = ref(storage, `${folder}/${Date.now()}_${item.id}_${item.file.name}`);
-    const uploadTask = uploadBytesResumable(storageRef, item.file);
+    
+    // No 'await' in the loop: let workers run independently
+    uploadBytes(storageRef, item.file)
+      .then(async (snapshot) => {
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        
+        // 3. Silent State Swap
+        const currentList = imagesRef.current;
+        onChange([...currentList, downloadURL]);
 
-    uploadTask.on('state_changed', 
-      null, 
-      (error) => {
-        console.error(`Background Sync failed for ${item.id}:`, error);
+        // Cleanup local UI item and memory
+        setActiveUploads(prev => prev.filter(u => u.id !== item.id));
+        setTimeout(() => URL.revokeObjectURL(item.preview), 5000);
+      })
+      .catch((error) => {
+        console.error(`Sync worker ${item.id} failed:`, error);
         setActiveUploads(prev => prev.map(u => 
           u.id === item.id ? { ...u, status: 'failed' } : u
         ));
-        toast({ variant: 'destructive', title: 'Upload Error', description: `Failed to sync ${item.file.name}` });
-      },
-      async () => {
-        try {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          
-          // Use ref to avoid closure staleness in concurrent updates
-          const currentList = imagesRef.current;
-          const updatedImages = [...currentList, downloadURL];
-          onChange(updatedImages);
-
-          // Remove from active UI
-          setActiveUploads(prev => prev.filter(u => u.id !== item.id));
-          
-          // Cleanup memory after a small delay to avoid hydration flicker
-          setTimeout(() => {
-            URL.revokeObjectURL(item.preview);
-            objectUrlRegistry.current.delete(item.preview);
-          }, 2000);
-        } catch (err) {
-          setActiveUploads(prev => prev.map(u => u.id === item.id ? { ...u, status: 'failed' } : u));
-        }
-      }
-    );
+        toast({ 
+          variant: 'destructive', 
+          title: 'Sync Interrupted', 
+          description: `Failed to upload ${item.file.name}` 
+        });
+      });
   };
 
   const removeCloudImage = (index: number) => {
@@ -132,7 +106,6 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
   const removePendingUpload = (id: string, preview: string) => {
     setActiveUploads(prev => prev.filter(u => u.id !== id));
     URL.revokeObjectURL(preview);
-    objectUrlRegistry.current.delete(preview);
   };
 
   return (
@@ -155,23 +128,35 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {/* Render existing cloud images */}
+        {/* Cloud Images */}
         {images.map((url, index) => (
           <MediaItem 
-            key={`cloud-${url}-${index}`} 
+            key={`cloud-${index}-${url}`} 
             url={url} 
             onRemove={() => removeCloudImage(index)} 
           />
         ))}
 
-        {/* Render immediate UI previews */}
+        {/* Instant Previews (Gemini Method) */}
         {activeUploads.map((item) => (
-          <MediaItem 
-            key={`pending-${item.id}`} 
-            url={item.preview} 
-            isError={item.status === 'failed'}
-            onRemove={() => removePendingUpload(item.id, item.preview)} 
-          />
+          <div key={item.id} className="relative group isolate">
+            <MediaItem 
+              url={item.preview} 
+              isError={item.status === 'failed'}
+              onRemove={() => removePendingUpload(item.id, item.preview)} 
+            />
+            
+            {item.status === 'failed' && (
+              <button
+                type="button"
+                onClick={() => triggerBackgroundUpload(item)}
+                className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-destructive/60 backdrop-blur-[2px] rounded-2xl transition-all hover:bg-destructive/80"
+              >
+                <RefreshCcw className="h-8 w-8 text-white mb-2" />
+                <span className="text-[9px] font-black text-white uppercase tracking-widest">Retry Sync</span>
+              </button>
+            )}
+          </div>
         ))}
 
         {images.length === 0 && activeUploads.length === 0 && (
