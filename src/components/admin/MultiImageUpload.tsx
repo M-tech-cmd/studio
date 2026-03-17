@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -16,24 +15,24 @@ interface MultiImageUploadProps {
 }
 
 /**
- * Robust Multi-Image Upload Component.
- * Features per-ID tracking and a 30-second sync timeout to prevent infinite loading.
+ * Enhanced Multi-Image Upload Component.
+ * Features per-ID state tracking and a 30-second safety timeout.
  */
 export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
-  // Track specific IDs being uploaded to avoid global freezing
+  // Track specific IDs being uploaded to prevent global state locking
   const [uploadingIds, setUploadingIds] = useState<Set<string>>(new Set());
   const [localPreviews, setLocalPreviews] = useState<{ id: string; url: string }[]>([]);
   const storage = useStorage();
   const { toast } = useToast();
 
   const validImages = (images || []).filter(img => 
-    typeof img === 'string' && img.trim() !== '' && img !== 'undefined' && img !== 'null'
+    typeof img === 'string' && img.trim() !== '' && img !== 'undefined'
   );
 
-  const uploadWithTimeout = async (storageRef: any, file: File, timeoutMs: number = 30000) => {
+  const uploadWithTimeout = async (storageRef: any, file: File) => {
     const uploadPromise = uploadBytes(storageRef, file);
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Sync Timeout: Upload exceeded 30 seconds')), timeoutMs)
+      setTimeout(() => reject(new Error('Sync Timeout: Connection unstable')), 30000)
     );
     return Promise.race([uploadPromise, timeoutPromise]);
   };
@@ -42,14 +41,14 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
     const files = e.target.files;
     if (!files || files.length === 0 || !storage) return;
 
-    const newEntries: { id: string; url: string; file: File }[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const id = Math.random().toString(36).substring(7);
-      const url = URL.createObjectURL(files[i]);
-      newEntries.push({ id, url, file: files[i] });
-    }
+    // Create unique ID mapping for per-item tracking
+    const newEntries = Array.from(files).map(file => ({
+      id: Math.random().toString(36).substring(7),
+      url: URL.createObjectURL(file),
+      file
+    }));
 
-    // Show previews and mark as uploading immediately
+    // Start tracking items immediately
     setLocalPreviews(prev => [...prev, ...newEntries.map(e => ({ id: e.id, url: e.url }))]);
     setUploadingIds(prev => {
       const next = new Set(prev);
@@ -65,29 +64,23 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
         const snapshot: any = await uploadWithTimeout(storageRef, entry.file);
         const url = await getDownloadURL(snapshot.ref);
         newUrls.push(url);
-        
-        // Remove from temporary state on success
-        setLocalPreviews(prev => prev.filter(p => p.id !== entry.id));
-        setUploadingIds(prev => {
-          const next = new Set(prev);
-          next.delete(entry.id);
-          return next;
-        });
       } catch (error: any) {
-        console.error(`Media Sync Blocked for ${entry.id}:`, error);
+        console.error(`Media Deadlock for ${entry.id}:`, error);
         toast({ 
           variant: 'destructive', 
-          title: 'Sync Failed', 
-          description: error.message || 'Check your connection or storage permissions.' 
+          title: 'Sync Interrupted', 
+          description: error.message || 'Check connection and try again.' 
         });
-        
-        // Clear failed item
+      } finally {
+        // Clear tracking for this specific item regardless of result
         setLocalPreviews(prev => prev.filter(p => p.id !== entry.id));
         setUploadingIds(prev => {
           const next = new Set(prev);
           next.delete(entry.id);
           return next;
         });
+        // Release blob URL to prevent memory leaks
+        URL.revokeObjectURL(entry.url);
       }
     }
 
@@ -95,36 +88,38 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       onChange([...validImages, ...newUrls]);
     }
     
+    // Clear input so same file can be re-selected if needed
     if (e.target) e.target.value = '';
   };
 
   const removeImage = (index: number) => {
-    const newImages = [...validImages];
-    newImages.splice(index, 1);
-    onChange(newImages);
+    const next = [...validImages];
+    next.splice(index, 1);
+    onChange(next);
   };
 
   return (
-    <div className="space-y-4 pt-4">
-      <div className="flex items-center justify-between">
-        <Label className="font-bold text-xs uppercase tracking-widest text-muted-foreground">
-          Attached Media ({validImages.length + localPreviews.length})
-        </Label>
-        <div className="flex items-center gap-2">
+    <div className="space-y-6 pt-4">
+      <div className="flex items-center justify-between bg-muted/30 p-4 rounded-2xl border border-dashed">
+        <div className="space-y-1">
+          <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Gallery Media</Label>
+          <p className="text-[9px] text-muted-foreground italic">Max 30s upload window per item.</p>
+        </div>
+        <div className="flex items-center gap-3">
           {uploadingIds.size > 0 && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
           <label className="cursor-pointer">
-            <div className="flex items-center gap-2 px-4 py-2 bg-[#1e3a5f] text-white rounded-full text-xs font-black hover:bg-[#1e3a5f]/90 transition-all shadow-lg uppercase tracking-widest">
+            <div className="flex items-center gap-2 px-5 py-2.5 bg-[#1e3a5f] text-white rounded-full text-[10px] font-black hover:bg-[#1e3a5f]/90 transition-all shadow-lg uppercase tracking-widest active:scale-95">
               <Upload className="h-3.5 w-3.5" />
-              Upload Files
+              Add Photos
             </div>
-            <input type="file" multiple className="hidden" accept="image/*,video/*,audio/*" onChange={handleFileChange} />
+            <input type="file" multiple className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
           </label>
         </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {validImages.map((url, index) => (
-          <MediaItem key={`saved-${index}`} url={url} onRemove={() => removeImage(index)} />
+          <MediaItem key={url + index} url={url} onRemove={() => removeImage(index)} />
         ))}
 
         {localPreviews.map((preview) => (
@@ -144,8 +139,8 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
         ))}
 
         {validImages.length === 0 && localPreviews.length === 0 && (
-          <div className="col-span-full border-2 border-dashed rounded-3xl py-16 flex flex-col items-center justify-center text-muted-foreground bg-muted/5 border-muted-foreground/20">
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">No media selected</p>
+          <div className="col-span-full py-12 flex flex-col items-center justify-center text-muted-foreground/40 bg-muted/5 border-2 border-dashed rounded-3xl">
+            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Empty Gallery</p>
           </div>
         )}
       </div>

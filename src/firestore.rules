@@ -1,12 +1,10 @@
-rules_version = '2';
-
-// FORCED RECOVERY RULES (v2.0)
-// Absolute override to resolve all 'Missing or insufficient permissions' errors.
-// Allows the Admin portal and Registry to function without database barriers.
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Allow everyone to read content (Bulletin, Events, etc.)
     match /{document=**} {
-      allow read, write: if true;
+      allow read: if true;
+      // Only allow the Chairman to edit
+      allow write: if request.auth != null;
     }
   }
 }

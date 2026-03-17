@@ -1,15 +1,5 @@
-
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-
 /**
- * Standard Proxy Export for Next.js 16.
- * The function name MUST match the filename to satisfy platform requirements.
+ * Deactivated Proxy.
+ * Next.js 16 preference is src/middleware.ts.
  */
-export function proxy(request: NextRequest) {
-  return NextResponse.next();
-}
-
-export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
-};
+export {};

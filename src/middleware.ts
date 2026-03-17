@@ -1,7 +1,23 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 /**
- * Legacy Middleware Deactivated.
- * Next.js 16 requires either middleware.ts or proxy.ts.
- * We are using src/proxy.ts as the primary request handler.
+ * Next.js Middleware.
+ * This acts as a 'green light' to ensure requests reach Firebase without loops.
  */
-export {};
+export default function middleware(request: NextRequest) {
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
+};
