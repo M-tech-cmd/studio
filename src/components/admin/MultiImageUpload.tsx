@@ -16,7 +16,8 @@ interface MultiImageUploadProps {
 
 /**
  * Enhanced Multi-Image Upload Component.
- * Features per-ID state tracking and a 30-second safety timeout.
+ * Features per-ID state tracking and a 60-second safety timeout.
+ * Processes uploads SEQUENTIALLY to prevent network deadlock.
  */
 export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
   const [uploadingIds, setUploadingIds] = useState<Set<string>>(new Set());
@@ -30,8 +31,9 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
 
   const uploadWithTimeout = async (storageRef: any, file: File) => {
     const uploadPromise = uploadBytes(storageRef, file);
+    // Increased timeout to 60s for high-resolution stability
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Sync Timeout: Connection unstable')), 30000)
+      setTimeout(() => reject(new Error('Sync Timeout: Connection unstable')), 60000)
     );
     return Promise.race([uploadPromise, timeoutPromise]);
   };
@@ -55,6 +57,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
 
     const newUrls: string[] = [];
 
+    // CRITICAL: Sequential loop to prevent media deadlock
     for (const entry of newEntries) {
       try {
         const storageRef = ref(storage, `${folder}/${Date.now()}_${entry.file.name}`);
@@ -97,7 +100,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       <div className="flex items-center justify-between bg-muted/30 p-4 rounded-2xl border border-dashed">
         <div className="space-y-1">
           <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Gallery Media</Label>
-          <p className="text-[9px] text-muted-foreground italic">Max 30s upload window per item.</p>
+          <p className="text-[9px] text-muted-foreground italic">Max 60s upload window per item.</p>
         </div>
         <div className="flex items-center gap-3">
           {uploadingIds.size > 0 && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
