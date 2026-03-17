@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { createUserWithEmailAndPassword, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import type { SiteSettings } from '@/lib/types';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,9 +34,12 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const router = useRouter();
-  const auth = useAuth();
+  const { auth, user, isUserLoading } = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
+
+  const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
+  const { data: settings } = useDoc<SiteSettings>(settingsRef);
 
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
@@ -46,13 +50,16 @@ export default function SignupPage() {
     },
   });
 
+  useEffect(() => {
+    if (!isUserLoading && user && !user.isAnonymous) {
+      router.replace('/');
+    }
+  }, [user, isUserLoading, router]);
+
   async function onSubmit(values: z.infer<typeof signupSchema>) {
+    if (!auth || !firestore) return;
     setLoading(true);
     try {
-      if (!auth || !firestore) {
-        throw new Error('Firebase services are not available.');
-      }
-      // Set persistence to LOCAL before creating account
       await setPersistence(auth, browserLocalPersistence);
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       
@@ -76,9 +83,7 @@ export default function SignupPage() {
         description: "Welcome! Please sign in to continue.",
       });
       router.push('/login');
-    } catch (error: any)
-    {
-      console.error(error);
+    } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Sign Up Failed',
@@ -89,18 +94,27 @@ export default function SignupPage() {
     }
   }
 
+  if (isUserLoading || (user && !user.isAnonymous)) {
+    return (
+        <div className="flex h-screen items-center justify-center bg-background">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
+    );
+  }
+
   return (
-    <Card className="mx-auto max-w-md w-full">
+    <Card className="mx-auto max-w-md w-full shadow-2xl">
       <CardHeader className="text-center space-y-4">
         <div className="flex justify-center">
-            <Logo />
+            <Logo url={settings?.logoUrl} className="h-20 w-20" />
         </div>
         <Button asChild variant="ghost" className="w-fit p-0 h-auto absolute top-6 left-6">
             <Link href="/login">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to sign in
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to login
             </Link>
         </Button>
-        <CardTitle className="text-2xl font-bold pt-12">Create your account</CardTitle>
+        <CardTitle className="text-3xl font-black tracking-tight uppercase pt-12">PARISH HUB</CardTitle>
+        <CardDescription>Create your member account</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -114,7 +128,7 @@ export default function SignupPage() {
                     <FormControl>
                         <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="you@example.com" {...field} className="pl-10" />
+                            <Input placeholder="you@example.com" {...field} className="pl-10 h-12" />
                         </div>
                     </FormControl>
                     <FormMessage />
@@ -130,9 +144,9 @@ export default function SignupPage() {
                     <FormControl>
                         <div className="relative">
                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                           <Input type={showPassword ? 'text' : 'password'} placeholder="Min. 8 characters" {...field} className="pl-10 pr-10"/>
+                           <Input type={showPassword ? 'text' : 'password'} placeholder="Min. 8 characters" {...field} className="pl-10 pr-10 h-12"/>
                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">
-                             {showPassword ? <EyeOff /> : <Eye />}
+                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                            </button>
                         </div>
                     </FormControl>
@@ -149,9 +163,9 @@ export default function SignupPage() {
                     <FormControl>
                         <div className="relative">
                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                           <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-enter password" {...field} className="pl-10 pr-10"/>
+                           <Input type={showConfirmPassword ? 'text' : 'password'} placeholder="Re-enter password" {...field} className="pl-10 pr-10 h-12"/>
                             <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">
-                             {showConfirmPassword ? <EyeOff /> : <Eye />}
+                             {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                            </button>
                         </div>
                     </FormControl>
@@ -159,7 +173,7 @@ export default function SignupPage() {
                 </FormItem>
                 )}
             />
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full h-12 font-bold" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create account
             </Button>

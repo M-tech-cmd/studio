@@ -7,14 +7,15 @@ import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   setPersistence,
   browserLocalPersistence
 } from 'firebase/auth';
-
+import { doc } from 'firebase/firestore';
+import type { SiteSettings } from '@/lib/types';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,12 +42,14 @@ export default function LoginPage() {
   const [view, setView] = useState<View>('login');
   const router = useRouter();
   const { user, isUserLoading, auth, startGoogleSignIn, isSigningIn } = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
 
+  const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
+  const { data: settings } = useDoc<SiteSettings>(settingsRef);
+
   useEffect(() => {
-    // If auth initialization is finished and user is found, redirect away from login.
     if (!isUserLoading && user && !user.isAnonymous) {
-      console.log("Login Page: Authenticated session detected, redirecting to home.");
       router.replace('/');
     }
   }, [user, isUserLoading, router]);
@@ -58,7 +61,6 @@ export default function LoginPage() {
       await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, values.email, values.password);
     } catch (error: any) {
-      console.error("Login Page: Sign-in error:", error);
       toast({
         variant: 'destructive',
         title: 'Login Failed',
@@ -105,7 +107,6 @@ export default function LoginPage() {
     defaultValues: { email: '' },
   });
   
-  // While we are checking auth state, show a clean loading screen
   if (isUserLoading || (user && !user.isAnonymous)) {
     return (
         <div className="flex h-screen items-center justify-center bg-background">
@@ -116,9 +117,11 @@ export default function LoginPage() {
 
   if (view === 'reset') {
     return (
-        <Card className="mx-auto max-w-md w-full">
+        <Card className="mx-auto max-w-md w-full shadow-2xl">
             <CardHeader className="text-center space-y-4">
-                <div className="flex justify-center"><Logo /></div>
+                <div className="flex justify-center">
+                    <Logo url={settings?.logoUrl} className="h-20 w-20" />
+                </div>
                 <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
                 <CardDescription>Enter your email to receive a reset link</CardDescription>
             </CardHeader>
@@ -158,8 +161,10 @@ export default function LoginPage() {
   return (
     <Card className="mx-auto max-w-md w-full shadow-2xl">
       <CardHeader className="text-center space-y-4">
-        <div className="flex justify-center"><Logo /></div>
-        <CardTitle className="text-3xl font-black tracking-tight">PARISH HUB</CardTitle>
+        <div className="flex justify-center">
+            <Logo url={settings?.logoUrl} className="h-20 w-20" />
+        </div>
+        <CardTitle className="text-3xl font-black tracking-tight uppercase">PARISH HUB</CardTitle>
         <CardDescription>Sign in to your member account</CardDescription>
       </CardHeader>
       <CardContent>
