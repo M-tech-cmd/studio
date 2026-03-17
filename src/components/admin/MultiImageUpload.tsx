@@ -1,8 +1,7 @@
-
 'use client';
 
-import { useState } from 'react';
-import { Upload, Loader2, Info, AlertCircle } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Upload, Loader2, Info } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useStorage } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -15,15 +14,28 @@ interface MultiImageUploadProps {
   folder: string;
 }
 
+interface LocalPreview {
+  id: string;
+  url: string;
+  file: File;
+}
+
 /**
- * IMPLEMENT INSTANT MULTI-UPLOAD
- * Features instant previews, parallel workers, and individual sync tracking.
+ * IMPLEMENT INSTANT UI PREVIEWS (GEMINI METHOD)
+ * Features parallel background workers, instant previews, and granular error states.
  */
 export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
+  const [localPreviews, setLocalPreviews] = useState<LocalPreview[]>([]);
   const [uploadingIds, setUploadingIds] = useState<Set<string>>(new Set());
-  const [localPreviews, setLocalPreviews] = useState<{ id: string; url: string }[]>([]);
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
   const storage = useStorage();
   const { toast } = useToast();
+
+  // Use a ref to track current valid images to avoid closure race conditions during parallel updates
+  const committedUrlsRef = useRef<string[]>(images || []);
+  useEffect(() => {
+    committedUrlsRef.current = images || [];
+  }, [images]);
 
   const validImages = (images || []).filter(img => 
     typeof img === 'string' && img.trim() !== '' && img !== 'undefined'
@@ -43,64 +55,98 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
         });
     }
 
-    // INSTANT UI PREVIEW: Create local links immediately
-    const newEntries = selectedFiles.map(file => ({
+    // 1. INSTANT UI PREVIEWS: Create local URLs immediately
+    const newPreviews: LocalPreview[] = selectedFiles.map(file => ({
       id: Math.random().toString(36).substring(7),
       url: URL.createObjectURL(file),
       file
     }));
 
-    setLocalPreviews(prev => [...prev, ...newEntries.map(e => ({ id: e.id, url: e.url }))]);
+    setLocalPreviews(prev => [...prev, ...newPreviews]);
     setUploadingIds(prev => {
       const next = new Set(prev);
-      newEntries.forEach(e => next.add(e.id));
+      newPreviews.forEach(p => next.add(p.id));
       return next;
     });
 
-    // PARALLEL BACKGROUND WORKERS: Trigger independent uploads
-    newEntries.forEach(async (entry) => {
-        try {
-            const storageRef = ref(storage, `${folder}/${Date.now()}_${entry.file.name}`);
-            
-            // Safety timeout: 60s
-            const uploadPromise = uploadBytes(storageRef, entry.file);
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Sync Timeout')), 60000)
-            );
-
-            await Promise.race([uploadPromise, timeoutPromise]);
-            const downloadURL = await getDownloadURL(storageRef);
-
-            // Update parent state with the new cloud URL
-            onChange([...validImages, downloadURL]);
-            
-        } catch (error: any) {
-            console.error(`Upload worker ${entry.id} failed:`, error);
-            toast({ 
-                variant: 'destructive', 
-                title: 'Sync Failed', 
-                description: `Could not upload ${entry.file.name}.` 
-            });
-        } finally {
-            // MEMORY MANAGEMENT: Revoke and cleanup
-            setLocalPreviews(prev => prev.filter(p => p.id !== entry.id));
-            setUploadingIds(prev => {
-                const next = new Set(prev);
-                next.delete(entry.id);
-                return next;
-            });
-            URL.revokeObjectURL(entry.url);
-        }
+    // 2. PARALLEL BACKGROUND WORKERS: Start uploads without awaiting inside the loop
+    newPreviews.forEach(preview => {
+      uploadWorker(preview);
     });
 
-    // Clear input so the same files can be selected again if needed
+    // Clear input so same files can be re-selected if needed
     if (e.target) e.target.value = '';
+  };
+
+  /**
+   * Independent upload worker for a single file.
+   * Manages its own sync state and handles errors gracefully.
+   */
+  const uploadWorker = async (preview: LocalPreview) => {
+    const storageRef = ref(storage, `${folder}/${Date.now()}_${preview.id}_${preview.file.name}`);
+    
+    try {
+      // Safety Timeout: 60 seconds
+      const uploadPromise = uploadBytes(storageRef, preview.file);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Sync Timeout')), 60000)
+      );
+
+      await Promise.race([uploadPromise, timeoutPromise]);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Successfully synced: Update parent and local state
+      const nextUrls = [...committedUrlsRef.current, downloadURL];
+      committedUrlsRef.current = nextUrls;
+      onChange(nextUrls);
+
+      // Cleanup preview
+      setLocalPreviews(prev => prev.filter(p => p.id !== preview.id));
+      setUploadingIds(prev => {
+        const next = new Set(prev);
+        next.delete(preview.id);
+        return next;
+      });
+      URL.revokeObjectURL(preview.url);
+
+    } catch (error: any) {
+      console.error(`Upload worker ${preview.id} failed:`, error);
+      
+      // Mark as failed instead of timing out the whole set
+      setFailedIds(prev => new Set([...prev, preview.id]));
+      setUploadingIds(prev => {
+        const next = new Set(prev);
+        next.delete(preview.id);
+        return next;
+      });
+      
+      toast({ 
+        variant: 'destructive', 
+        title: 'Sync Failed', 
+        description: `Could not upload ${preview.file.name}.` 
+      });
+    }
   };
 
   const removeImage = (index: number) => {
     const next = [...validImages];
     next.splice(index, 1);
     onChange(next);
+  };
+
+  const removeLocalPreview = (id: string, url: string) => {
+    setLocalPreviews(prev => prev.filter(p => p.id !== id));
+    setUploadingIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    setFailedIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -123,27 +169,19 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {/* Validated Cloud Images */}
+        {/* Confirmed Cloud Images */}
         {validImages.map((url, index) => (
-          <MediaItem key={url + index} url={url} onRemove={() => removeImage(index)} />
+          <MediaItem key={`cloud-${url}-${index}`} url={url} onRemove={() => removeImage(index)} />
         ))}
 
-        {/* INDIVIDUAL PROGRESS: Local Previews with Syncing Overlay */}
+        {/* Local Previews with Status Overlays */}
         {localPreviews.map((preview) => (
           <MediaItem 
-            key={preview.id} 
+            key={`preview-${preview.id}`} 
             url={preview.url} 
             isLoading={uploadingIds.has(preview.id)} 
-            onRemove={() => {
-                // Allow cancelling a pending preview
-                setLocalPreviews(prev => prev.filter(p => p.id !== preview.id));
-                setUploadingIds(prev => {
-                    const next = new Set(prev);
-                    next.delete(preview.id);
-                    return next;
-                });
-                URL.revokeObjectURL(preview.url);
-            }} 
+            isError={failedIds.has(preview.id)}
+            onRemove={() => removeLocalPreview(preview.id, preview.url)} 
           />
         ))}
 
