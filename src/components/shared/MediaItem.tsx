@@ -7,28 +7,26 @@ import { cn } from '@/lib/utils';
 interface MediaItemProps {
   url: string;
   onRemove?: () => void;
-  isLoading?: boolean;
+  isLoading?: boolean; // Prop kept for API compatibility but functionally ignored
   isError?: boolean;
-  progress?: number;
+  progress?: number; // Prop kept for API compatibility but functionally ignored
   className?: string;
   showIconOverlay?: boolean;
 }
 
 /**
- * High-Fidelity Media Item.
- * Optimized for "Instant UX": No blocking overlays, no dimming, and no blurs.
- * Uses a sub-pixel progress line at the very bottom for non-intrusive feedback.
+ * High-Performance Media Item — ZERO BLOCKING UI
+ * Instant UX: image shows immediately at full opacity, no spinner, no blur.
  */
 export function MediaItem({ 
   url, 
   onRemove, 
-  isLoading, 
   isError,
-  progress, 
   className,
   showIconOverlay = true
 }: MediaItemProps) {
-  // STRICT GUARD: Prevent broken image ghosts
+
+  // Prevent broken image rendering
   if (!url || typeof url !== 'string' || url.trim() === '' || url === 'undefined' || url === 'null') {
     return null;
   }
@@ -38,51 +36,48 @@ export function MediaItem({
 
   return (
     <div className={cn(
-      "group relative aspect-square rounded-2xl overflow-hidden bg-muted shadow-md isolate border-2 border-border/50 transition-all",
-      !isLoading && !isError && "hover:ring-4 hover:ring-primary/20",
+      "group relative aspect-square rounded-2xl overflow-hidden bg-muted shadow-md isolate border-2 border-border/50 transition-all hover:ring-4 hover:ring-primary/20",
       isError && "border-destructive/50 ring-2 ring-destructive/20",
       className
     )}>
+      
+      {/* AUDIO UI */}
       {isAudio ? (
         <div className="h-full w-full flex items-center justify-center bg-slate-100">
           <Music className="h-10 w-10 text-primary/40" />
         </div>
+
       ) : isVideo ? (
+
+        /* VIDEO UI */
         <div className="h-full w-full bg-slate-900 flex items-center justify-center">
           <Video className="h-10 w-10 text-white/20" />
-          {showIconOverlay && !isLoading && !isError && (
+
+          {showIconOverlay && !isError && (
             <div className="absolute inset-0 flex items-center justify-center">
-                <div className="h-12 w-12 rounded-full bg-primary text-white flex items-center justify-center shadow-lg scale-90 group-hover:scale-100 transition-transform">
-                    <Play className="h-6 w-6 fill-current ml-1" />
-                </div>
+              <div className="h-12 w-12 rounded-full bg-primary text-white flex items-center justify-center shadow-lg scale-90 group-hover:scale-100 transition-transform">
+                <Play className="h-6 w-6 fill-current ml-1" />
+              </div>
             </div>
           )}
         </div>
+
       ) : (
+
+        /* IMAGE UI - ALWAYS 100% OPACITY, NEVER DIMMED */
         <Image
           src={url}
           alt="Media item"
           fill
           className={cn(
-            "object-cover transition-transform duration-700",
-            !isLoading && !isError && "group-hover:scale-110",
+            "object-cover transition-transform duration-700 group-hover:scale-110",
             isError && "opacity-40 grayscale"
           )}
           unoptimized
         />
       )}
 
-      {/* Ultra-minimal progress line (Non-blocking) */}
-      {isLoading && (
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/5 z-20 overflow-hidden">
-          <div 
-            className="h-full bg-primary transition-all duration-500 ease-out"
-            style={{ width: `${progress ?? 0}%` }}
-          />
-        </div>
-      )}
-
-      {/* Error State Overlay (Only shown on hard failure) */}
+      {/* ERROR FEEDBACK ONLY (Visible on actual failure) */}
       {isError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-destructive/40 backdrop-blur-[2px]">
           <AlertCircle className="h-8 w-8 text-white mb-2" />
@@ -92,6 +87,16 @@ export function MediaItem({
         </div>
       )}
 
+      {/* SYNC INDICATOR - SUBTLE & NON-BLOCKING */}
+      {!isError && url.startsWith('blob:') && (
+        <div className="absolute bottom-2 left-2 z-20">
+            <span className="bg-black/60 backdrop-blur-md text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-tighter">
+                Syncing...
+            </span>
+        </div>
+      )}
+
+      {/* REMOVE ACTION */}
       {onRemove && (
         <button
           type="button"
