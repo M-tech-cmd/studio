@@ -3,7 +3,6 @@
 import Image from 'next/image';
 import { X, Play, Video, Music, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Progress } from '@/components/ui/progress';
 
 interface MediaItemProps {
   url: string;
@@ -16,9 +15,9 @@ interface MediaItemProps {
 }
 
 /**
- * Lightweight Media Item.
- * Removed heavy blocking overlays. Features a subtle bottom-docked progress bar
- * during synchronization so the image remains visible.
+ * High-Fidelity Media Item.
+ * Optimized for "Instant UX": No blocking overlays, no dimming, and no blurs.
+ * Uses a sub-pixel progress line at the very bottom for non-intrusive feedback.
  */
 export function MediaItem({ 
   url, 
@@ -73,14 +72,17 @@ export function MediaItem({
         />
       )}
 
-      {/* Lightweight Progress Bar (Bottom-Docked) */}
+      {/* Ultra-minimal progress line (Non-blocking) */}
       {isLoading && (
-        <div className="absolute bottom-0 left-0 right-0 p-2 bg-black/20 backdrop-blur-[2px] z-10">
-          <Progress value={progress ?? 0} className="h-1 bg-white/20" />
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/5 z-20 overflow-hidden">
+          <div 
+            className="h-full bg-primary transition-all duration-500 ease-out"
+            style={{ width: `${progress ?? 0}%` }}
+          />
         </div>
       )}
 
-      {/* Error State Overlay */}
+      {/* Error State Overlay (Only shown on hard failure) */}
       {isError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-destructive/40 backdrop-blur-[2px]">
           <AlertCircle className="h-8 w-8 text-white mb-2" />

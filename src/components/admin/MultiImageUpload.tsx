@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Loader2 } from 'lucide-react';
+import { Upload, Loader2, Info } from 'lucide-react';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useStorage } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -23,11 +23,11 @@ interface UploadingItem {
 
 /**
  * INSTANT MULTI-UPLOAD SYSTEM
- * Refactored to eliminate blocking "Syncing" overlays. 
- * Renders local previews immediately and handles Cloud sync in the background.
+ * Refactored to eliminate ALL blocking UI elements.
+ * Images render immediately at 100% opacity. 
+ * Progress is shown via a subtle line at the bottom of the card.
  */
 export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
-  // Source of truth for existing cloud images
   const [activeUploads, setActiveUploads] = useState<UploadingItem[]>([]);
   const storage = useStorage();
   const { toast } = useToast();
@@ -52,6 +52,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
     const files = e.target.files;
     if (!files || files.length === 0 || !storage) return;
 
+    // Hard cap at 10 images for stability
     const selectedFiles = Array.from(files).slice(0, 10);
     if (files.length > 10) {
       toast({ 
@@ -77,7 +78,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
     // Add previews to local state immediately
     setActiveUploads(prev => [...prev, ...newItems]);
 
-    // 2. TRIGGER BACKGROUND WORKERS
+    // 2. TRIGGER PARALLEL BACKGROUND WORKERS
     newItems.forEach(item => {
       uploadWorker(item as any);
     });
@@ -95,7 +96,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
 
     uploadTask.on('state_changed', 
       (snapshot) => {
-        // Subtle progress update
+        // Update subtle progress line
         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
         setActiveUploads(prev => prev.map(u => 
           u.id === item.id ? { ...u, progress, status: 'syncing' } : u
@@ -109,7 +110,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
         toast({ variant: 'destructive', title: 'Upload Failed', description: item.file.name });
       },
       async () => {
-        // SUCCESS: Final URL replacement
+        // SUCCESS: Hand-off to Firestore
         try {
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
           
@@ -117,7 +118,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
           const updatedImages = [...imagesRef.current, downloadURL];
           onChange(updatedImages);
 
-          // Remove from local "active" list and cleanup memory
+          // Clean up local preview
           setActiveUploads(prev => prev.filter(u => u.id !== item.id));
           URL.revokeObjectURL(item.preview);
           objectUrlRegistry.current.delete(item.preview);
@@ -145,12 +146,12 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       <div className="flex items-center justify-between bg-muted/30 p-4 rounded-2xl border border-dashed border-primary/20">
         <div className="space-y-1">
           <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Gallery Media</Label>
-          <p className="text-[9px] text-muted-foreground italic">Instant preview enabled • Parallel background sync.</p>
+          <p className="text-[9px] text-muted-foreground italic">Instant upload UX active.</p>
         </div>
         <div className="flex items-center gap-3">
           {activeUploads.length > 0 && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
           <label className="cursor-pointer">
-            <div className="flex items-center gap-2 px-5 py-2.5 bg-[#1e3a5f] text-white rounded-full text-[10px] font-black hover:bg-[#1e3a5f]/90 transition-all shadow-lg uppercase tracking-widest active:scale-95">
+            <div className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-full text-[10px] font-black hover:scale-105 transition-all shadow-lg uppercase tracking-widest active:scale-95">
               <Upload className="h-3.5 w-3.5" />
               Add Photos
             </div>
@@ -160,7 +161,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {/* 1. RENDER EXISTING CLOUD IMAGES */}
+        {/* 1. CLOUD ASSETS */}
         {images.map((url, index) => (
           <MediaItem 
             key={`cloud-${url}-${index}`} 
@@ -169,7 +170,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
           />
         ))}
 
-        {/* 2. RENDER ACTIVE UPLOADS (Instant Previews) */}
+        {/* 2. INSTANT PREVIEWS (Syncing in background) */}
         {activeUploads.map((item) => (
           <MediaItem 
             key={`pending-${item.id}`} 
@@ -183,7 +184,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
 
         {images.length === 0 && activeUploads.length === 0 && (
           <div className="col-span-full py-12 flex flex-col items-center justify-center text-muted-foreground/40 bg-muted/5 border-2 border-dashed rounded-3xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Gallery Empty</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.4em]">No Media Attached</p>
           </div>
         )}
       </div>
