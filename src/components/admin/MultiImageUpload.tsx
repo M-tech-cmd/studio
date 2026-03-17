@@ -18,12 +18,14 @@ interface UploadingItem {
   id: string;
   preview: string;
   status: 'pending' | 'syncing' | 'failed';
+  file: File;
 }
 
 /**
- * INSTANT MULTI-UPLOAD SYSTEM
- * Refactored to eliminate ALL blocking UI elements.
- * Images render immediately at 100% visibility.
+ * INSTANT MULTI-UPLOAD SYSTEM (FIXED)
+ * 1. Shows local previews IMMEDIATELY using URL.createObjectURL.
+ * 2. Uses parallel workers to upload in background (non-blocking).
+ * 3. Updates parent state as each file completes.
  */
 export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
   const [activeUploads, setActiveUploads] = useState<UploadingItem[]>([]);
@@ -33,20 +35,23 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
   const objectUrlRegistry = useRef<Set<string>>(new Set());
   const imagesRef = useRef<string[]>(images || []);
 
+  // Keep ref in sync with prop for background worker access
   useEffect(() => {
     imagesRef.current = images || [];
   }, [images]);
 
+  // Clean up Object URLs on unmount
   useEffect(() => {
     return () => {
       objectUrlRegistry.current.forEach(url => URL.revokeObjectURL(url));
     };
   }, []);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !storage) return;
 
+    // Hard-cap at 10 to keep browser stable
     const selectedFiles = Array.from(files).slice(0, 10);
     if (files.length > 10) {
       toast({ 
@@ -56,6 +61,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       });
     }
 
+    // 1. Create UI previews immediately (non-blocking)
     const newItems: UploadingItem[] = selectedFiles.map(file => {
       const preview = URL.createObjectURL(file);
       objectUrlRegistry.current.add(preview);
@@ -64,42 +70,52 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
         preview,
         status: 'pending',
         file
-      } as any;
+      };
     });
 
     setActiveUploads(prev => [...prev, ...newItems]);
 
+    // 2. Fire and forget parallel workers
     newItems.forEach(item => {
-      uploadWorker(item as any);
+      uploadWorker(item);
     });
 
+    // Reset input so user can select same files again if they want
     if (e.target) e.target.value = '';
   };
 
-  const uploadWorker = async (item: UploadingItem & { file: File }) => {
+  const uploadWorker = (item: UploadingItem) => {
+    if (!storage) return;
+
     const storageRef = ref(storage, `${folder}/${Date.now()}_${item.id}_${item.file.name}`);
     const uploadTask = uploadBytesResumable(storageRef, item.file);
 
     uploadTask.on('state_changed', 
-      null, // No visual progress needed per user request
+      null, 
       (error) => {
-        console.error(`Sync failed for ${item.id}:`, error);
+        console.error(`Background Sync failed for ${item.id}:`, error);
         setActiveUploads(prev => prev.map(u => 
           u.id === item.id ? { ...u, status: 'failed' } : u
         ));
+        toast({ variant: 'destructive', title: 'Upload Error', description: `Failed to sync ${item.file.name}` });
       },
       async () => {
         try {
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          const updatedImages = [...imagesRef.current, downloadURL];
+          
+          // Use ref to avoid closure staleness in concurrent updates
+          const currentList = imagesRef.current;
+          const updatedImages = [...currentList, downloadURL];
           onChange(updatedImages);
 
+          // Remove from active UI
           setActiveUploads(prev => prev.filter(u => u.id !== item.id));
-          // Keep ObjectURL alive for a few seconds to avoid flicker during state hydration
+          
+          // Cleanup memory after a small delay to avoid hydration flicker
           setTimeout(() => {
             URL.revokeObjectURL(item.preview);
             objectUrlRegistry.current.delete(item.preview);
-          }, 3000);
+          }, 2000);
         } catch (err) {
           setActiveUploads(prev => prev.map(u => u.id === item.id ? { ...u, status: 'failed' } : u));
         }
@@ -123,15 +139,15 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
     <div className="space-y-6 pt-4">
       <div className="flex items-center justify-between bg-muted/30 p-4 rounded-2xl border border-dashed border-primary/20">
         <div className="space-y-1">
-          <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Gallery Media</Label>
-          <p className="text-[9px] text-muted-foreground italic">Instant upload UX active.</p>
+          <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Instant Gallery Sync</Label>
+          <p className="text-[9px] text-muted-foreground italic">Parallel background workers active.</p>
         </div>
         <div className="flex items-center gap-3">
           {activeUploads.length > 0 && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
           <label className="cursor-pointer">
             <div className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-full text-[10px] font-black hover:scale-105 transition-all shadow-lg uppercase tracking-widest active:scale-95">
               <Upload className="h-3.5 w-3.5" />
-              Add Photos
+              Select Media
             </div>
             <input type="file" multiple className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
           </label>
@@ -139,6 +155,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        {/* Render existing cloud images */}
         {images.map((url, index) => (
           <MediaItem 
             key={`cloud-${url}-${index}`} 
@@ -147,6 +164,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
           />
         ))}
 
+        {/* Render immediate UI previews */}
         {activeUploads.map((item) => (
           <MediaItem 
             key={`pending-${item.id}`} 

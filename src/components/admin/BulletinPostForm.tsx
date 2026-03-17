@@ -1,9 +1,9 @@
-
 'use client';
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import dynamic from 'next/dynamic';
 
 import type { BulletinPost } from '@/lib/types';
 
@@ -28,8 +28,13 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RichTextEditor } from '../ui/rich-text-editor';
-import { MultiImageUpload } from './MultiImageUpload';
 import { Info } from 'lucide-react';
+
+// Lazy load uploader to prevent ChunkLoadError and Hydration mismatches
+const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
+  ssr: false,
+  loading: () => <div className="h-24 w-full animate-pulse bg-muted rounded-2xl" />
+});
 
 const postSchema = z.object({
   title: z.string().min(3, 'Title is required.'),

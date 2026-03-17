@@ -1,11 +1,11 @@
-
 'use client';
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Upload, X, Expand, Target, TrendingUp, Info } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { Expand, Target, TrendingUp, Info } from 'lucide-react';
 
 import type { DevelopmentProject } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { LargeTextEditModal } from './LargeTextEditModal';
-import { MultiImageUpload } from './MultiImageUpload';
+
+// Lazy load uploader to prevent ChunkLoadError
+const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
+  ssr: false,
+  loading: () => <div className="h-24 w-full animate-pulse bg-muted rounded-2xl" />
+});
 
 const projectSchema = z.object({
   title: z.string().min(3, 'Title required.'),

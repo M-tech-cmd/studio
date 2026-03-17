@@ -1,11 +1,10 @@
-
 'use client';
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import Image from 'next/image';
-import { Upload, Link as LinkIcon, X, Expand, Image as ImageIcon, MapPin, Clock, Calendar as CalendarIcon, Info } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { Expand, MapPin, Clock, Calendar as CalendarIcon, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { Timestamp } from 'firebase/firestore';
 
@@ -38,9 +37,14 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { LargeTextEditModal } from './LargeTextEditModal';
-import { MultiImageUpload } from './MultiImageUpload';
+
+// Lazy load uploader to prevent ChunkLoadError
+const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
+  ssr: false,
+  loading: () => <div className="h-24 w-full animate-pulse bg-muted rounded-2xl" />
+});
 
 const eventSchema = z.object({
   title: z.string().min(3, 'Title is required.'),
@@ -69,7 +73,6 @@ const formatDateForInput = (date: any) => {
 
 export function EventForm({ event, onSave, onClose }: EventFormProps) {
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
-  const [imagePreviewError, setImagePreviewError] = useState(false);
 
   const form = useForm<z.infer<typeof eventSchema>>({
     resolver: zodResolver(eventSchema),
@@ -86,12 +89,6 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
       galleryImages: event?.galleryImages || [],
     },
   });
-
-  const imagePreview = form.watch('imageUrl');
-
-  useEffect(() => {
-    setImagePreviewError(false);
-  }, [imagePreview]);
 
   const onSubmit = (values: z.infer<typeof eventSchema>) => {
     const dataToSave = {
