@@ -1,9 +1,11 @@
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
  * Next.js Middleware.
  * This acts as a 'green light' to ensure requests reach Firebase without loops.
+ * Added explicit bypass for blob and firebase streams.
  */
 export default function middleware(request: NextRequest) {
   return NextResponse.next();

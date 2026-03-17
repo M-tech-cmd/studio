@@ -1,7 +1,8 @@
+
 'use client';
 
 import Image from 'next/image';
-import { X, Play, Video, Music, Loader2 } from 'lucide-react';
+import { X, Play, Video, Music, Loader2, CloudSync } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 
@@ -15,8 +16,8 @@ interface MediaItemProps {
 }
 
 /**
- * Enhanced Media Item with strict conditional rendering.
- * Prevents "ghost" broken images by verifying url before mounting Image tags.
+ * Enhanced Media Item with strictly conditional rendering.
+ * Features a unique "Syncing" overlay for local previews.
  */
 export function MediaItem({ 
   url, 
@@ -26,7 +27,7 @@ export function MediaItem({
   className,
   showIconOverlay = true
 }: MediaItemProps) {
-  // STRICT GUARD: Return null if url is invalid to prevent ghosting
+  // STRICT GUARD: Prevent broken image ghosts
   if (!url || typeof url !== 'string' || url.trim() === '' || url === 'undefined' || url === 'null') {
     return null;
   }
@@ -56,24 +57,27 @@ export function MediaItem({
           )}
         </div>
       ) : (
-        /* Image rendering - Strictly conditional */
         <Image
           src={url}
           alt="Media item"
           fill
           className={cn(
-            "object-cover transition-transform duration-700 group-hover:scale-110",
+            "object-cover transition-transform duration-700",
+            !isLoading && "group-hover:scale-110",
             isLoading && "opacity-40 grayscale"
           )}
           unoptimized
         />
       )}
 
+      {/* Individual Sync Progress Overlay */}
       {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-black/20 backdrop-blur-[2px]">
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-black/40 backdrop-blur-[2px]">
           <Loader2 className="h-8 w-8 animate-spin text-white mb-3" />
           <div className="w-full px-6">
-              <p className="text-[9px] font-black text-white uppercase tracking-widest text-center mb-1.5 drop-shadow-md">Syncing Media...</p>
+              <p className="text-[9px] font-black text-white uppercase tracking-widest text-center mb-1.5 drop-shadow-md flex items-center justify-center gap-1.5">
+                Syncing Media...
+              </p>
               <Progress value={progress ?? 45} className="h-1 bg-white/20" />
           </div>
         </div>

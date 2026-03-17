@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useState } from 'react';
-import { Upload, Loader2 } from 'lucide-react';
+import { Upload, Loader2, Info, AlertCircle } from 'lucide-react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useStorage } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -15,9 +16,8 @@ interface MultiImageUploadProps {
 }
 
 /**
- * Enhanced Multi-Image Upload Component.
- * Features per-ID state tracking and a 60-second safety timeout.
- * Processes uploads SEQUENTIALLY to prevent network deadlock.
+ * IMPLEMENT INSTANT MULTI-UPLOAD
+ * Features instant previews, parallel workers, and individual sync tracking.
  */
 export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
   const [uploadingIds, setUploadingIds] = useState<Set<string>>(new Set());
@@ -29,20 +29,22 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
     typeof img === 'string' && img.trim() !== '' && img !== 'undefined'
   );
 
-  const uploadWithTimeout = async (storageRef: any, file: File) => {
-    const uploadPromise = uploadBytes(storageRef, file);
-    // Increased timeout to 60s for high-resolution stability
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Sync Timeout: Connection unstable')), 60000)
-    );
-    return Promise.race([uploadPromise, timeoutPromise]);
-  };
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !storage) return;
 
-    const newEntries = Array.from(files).map(file => ({
+    // BATCH LIMIT: Hard-cap at 10 images for stability
+    const selectedFiles = Array.from(files).slice(0, 10);
+    if (files.length > 10) {
+        toast({ 
+            variant: 'destructive', 
+            title: 'Limit Exceeded', 
+            description: 'Please select a maximum of 10 images per batch.' 
+        });
+    }
+
+    // INSTANT UI PREVIEW: Create local links immediately
+    const newEntries = selectedFiles.map(file => ({
       id: Math.random().toString(36).substring(7),
       url: URL.createObjectURL(file),
       file
@@ -55,37 +57,43 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       return next;
     });
 
-    const newUrls: string[] = [];
+    // PARALLEL BACKGROUND WORKERS: Trigger independent uploads
+    newEntries.forEach(async (entry) => {
+        try {
+            const storageRef = ref(storage, `${folder}/${Date.now()}_${entry.file.name}`);
+            
+            // Safety timeout: 60s
+            const uploadPromise = uploadBytes(storageRef, entry.file);
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Sync Timeout')), 60000)
+            );
 
-    // CRITICAL: Sequential loop to prevent media deadlock
-    for (const entry of newEntries) {
-      try {
-        const storageRef = ref(storage, `${folder}/${Date.now()}_${entry.file.name}`);
-        const snapshot: any = await uploadWithTimeout(storageRef, entry.file);
-        const url = await getDownloadURL(snapshot.ref);
-        newUrls.push(url);
-      } catch (error: any) {
-        console.error(`Media Deadlock for ${entry.id}:`, error);
-        toast({ 
-          variant: 'destructive', 
-          title: 'Sync Interrupted', 
-          description: error.message || 'Check connection and try again.' 
-        });
-      } finally {
-        setLocalPreviews(prev => prev.filter(p => p.id !== entry.id));
-        setUploadingIds(prev => {
-          const next = new Set(prev);
-          next.delete(entry.id);
-          return next;
-        });
-        URL.revokeObjectURL(entry.url);
-      }
-    }
+            await Promise.race([uploadPromise, timeoutPromise]);
+            const downloadURL = await getDownloadURL(storageRef);
 
-    if (newUrls.length > 0) {
-      onChange([...validImages, ...newUrls]);
-    }
-    
+            // Update parent state with the new cloud URL
+            onChange([...validImages, downloadURL]);
+            
+        } catch (error: any) {
+            console.error(`Upload worker ${entry.id} failed:`, error);
+            toast({ 
+                variant: 'destructive', 
+                title: 'Sync Failed', 
+                description: `Could not upload ${entry.file.name}.` 
+            });
+        } finally {
+            // MEMORY MANAGEMENT: Revoke and cleanup
+            setLocalPreviews(prev => prev.filter(p => p.id !== entry.id));
+            setUploadingIds(prev => {
+                const next = new Set(prev);
+                next.delete(entry.id);
+                return next;
+            });
+            URL.revokeObjectURL(entry.url);
+        }
+    });
+
+    // Clear input so the same files can be selected again if needed
     if (e.target) e.target.value = '';
   };
 
@@ -97,17 +105,17 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
 
   return (
     <div className="space-y-6 pt-4">
-      <div className="flex items-center justify-between bg-muted/30 p-4 rounded-2xl border border-dashed">
+      <div className="flex items-center justify-between bg-muted/30 p-4 rounded-2xl border border-dashed border-primary/20">
         <div className="space-y-1">
           <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Gallery Media</Label>
-          <p className="text-[9px] text-muted-foreground italic">Max 60s upload window per item.</p>
+          <p className="text-[9px] text-muted-foreground italic">Parallel sync • Max 10 items per batch.</p>
         </div>
         <div className="flex items-center gap-3">
           {uploadingIds.size > 0 && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
           <label className="cursor-pointer">
             <div className="flex items-center gap-2 px-5 py-2.5 bg-[#1e3a5f] text-white rounded-full text-[10px] font-black hover:bg-[#1e3a5f]/90 transition-all shadow-lg uppercase tracking-widest active:scale-95">
               <Upload className="h-3.5 w-3.5" />
-              Add Photos
+              Instant Upload
             </div>
             <input type="file" multiple className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
           </label>
@@ -115,22 +123,26 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        {/* Validated Cloud Images */}
         {validImages.map((url, index) => (
           <MediaItem key={url + index} url={url} onRemove={() => removeImage(index)} />
         ))}
 
+        {/* INDIVIDUAL PROGRESS: Local Previews with Syncing Overlay */}
         {localPreviews.map((preview) => (
           <MediaItem 
             key={preview.id} 
             url={preview.url} 
             isLoading={uploadingIds.has(preview.id)} 
             onRemove={() => {
+                // Allow cancelling a pending preview
                 setLocalPreviews(prev => prev.filter(p => p.id !== preview.id));
                 setUploadingIds(prev => {
                     const next = new Set(prev);
                     next.delete(preview.id);
                     return next;
                 });
+                URL.revokeObjectURL(preview.url);
             }} 
           />
         ))}
