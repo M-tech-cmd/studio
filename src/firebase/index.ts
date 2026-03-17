@@ -3,12 +3,12 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, enableMultiTabIndexedDbPersistence } from 'firebase/firestore'
+import { getFirestore, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getDatabase } from 'firebase/database';
 
-// Guard to ensure persistence is only attempted once per app lifecycle
-let persistenceInitiated = false;
+// Global guard to ensure persistence is only attempted once per page lifecycle
+let persistencePromise: Promise<void> | null = null;
 
 export function initializeFirebase() {
   let firebaseApp: FirebaseApp;
@@ -17,9 +17,6 @@ export function initializeFirebase() {
     try {
       firebaseApp = initializeApp();
     } catch (e) {
-      if (process.env.NODE_ENV === "production") {
-        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
-      }
       firebaseApp = initializeApp(firebaseConfig);
     }
   } else {
@@ -33,16 +30,15 @@ export function getSdks(firebaseApp: FirebaseApp) {
   const firestore = getFirestore(firebaseApp);
   
   // Enable multi-tab offline persistence to prevent "Primary Lease" and "Internal Assertion" errors
-  if (typeof window !== 'undefined' && !persistenceInitiated) {
-    persistenceInitiated = true;
-    
-    enableMultiTabIndexedDbPersistence(firestore).catch((err) => {
+  if (typeof window !== 'undefined' && !persistencePromise) {
+    persistencePromise = enableMultiTabIndexedDbPersistence(firestore).catch((err) => {
       if (err.code === 'failed-precondition') {
-        console.warn('Firestore persistence failed: Multiple tabs open. Multi-tab sync is active.');
+        // Multiple tabs open, persistence can only be enabled in one tab at a time.
+        // multi-tab persistence (IndexedDb) handles this gracefully.
+        console.warn('Firestore persistence: Multiple tabs detected.');
       } else if (err.code === 'unimplemented') {
-        console.warn('Firestore persistence unimplemented: Browser not supported.');
-      } else {
-        console.error('Firestore persistence unexpected error:', err);
+        // The current browser doesn't support all of the features required to enable persistence
+        console.warn('Firestore persistence: Browser not supported.');
       }
     });
   }

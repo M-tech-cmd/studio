@@ -193,7 +193,7 @@ export function BibleReadingClient() {
                         <CardHeader className="p-8 pb-4">
                             <div className="flex items-center gap-2 text-primary font-black uppercase tracking-widest text-[9px] mb-4 opacity-60">
                                 <Book className="h-3 w-3" />
-                                Daily Word
+                                Word of God
                             </div>
                             <CardTitle className="text-2xl font-black tracking-tighter leading-tight group-hover:text-primary transition-colors min-h-[4rem]">
                                 {reading.title}

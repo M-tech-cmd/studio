@@ -19,7 +19,6 @@ interface MultiImageUploadProps {
  * Features per-ID state tracking and a 30-second safety timeout.
  */
 export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
-  // Track specific IDs being uploaded to prevent global state locking
   const [uploadingIds, setUploadingIds] = useState<Set<string>>(new Set());
   const [localPreviews, setLocalPreviews] = useState<{ id: string; url: string }[]>([]);
   const storage = useStorage();
@@ -41,14 +40,12 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
     const files = e.target.files;
     if (!files || files.length === 0 || !storage) return;
 
-    // Create unique ID mapping for per-item tracking
     const newEntries = Array.from(files).map(file => ({
       id: Math.random().toString(36).substring(7),
       url: URL.createObjectURL(file),
       file
     }));
 
-    // Start tracking items immediately
     setLocalPreviews(prev => [...prev, ...newEntries.map(e => ({ id: e.id, url: e.url }))]);
     setUploadingIds(prev => {
       const next = new Set(prev);
@@ -72,14 +69,12 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
           description: error.message || 'Check connection and try again.' 
         });
       } finally {
-        // Clear tracking for this specific item regardless of result
         setLocalPreviews(prev => prev.filter(p => p.id !== entry.id));
         setUploadingIds(prev => {
           const next = new Set(prev);
           next.delete(entry.id);
           return next;
         });
-        // Release blob URL to prevent memory leaks
         URL.revokeObjectURL(entry.url);
       }
     }
@@ -88,7 +83,6 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       onChange([...validImages, ...newUrls]);
     }
     
-    // Clear input so same file can be re-selected if needed
     if (e.target) e.target.value = '';
   };
 
