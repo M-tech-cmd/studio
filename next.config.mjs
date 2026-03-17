@@ -13,7 +13,7 @@ const nextConfig = {
       // User Authentication & Social
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' }, // For Google Sign-In profile pictures
       
-      // Professional Design Assets
+      // Professional Design Asset s
       { protocol: 'https', hostname: 'images.adobe.com' },
       { protocol: 'https', hostname: 'utfs.io' }, // Common for UploadThing if you use it for faster transfers
       
