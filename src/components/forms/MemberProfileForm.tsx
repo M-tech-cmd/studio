@@ -162,8 +162,54 @@ export function MemberProfileForm() {
   async function onSubmit(values: z.infer<typeof profileSchema>) {
     if (!user || !firestore) return;
     try {
+      // SAFE CHECK: Defend against undefined fields before writing to Firestore
+      const sanitizedValues = {
+        fullName: values.fullName || "",
+        email: values.email || "",
+        age: values.age || 0,
+        maritalStatus: values.maritalStatus || "Single",
+        location: values.location || "",
+        phone: values.phone || "",
+        profession: values.profession || "",
+        employmentStatus: values.employmentStatus || "Employed",
+        groupType: values.groupType || "Families",
+        sundayMassPreference: values.sundayMassPreference || "1st Mass",
+        sccId: values.sccId || "",
+        customSccName: values.customSccName || "",
+        parishGroupId: values.parishGroupId || "",
+        customParishGroupName: values.customParishGroupName || "",
+        baptism: values.baptism ?? false,
+        confirmation: values.confirmation ?? false,
+        eucharist: values.eucharist ?? false,
+        penance: values.penance ?? false,
+        anointing: values.anointing ?? false,
+        matrimony: values.matrimony ?? false,
+        holyOrders: values.holyOrders ?? false,
+        fatherInfo: {
+          name: values.fatherInfo?.name || "",
+          phone: values.fatherInfo?.phone || "",
+        },
+        motherInfo: {
+          name: values.motherInfo?.name || "",
+          phone: values.motherInfo?.phone || "",
+        },
+        children: (values.children || []).map(c => ({
+          name: c.name || "",
+          age: c.age || 0,
+          baptism: c.baptism ?? false,
+          confirmation: c.confirmation ?? false,
+          eucharist: c.eucharist ?? false,
+          penance: c.penance ?? false,
+          anointing: c.anointing ?? false,
+          matrimony: c.matrimony ?? false,
+          holyOrders: c.holyOrders ?? false,
+          parishGroupId: c.parishGroupId || "",
+          customGroupName: c.customGroupName || "",
+        })),
+      };
+
       await setDoc(doc(firestore, 'members', user.uid), {
-        ...values,
+        ...sanitizedValues,
         userId: user.uid,
         id: user.uid,
         updatedAt: serverTimestamp(),
@@ -173,6 +219,7 @@ export function MemberProfileForm() {
       toast({ title: "Registry Updated", description: "Your official church profile is now synchronized." });
       router.push('/');
     } catch (error) {
+      console.error("Registry error:", error);
       toast({ variant: "destructive", title: "Update Failed", description: "Database connection interrupted." });
     }
   }

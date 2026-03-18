@@ -30,6 +30,8 @@ function FooterContent() {
     { href: '/community', label: 'Community' },
   ];
 
+  const sanitizedPhone = settings?.phone ? settings.phone.replace(/\D/g, '') : '';
+
   return (
     <div className="container max-w-7xl mx-auto px-4 py-8 bg-transparent">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -84,7 +86,11 @@ function FooterContent() {
               <li className="flex items-center gap-3">
                 <Phone className="w-5 h-5 text-primary flex-shrink-0" />
                 {isLoading ? <Skeleton className="h-4 w-1/2" /> : (
-                    settings?.phone ? <a href={`tel:${settings.phone}`} className="text-muted-foreground hover:text-primary transition-colors">{settings.phone}</a> : <span className="text-muted-foreground">Phone not set</span>
+                    settings?.phone ? (
+                      <a href={`tel:${sanitizedPhone}`} className="text-muted-foreground hover:text-primary transition-colors hover:underline decoration-primary/30">
+                        {settings.phone}
+                      </a>
+                    ) : <span className="text-muted-foreground">Phone not set</span>
                 )}
               </li>
               {settings && (

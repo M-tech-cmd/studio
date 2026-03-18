@@ -1,4 +1,3 @@
-
 'use client';
 import { Phone, Mail, MapPin } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -24,6 +23,8 @@ function ContactDetails() {
         )
     }
 
+    const sanitizedPhone = settings?.phone ? settings.phone.replace(/\D/g, '') : '';
+
     return (
         <div className="space-y-6">
             <Card className="bg-card/50 border-none shadow-md">
@@ -41,7 +42,13 @@ function ContactDetails() {
                     </div>
                     <div className="flex items-center gap-4">
                         <Phone className="w-5 h-5 text-primary flex-shrink-0" />
-                        <a href={`tel:${settings?.phone}`} className="text-muted-foreground hover:text-primary text-sm transition-colors">{settings?.phone || 'Phone not available'}</a>
+                        {settings?.phone ? (
+                          <a href={`tel:${sanitizedPhone}`} className="text-muted-foreground hover:text-primary text-sm transition-colors hover:underline">
+                            {settings.phone}
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">Phone not available</span>
+                        )}
                     </div>
                 </CardContent>
             </Card>

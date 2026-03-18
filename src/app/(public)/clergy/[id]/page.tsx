@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useParams, notFound } from 'next/navigation';
@@ -50,6 +49,8 @@ export default function ClergyDetailPage() {
         </div>
     );
   }
+
+  const sanitizedPhone = profile.phone ? profile.phone.replace(/\D/g, '') : '';
 
   return (
     <div className="bg-transparent animate-in fade-in duration-700">
@@ -105,8 +106,14 @@ export default function ClergyDetailPage() {
                             <Phone className="h-6 w-6" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Office Extension</p>
-                            <p className="font-bold text-lg">{profile.phone}</p>
+                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Direct Contact</p>
+                            {profile.phone ? (
+                              <a href={`tel:${sanitizedPhone}`} className="font-bold text-lg hover:text-primary transition-colors hover:underline decoration-primary/30">
+                                {profile.phone}
+                              </a>
+                            ) : (
+                              <p className="font-bold text-lg text-muted-foreground">Not provided</p>
+                            )}
                         </div>
                     </div>
                   </div>

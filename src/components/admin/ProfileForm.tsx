@@ -88,8 +88,17 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
 
 
   const onSubmit = (values: z.infer<typeof profileSchema>) => {
+    // SAFE CHECK: Ensure no field is undefined before saving to Firestore
     const dataToSave = {
-      ...values,
+      name: values.name || "",
+      title: values.title || "",
+      role: values.role || "Staff",
+      bio: values.bio || "",
+      email: values.email || "",
+      phone: values.phone || "",
+      imageUrl: values.imageUrl || "",
+      imageHint: values.imageHint || "",
+      active: values.active ?? true,
       id: profile?.id,
     };
     onSave(dataToSave);
