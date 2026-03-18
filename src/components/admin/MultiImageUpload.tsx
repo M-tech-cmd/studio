@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Loader2, RefreshCcw } from 'lucide-react';
-import { ref, getDownloadURL, uploadBytes } from 'firebase/storage';
+import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useStorage } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -18,12 +18,14 @@ interface UploadingItem {
   id: string;
   preview: string;
   status: 'syncing' | 'failed';
+  progress: number;
   file: File;
 }
 
 /**
- * INSTANT MULTI-UPLOAD (GEMINI METHOD)
- * Features parallel non-blocking workers and immediate UI feedback.
+ * RELIABLE INSTANT MULTI-UPLOAD
+ * Features parallel background workers using native Firebase observers.
+ * No manual timeouts; let's Firebase handle retry logic internally.
  */
 export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
   const [activeUploads, setActiveUploads] = useState<UploadingItem[]>([]);
@@ -41,7 +43,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
     const files = e.target.files;
     if (!files || files.length === 0 || !storage) return;
 
-    // Hard-cap at 10 to ensure stability and match Gemini behavior
+    // Hard-cap at 10 to ensure stability
     const selectedFiles = Array.from(files).slice(0, 10);
     if (files.length > 10) {
       toast({ 
@@ -56,7 +58,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       const id = Math.random().toString(36).substring(7);
       const preview = URL.createObjectURL(file);
       
-      const newItem: UploadingItem = { id, preview, status: 'syncing', file };
+      const newItem: UploadingItem = { id, preview, status: 'syncing', progress: 0, file };
       setActiveUploads(prev => [...prev, newItem]);
 
       // 2. Parallel Background Sync (Non-blocking)
@@ -71,36 +73,50 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
 
     const storageRef = ref(storage, `${folder}/${Date.now()}_${item.id}_${item.file.name}`);
     
-    // Using uploadBytes (faster for multi-batches) with a 60s fail-safe race
-    const uploadPromise = uploadBytes(storageRef, item.file);
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Sync Timeout')), 60000)
-    );
+    // Switch to uploadBytesResumable for reliable progress tracking and native retry handling
+    const uploadTask = uploadBytesResumable(storageRef, item.file);
 
-    Promise.race([uploadPromise, timeoutPromise])
-      .then(async (snapshot: any) => {
-        const downloadURL = await getDownloadURL(snapshot.ref);
-        
-        // 3. Silent State Swap
-        // Get the latest images from ref to ensure we don't drop other parallel uploads
-        const currentList = [...imagesRef.current, downloadURL];
-        onChange(currentList);
-
-        // Cleanup local UI item and memory
-        setActiveUploads(prev => prev.filter(u => u.id !== item.id));
-        setTimeout(() => URL.revokeObjectURL(item.preview), 5000);
-      })
-      .catch((error) => {
-        console.error(`Sync worker ${item.id} failed:`, error);
+    uploadTask.on(
+      'state_changed',
+      (snapshot) => {
+        // Track real-time progress
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        setActiveUploads(prev => prev.map(u => 
+          u.id === item.id ? { ...u, progress } : u
+        ));
+      },
+      (error) => {
+        // Firebase native error handling (Network, Permissions, Storage full, etc.)
+        console.error(`Sync worker ${item.id} failed:`, error.message);
         setActiveUploads(prev => prev.map(u => 
           u.id === item.id ? { ...u, status: 'failed' } : u
         ));
         toast({ 
           variant: 'destructive', 
           title: 'Sync Interrupted', 
-          description: `Failed to upload ${item.file.name}` 
+          description: error.message 
         });
-      });
+      },
+      async () => {
+        // 3. Finalization - Native task complete
+        try {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          
+          // Silent State Swap using the latest ref list
+          const currentList = [...imagesRef.current, downloadURL];
+          onChange(currentList);
+
+          // Cleanup local UI item and memory
+          setActiveUploads(prev => prev.filter(u => u.id !== item.id));
+          setTimeout(() => URL.revokeObjectURL(item.preview), 5000);
+        } catch (err: any) {
+          console.error("URL retrieval failed:", err);
+          setActiveUploads(prev => prev.map(u => 
+            u.id === item.id ? { ...u, status: 'failed' } : u
+          ));
+        }
+      }
+    );
   };
 
   const removeCloudImage = (index: number) => {
@@ -153,10 +169,11 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
             />
             
             {item.status === 'syncing' && (
-                <div className="absolute bottom-2 left-2 z-20">
-                    <span className="bg-black/60 backdrop-blur-md text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-tighter animate-pulse">
-                        Syncing...
-                    </span>
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20 z-20 overflow-hidden rounded-b-2xl">
+                    <div 
+                        className="h-full bg-primary transition-all duration-300" 
+                        style={{ width: `${item.progress}%` }}
+                    />
                 </div>
             )}
 
