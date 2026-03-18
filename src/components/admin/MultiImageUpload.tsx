@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, RefreshCcw, X, Loader2 } from 'lucide-react';
+import { Upload, RefreshCcw, X } from 'lucide-react';
 import { ref, getDownloadURL, uploadBytes } from 'firebase/storage';
 import { useStorage } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -24,9 +23,9 @@ interface UploadingItem {
 }
 
 /**
- * PRODUCTION-GRADE ATOMIC MULTI-UPLOAD
- * - Uses uploadBytes to prevent retry-limit-exceeded deadlocks.
- * - Instant local previews for zero-latency UX.
+ * ZERO-GHOST INSTANT MULTI-UPLOAD
+ * - No spinners, no blurs, no blocking.
+ * - Parallel background workers handle the cloud handoff.
  */
 export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange }: MultiImageUploadProps) {
   const [activeUploads, setActiveUploads] = useState<UploadingItem[]>([]);
@@ -56,6 +55,7 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
       const newItem: UploadingItem = { id, preview, status: 'syncing', file };
       setActiveUploads(prev => [...prev, newItem]);
 
+      // Trigger background sync immediately without awaiting
       triggerBackgroundUpload(newItem);
     }
 
@@ -68,7 +68,7 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
     const storageRef = ref(storage, `${folder}/${Date.now()}_${item.id}_${item.file.name}`);
     
     try {
-      // Atomic upload: Faster and prevents the resumable stream retry deadlock
+      // Atomic upload: Faster and non-blocking
       const snapshot = await uploadBytes(storageRef, item.file);
       const downloadURL = await getDownloadURL(snapshot.ref);
       
@@ -76,18 +76,13 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
       onChange(currentList);
 
       setActiveUploads(prev => prev.filter(u => u.id !== item.id));
-      // Delay revocation to allow browser to swap URLs smoothly
-      setTimeout(() => URL.revokeObjectURL(item.preview), 5000);
+      // Cleanup preview URL
+      setTimeout(() => URL.revokeObjectURL(item.preview), 10000);
     } catch (error: any) {
       console.error("Sync worker failed:", error);
       setActiveUploads(prev => prev.map(u => 
         u.id === item.id ? { ...u, status: 'failed' } : u
       ));
-      toast({ 
-        variant: 'destructive', 
-        title: 'Sync Interrupted', 
-        description: `Failed to upload ${item.file.name}. Click retry to try again.` 
-      });
     }
   };
 
@@ -132,14 +127,6 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
               onRemove={() => removePendingUpload(item.id, item.preview)} 
             />
             
-            {item.status === 'syncing' && (
-              <div className="absolute inset-0 flex items-center justify-center z-50 bg-black/10 backdrop-blur-[1px] rounded-2xl">
-                <div className="bg-white/90 p-2 rounded-full shadow-lg">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                </div>
-              </div>
-            )}
-
             {item.status === 'failed' && (
               <button
                 type="button"

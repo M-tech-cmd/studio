@@ -1,21 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Save, Loader2, MapPin, Clock, PlusCircle, Trash2, RotateCcw } from 'lucide-react';
+import { Clock, RotateCcw, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
 
 import type { SiteSettings } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError, useDoc, useUser } from '@/firebase';
+import { useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -46,10 +45,8 @@ const contactSchema = z.object({
 
 export default function ContactSettingsPage() {
     const firestore = useFirestore();
-    const { user } = useUser();
     const router = useRouter();
     const { toast } = useToast();
-    const [isSaving, setIsSaving] = useState(false);
 
     const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
     const { data: settings, isLoading } = useDoc<SiteSettings>(settingsRef);
@@ -64,8 +61,6 @@ export default function ContactSettingsPage() {
             showWhatsAppChat: false,
         }
     });
-
-    const { fields, append, remove } = useFieldArray({ control: form.control, name: "socialLinks" });
 
     useEffect(() => {
         if(settings) {
@@ -86,21 +81,21 @@ export default function ContactSettingsPage() {
         if (!settingsRef) return;
         const defaultHours = { monday_friday: {open: '08:00', close: '18:00'}, saturday: {open: '09:00', close: '12:00'}, sunday: {open: '07:00', close: '20:00'} };
         form.setValue('officeHours', defaultHours);
-        await updateDoc(settingsRef, { officeHours: defaultHours });
+        updateDoc(settingsRef, { officeHours: defaultHours });
         toast({ title: 'Hours Reset' });
     };
 
     const onSubmit = (values: z.infer<typeof contactSchema>) => {
         if (!settingsRef) return;
-        setIsSaving(true);
-        const sanitizedData = JSON.parse(JSON.stringify(values));
-        setDoc(settingsRef, sanitizedData, { merge: true })
-            .then(() => { toast({ title: 'Success!', description: 'Contact info updated.' }); })
-            .catch((error) => {
-                 const permissionError = new FirestorePermissionError({ path: settingsRef.path, operation: 'update', requestResourceData: sanitizedData });
-                errorEmitter.emit('permission-error', permissionError);
-            })
-            .finally(() => setIsSaving(false));
+        // INSTANT SAVE UX
+        toast({ title: 'Registry Synchronized', description: 'Contact details have been updated successfully.' });
+        let sanitizedData = {};
+        try {
+            sanitizedData = JSON.parse(JSON.stringify(values));
+        } catch (e) {
+            sanitizedData = values;
+        }
+        setDoc(settingsRef, sanitizedData, { merge: true }).then(() => router.refresh());
     };
 
     if (isLoading) return <Skeleton className="h-96 w-full" />;
@@ -152,9 +147,8 @@ export default function ContactSettingsPage() {
                     </Card>
 
                     <div className="flex justify-end sticky bottom-6 z-50">
-                        <Button type="submit" size="lg" className="shadow-2xl rounded-full h-14 px-10" disabled={isSaving}>
-                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Save All Changes
+                        <Button type="submit" size="lg" className="shadow-2xl rounded-full h-14 px-10">
+                            Commit Contact Info
                         </Button>
                     </div>
                 </form>

@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server';
  * Next.js Middleware.
  * Optimized to bypass static assets, JSON chunks, and Firebase internal streams.
  * This prevents ChunkLoadError and 504 Timeouts during heavy media sync.
+ * Matches all request paths except for those explicitly excluded in the matcher.
  */
 export default function middleware(request: NextRequest) {
   return NextResponse.next();
@@ -21,8 +22,8 @@ export const config = {
      * - firebase (Firebase SDK endpoints)
      * - firebase-storage (Storage interactions)
      * - blob (local media streams)
-     * - Any path ending in .js or .json (Static chunks)
+     * - Any path containing .js or .json (Static chunks and data)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|firebase|blob|.*\\.js$|.*\\.json$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|firebase|blob|.*\\.js|.*\\.json).*)',
   ],
 };

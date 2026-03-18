@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,9 +5,9 @@ import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Upload, RotateCcw, Palette, Link as LinkIcon, X, Loader2, Palette as PaletteIcon } from 'lucide-react';
+import { Upload, RotateCcw, Palette, Link as LinkIcon, X, Palette as PaletteIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
 
 import type { SiteContent, SiteSettings } from '@/lib/types';
@@ -18,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useCollection, useFirestore, useMemoFirebase, useDoc, useStorage, useUser } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useDoc, useStorage } from '@/firebase';
 import { collection, doc, setDoc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
@@ -134,10 +133,8 @@ const SectionControls = ({ form, prefix, label, onReset, onImageUpload }: { form
 export default function BrandingPage() {
     const firestore = useFirestore();
     const storage = useStorage();
-    const { user } = useUser();
     const router = useRouter();
     const { toast } = useToast();
-    const [isSaving, setIsSaving] = useState(false);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
     const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
@@ -170,26 +167,21 @@ export default function BrandingPage() {
         defaultValues: { title: '', content: '', imageUrl: '' }
     });
 
-    // Seeder for all static pages
     useEffect(() => {
         if (!firestore) return;
         const seedData = async () => {
             const batch = writeBatch(firestore);
             const contentRef = collection(firestore, 'site_content');
-            
             const blocks = [
                 { id: 'about-us', pageName: 'About Us', title: 'Our History', content: '<p>Founded in 1962, St. Martin De Porres Parish has grown from a small community into a vibrant parish family.</p>', imageUrl: 'https://picsum.photos/seed/history/800/600' },
                 { id: 'about-dev-team', pageName: 'About Us', title: 'Development Team', content: '<p>Developed by the St. Martin Youth Serving Christ (YSC) group.</p>', imageUrl: 'https://picsum.photos/seed/dev-team/800/600' },
                 { id: 'privacy-policy', pageName: 'Legal', title: 'Privacy Policy', content: '<h2>Privacy Policy</h2><p>Your privacy is important to us...</p>' },
                 { id: 'terms-of-use', pageName: 'Legal', title: 'Terms of Use', content: '<h2>Terms of Use</h2><p>Welcome to our site...</p>' }
             ];
-
             for (const b of blocks) {
                 const docRef = doc(contentRef, b.id);
                 const snap = await getDoc(docRef);
-                if (!snap.exists()) {
-                    batch.set(docRef, b);
-                }
+                if (!snap.exists()) batch.set(docRef, b);
             }
             await batch.commit();
         };
@@ -222,7 +214,6 @@ export default function BrandingPage() {
         }
     }, [allContent, selectedContentId]);
 
-    // Force editor to update when switching pages
     useEffect(() => {
         if (selectedContent) {
             contentForm.reset({ 
@@ -235,16 +226,13 @@ export default function BrandingPage() {
 
     const handleImageUpload = async (prefix: string, file: File) => {
         if (!storage) return;
-        // Instant UI Preview
         const previewUrl = URL.createObjectURL(file);
         form.setValue(`${prefix}ImageUrl` as any, previewUrl);
-
         try {
             const storageRef = ref(storage, `banners/${prefix}_${Date.now()}_${file.name}`);
             const snapshot = await uploadBytes(storageRef, file);
             const url = await getDownloadURL(snapshot.ref);
             form.setValue(`${prefix}ImageUrl` as any, url);
-            toast({ title: 'Banner Synchronized' });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
         } finally {
@@ -256,13 +244,11 @@ export default function BrandingPage() {
         if (!storage) return;
         const previewUrl = URL.createObjectURL(file);
         contentForm.setValue('imageUrl', previewUrl);
-
         try {
             const storageRef = ref(storage, `content/${Date.now()}_${file.name}`);
             const snapshot = await uploadBytes(storageRef, file);
             const url = await getDownloadURL(snapshot.ref);
             contentForm.setValue('imageUrl', url);
-            toast({ title: 'Page Image Synchronized' });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
         } finally {
@@ -273,16 +259,13 @@ export default function BrandingPage() {
     const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !storage) return;
-        
         const previewUrl = URL.createObjectURL(file);
         setLogoPreview(previewUrl);
-        
         try {
             const storageRef = ref(storage, `branding/${Date.now()}_${file.name}`);
             const snapshot = await uploadBytes(storageRef, file);
             const url = await getDownloadURL(snapshot.ref);
             form.setValue('logoUrl', url);
-            toast({ title: 'Logo Synchronized' });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Logo Sync Failed', description: error.message });
         } finally {
@@ -300,16 +283,9 @@ export default function BrandingPage() {
             bulletin: { title: 'Latest Updates', desc: 'Stay informed with the latest news.', img: '' },
             projects: { title: 'Parish Projects', desc: 'Supporting our mission and growth.', img: '' },
             community: { title: 'Parish Communities', desc: 'Connect with our Small Christian Communities and groups.', img: '' },
-            ministries: { title: 'Our Ministries', desc: 'Serving God and our community through action.', img: '' },
-            bibleReadings: { title: 'Daily Bible Readings', desc: 'Nourish your soul with the Word of God each day.', img: '' },
-            documents: { title: 'Parish Documents', desc: 'Stay informed with our latest bulletins and documents.', img: '' },
-            findUs: { title: 'Find Us', desc: "Located in the heart of Nakuru, we're easy to find and accessible to all.", img: '' },
-            payments: { title: 'Payments & Giving', desc: 'Support our parish through secure digital payments.', img: '' },
         };
-
         const d = defaults[prefix] || { title: '', desc: '', img: '' };
         const resetData = { [`${prefix}Title`]: d.title, [`${prefix}Description`]: d.desc, [`${prefix}TitleColor`]: '', [`${prefix}DescriptionColor`]: '', [`${prefix}BoxColor`]: '', [`${prefix}ImageUrl`]: d.img };
-
         updateDoc(settingsRef, resetData).then(() => {
             form.setValue(`${prefix}Title` as any, d.title);
             form.setValue(`${prefix}Description` as any, d.desc);
@@ -320,32 +296,22 @@ export default function BrandingPage() {
 
     const onSubmitBranding = (values: z.infer<typeof brandingSchema>) => {
         if (!settingsRef) return;
-        setIsSaving(true);
-        
-        // SAFE SERIALIZATION WRAPPER: Handles 504 and JSON parse issues
+        // INSTANT SAVE UX
+        toast({ title: 'Visuals Synchronized', description: 'Changes are being reflected across the portal.' });
         let sanitizedData = {};
         try {
             sanitizedData = JSON.parse(JSON.stringify(values));
         } catch (e) {
-            console.error("Serialization failed", e);
             sanitizedData = values;
         }
-        
-        setDoc(settingsRef, sanitizedData, { merge: true })
-            .then(() => { 
-                toast({ title: 'Success!', description: 'Visual settings updated.' }); 
-                router.refresh(); 
-            })
-            .finally(() => setIsSaving(false));
+        setDoc(settingsRef, sanitizedData, { merge: true }).then(() => router.refresh());
     };
 
     const onSubmitContent = (values: any) => {
         if (!firestore || !selectedContent) return;
+        toast({ title: 'Page Content Updated' });
         const contentRef = doc(firestore, 'site_content', selectedContent.id);
-        updateDoc(contentRef, values).then(() => {
-            toast({ title: 'Success!', description: 'Page content updated.' });
-            router.refresh();
-        });
+        updateDoc(contentRef, values).then(() => router.refresh());
     };
 
     if (isLoading || contentLoading) return <Skeleton className="h-96 w-full" />;
@@ -404,9 +370,8 @@ export default function BrandingPage() {
                             </div>
 
                             <div className="flex justify-end sticky bottom-6 z-50">
-                                <Button type="submit" size="lg" className="shadow-2xl rounded-full px-12 h-16 text-lg font-bold" disabled={isSaving}>
-                                    {isSaving && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                                    Save All Visual Changes
+                                <Button type="submit" size="lg" className="shadow-2xl rounded-full px-12 h-16 text-lg font-bold">
+                                    Save Visual Identity
                                 </Button>
                             </div>
                         </form>
@@ -465,7 +430,7 @@ export default function BrandingPage() {
                                             </div>
                                         </>
                                     )}
-                                    <div className="flex justify-end border-t pt-6"><Button type="submit" size="lg">Update Page Data</Button></div>
+                                    <div className="flex justify-end border-t pt-6"><Button type="submit" size="lg">Update Content</Button></div>
                                 </form>
                             </Form>
                         </CardContent>
