@@ -12,6 +12,7 @@ interface MultiImageUploadProps {
   images: string[];
   onChange: (images: string[]) => void;
   folder: string;
+  onSyncStatusChange?: (isSyncing: boolean) => void;
 }
 
 interface UploadingItem {
@@ -23,11 +24,12 @@ interface UploadingItem {
 }
 
 /**
- * TRANSPARENT INSTANT MULTI-UPLOAD
- * Features parallel background workers with ZERO visual blockers.
- * Images appear instantly at 100% quality with no spinners or overlays.
+ * PRODUCTION-GRADE INSTANT MULTI-UPLOAD
+ * - Client-side image compression (< 1MB)
+ * - Automatic retry logic for retry-limit-exceeded
+ * - Zero-blocking UI with background resumable tasks
  */
-export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
+export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange }: MultiImageUploadProps) {
   const [activeUploads, setActiveUploads] = useState<UploadingItem[]>([]);
   const storage = useStorage();
   const { toast } = useToast();
@@ -38,7 +40,45 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
     imagesRef.current = images || [];
   }, [images]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    onSyncStatusChange?.(activeUploads.length > 0);
+  }, [activeUploads, onSyncStatusChange]);
+
+  const compressImage = async (file: File): Promise<File> => {
+    if (!file.type.startsWith('image/') || file.size < 1024 * 1024) return file;
+    
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const MAX_SIZE = 1200;
+          if (width > height && width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          } else if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (blob) resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+            else resolve(file);
+          }, 'image/jpeg', 0.7);
+        };
+      };
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !storage) return;
 
@@ -51,20 +91,22 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       });
     }
 
-    selectedFiles.forEach(file => {
+    for (const file of selectedFiles) {
       const id = Math.random().toString(36).substring(7);
       const preview = URL.createObjectURL(file);
       
       const newItem: UploadingItem = { id, preview, status: 'syncing', progress: 0, file };
       setActiveUploads(prev => [...prev, newItem]);
 
-      triggerBackgroundUpload(newItem);
-    });
+      // Compress large files in parallel to the sync trigger
+      const compressed = await compressImage(file);
+      triggerBackgroundUpload({ ...newItem, file: compressed });
+    }
 
     if (e.target) e.target.value = '';
   };
 
-  const triggerBackgroundUpload = (item: UploadingItem) => {
+  const triggerBackgroundUpload = (item: UploadingItem, retryCount = 0) => {
     if (!storage) return;
 
     const storageRef = ref(storage, `${folder}/${Date.now()}_${item.id}_${item.file.name}`);
@@ -75,14 +117,23 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       (snapshot) => {
         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
         setActiveUploads(prev => prev.map(u => 
-          u.id === item.id ? { ...u, progress } : u
+          u.id === item.id ? { ...u, progress, status: 'syncing' } : u
         ));
       },
       (error) => {
-        console.error(`Sync worker ${item.id} failed:`, error.message);
+        console.error(`Sync error for ${item.id}:`, error.code, error.message);
+        
+        // Automatic retry for standard network instability
+        if (error.code === 'storage/retry-limit-exceeded' && retryCount < 1) {
+          console.log(`Automatic retry triggered for worker ${item.id}`);
+          triggerBackgroundUpload(item, retryCount + 1);
+          return;
+        }
+
         setActiveUploads(prev => prev.map(u => 
           u.id === item.id ? { ...u, status: 'failed' } : u
         ));
+        toast({ variant: 'destructive', title: 'Sync Interrupted', description: error.message });
       },
       async () => {
         try {
@@ -93,7 +144,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
           setActiveUploads(prev => prev.filter(u => u.id !== item.id));
           setTimeout(() => URL.revokeObjectURL(item.preview), 5000);
         } catch (err: any) {
-          console.error("URL retrieval failed:", err);
+          console.error("URL resolution failed:", err);
           setActiveUploads(prev => prev.map(u => 
             u.id === item.id ? { ...u, status: 'failed' } : u
           ));
@@ -118,7 +169,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       <div className="flex items-center justify-between bg-muted/30 p-4 rounded-2xl border border-dashed border-primary/20">
         <div className="space-y-1">
           <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Gallery Synchronization</Label>
-          <p className="text-[9px] text-muted-foreground italic">Background workers processing selected media.</p>
+          <p className="text-[9px] text-muted-foreground italic">Background workers optimizing and syncing media.</p>
         </div>
         <div className="flex items-center gap-3">
           <label className="cursor-pointer">
@@ -132,31 +183,29 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {/* Persistent Cloud Media */}
         {images.map((url, index) => (
           <MediaItem 
             key={`cloud-${index}-${url}`} 
             url={url} 
+            status="done"
             onRemove={() => removeCloudImage(index)} 
           />
         ))}
 
-        {/* Instant Local Previews (Syncing invisibly in background) */}
         {activeUploads.map((item) => (
           <div key={item.id} className="relative group isolate">
             <MediaItem 
               url={item.preview} 
+              status="syncing"
               isError={item.status === 'failed'}
               onRemove={() => removePendingUpload(item.id, item.preview)} 
             />
             
-            {/* NO SYNC OVERLAYS - Image remains 100% visible */}
-
             {item.status === 'failed' && (
               <button
                 type="button"
                 onClick={() => triggerBackgroundUpload(item)}
-                className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-destructive/60 backdrop-blur-[2px] rounded-2xl transition-all hover:bg-destructive/80"
+                className="absolute inset-0 flex flex-col items-center justify-center z-[70] bg-destructive/60 backdrop-blur-[2px] rounded-2xl transition-all hover:bg-destructive/80"
               >
                 <RefreshCcw className="h-8 w-8 text-white mb-2" />
                 <span className="text-[9px] font-black text-white uppercase tracking-widest">Retry Sync</span>

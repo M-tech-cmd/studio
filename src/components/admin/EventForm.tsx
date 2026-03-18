@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import dynamic from 'next/dynamic';
-import { Expand, MapPin, Clock, Calendar as CalendarIcon, Info } from 'lucide-react';
+import { Expand, MapPin, Clock, Calendar as CalendarIcon, Info, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Timestamp } from 'firebase/firestore';
 
@@ -39,6 +39,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useState } from 'react';
 import { LargeTextEditModal } from './LargeTextEditModal';
+import { useToast } from '@/hooks/use-toast';
 
 // Lazy load uploader to prevent ChunkLoadError
 const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
@@ -73,6 +74,8 @@ const formatDateForInput = (date: any) => {
 
 export function EventForm({ event, onSave, onClose }: EventFormProps) {
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof eventSchema>>({
     resolver: zodResolver(eventSchema),
@@ -91,10 +94,18 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
   });
 
   const onSubmit = (values: z.infer<typeof eventSchema>) => {
+    if (isSyncing) {
+      toast({ variant: 'destructive', title: "Sync in progress", description: "Please wait for background uploads to finish." });
+      return;
+    }
+
+    const cloudOnlyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
+    
     const dataToSave = {
       ...values,
       id: event?.id,
       date: new Timestamp(new Date(`${values.date}T00:00:00`).getTime() / 1000, 0),
+      galleryImages: cloudOnlyImages
     };
     onSave(dataToSave as Omit<Event, 'id'> & { id?: string });
   };
@@ -199,6 +210,7 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
                         <MultiImageUpload 
                             images={form.watch('galleryImages')} 
                             onChange={(imgs) => form.setValue('galleryImages', imgs)} 
+                            onSyncStatusChange={setIsSyncing}
                             folder="event-gallery" 
                         />
                     </div>
@@ -217,7 +229,8 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
         )}
         <DialogFooter className="p-6 border-t bg-muted/5 mt-auto">
             <Button type="button" variant="outline" onClick={onClose} className="rounded-full">Cancel</Button>
-            <Button type="submit" form="event-form" className="rounded-full px-8 font-bold">
+            <Button type="submit" form="event-form" className="rounded-full px-8 font-bold" disabled={isSyncing}>
+                {isSyncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {event ? 'Save Changes' : 'Publish Event'}
             </Button>
         </DialogFooter>

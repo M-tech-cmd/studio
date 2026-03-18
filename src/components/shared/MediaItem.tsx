@@ -1,25 +1,28 @@
 'use client';
 
 import Image from 'next/image';
-import { X, Play, Video, Music } from 'lucide-react';
+import { X, Play, Video, Music, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MediaItemProps {
   url: string;
   onRemove?: () => void;
   isError?: boolean;
+  status?: 'syncing' | 'done';
   className?: string;
   showIconOverlay?: boolean;
 }
 
 /**
  * Zero-Ghost Media Item
- * Renders instantly at 100% quality without blocking spinners or blurs.
+ * Renders instantly at 100% quality.
+ * Features a tiny, non-intrusive status badge for background sync.
  */
 export function MediaItem({ 
   url, 
   onRemove, 
   isError,
+  status,
   className,
   showIconOverlay = true
 }: MediaItemProps) {
@@ -62,6 +65,14 @@ export function MediaItem({
           )}
           unoptimized
         />
+      )}
+
+      {/* SYNC INDICATOR - Tiny corner badge only */}
+      {status === 'syncing' && !isError && (
+        <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-[8px] font-black text-white uppercase px-2 py-0.5 rounded-full flex items-center gap-1 z-50">
+          <Loader2 className="h-2 w-2 animate-spin" />
+          Syncing
+        </div>
       )}
 
       {/* REMOVE ACTION */}
