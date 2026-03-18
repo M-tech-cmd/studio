@@ -15,7 +15,8 @@ interface MediaItemProps {
 
 /**
  * Zero-Ghost Media Item
- * Renders instantly at 100% quality. No spinners or blurs allowed.
+ * Renders instantly at 100% quality. 
+ * Features a top-left 'X' button for immediate task cancellation.
  */
 export function MediaItem({ 
   url, 
@@ -65,18 +66,18 @@ export function MediaItem({
         />
       )}
 
-      {/* REMOVE ACTION */}
+      {/* KILL-TASK ACTION (Top-Left 'X') */}
       {onRemove && (
         <button
           type="button"
-          className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-2xl z-[60] bg-white text-destructive hover:bg-white/90 hover:scale-110 active:scale-95 transition-all border-2 border-black/10 flex items-center justify-center"
+          className="absolute top-2 left-2 h-8 w-8 rounded-full shadow-2xl z-[70] bg-black/60 backdrop-blur-md text-white hover:bg-black/80 hover:scale-110 active:scale-95 transition-all border border-white/20 flex items-center justify-center"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             onRemove();
           }}
         >
-          <X className="h-5 w-5 stroke-[4px]" />
+          <X className="h-5 w-5 stroke-[3px]" />
         </button>
       )}
     </div>

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, RefreshCcw, X } from 'lucide-react';
-import { ref, getDownloadURL, uploadBytes } from 'firebase/storage';
+import { Upload, RefreshCcw } from 'lucide-react';
+import { ref, getDownloadURL, uploadBytesResumable, type UploadTask } from 'firebase/storage';
 import { useStorage } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -25,11 +25,12 @@ interface UploadingItem {
 /**
  * ZERO-GHOST INSTANT MULTI-UPLOAD
  * - No spinners, no blurs, no blocking.
- * - Parallel background workers handle the cloud handoff.
+ * - Parallel background workers with Kill-Task (X) support.
  */
 export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange }: MultiImageUploadProps) {
   const [activeUploads, setActiveUploads] = useState<UploadingItem[]>([]);
-  const storage = useStorage();
+  const storage = useRef(useStorage());
+  const tasksRef = useRef<Record<string, UploadTask>>({});
   const { toast } = useToast();
   
   const imagesRef = useRef<string[]>(images || []);
@@ -44,7 +45,7 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0 || !storage) return;
+    if (!files || files.length === 0 || !storage.current) return;
 
     const selectedFiles = Array.from(files).slice(0, 10);
     
@@ -55,7 +56,7 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
       const newItem: UploadingItem = { id, preview, status: 'syncing', file };
       setActiveUploads(prev => [...prev, newItem]);
 
-      // Trigger background sync immediately without awaiting
+      // Trigger background sync
       triggerBackgroundUpload(newItem);
     }
 
@@ -63,27 +64,34 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
   };
 
   const triggerBackgroundUpload = async (item: UploadingItem) => {
-    if (!storage) return;
+    if (!storage.current) return;
 
-    const storageRef = ref(storage, `${folder}/${Date.now()}_${item.id}_${item.file.name}`);
+    const storageRef = ref(storage.current, `${folder}/${Date.now()}_${item.id}_${item.file.name}`);
+    const uploadTask = uploadBytesResumable(storageRef, item.file);
     
-    try {
-      // Atomic upload: Faster and non-blocking
-      const snapshot = await uploadBytes(storageRef, item.file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      
-      const currentList = [...imagesRef.current, downloadURL];
-      onChange(currentList);
+    // Registry for Kill-Task logic
+    tasksRef.current[item.id] = uploadTask;
 
-      setActiveUploads(prev => prev.filter(u => u.id !== item.id));
-      // Cleanup preview URL
-      setTimeout(() => URL.revokeObjectURL(item.preview), 10000);
-    } catch (error: any) {
-      console.error("Sync worker failed:", error);
-      setActiveUploads(prev => prev.map(u => 
-        u.id === item.id ? { ...u, status: 'failed' } : u
-      ));
-    }
+    uploadTask.on('state_changed', 
+      null, 
+      (error) => {
+        if (error.code === 'storage/canceled') {
+            console.log(`Sync for ${item.id} terminated manually.`);
+            return;
+        }
+        console.error("Sync worker failed:", error);
+        setActiveUploads(prev => prev.map(u => u.id === item.id ? { ...u, status: 'failed' } : u));
+      }, 
+      async () => {
+        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+        const currentList = [...imagesRef.current, downloadURL];
+        onChange(currentList);
+
+        setActiveUploads(prev => prev.filter(u => u.id !== item.id));
+        delete tasksRef.current[item.id];
+        URL.revokeObjectURL(item.preview);
+      }
+    );
   };
 
   const removeCloudImage = (index: number) => {
@@ -93,6 +101,11 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
   };
 
   const removePendingUpload = (id: string, preview: string) => {
+    // KILL-TASK LOGIC
+    if (tasksRef.current[id]) {
+        tasksRef.current[id].cancel();
+        delete tasksRef.current[id];
+    }
     setActiveUploads(prev => prev.filter(u => u.id !== id));
     URL.revokeObjectURL(preview);
   };
@@ -104,9 +117,9 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
         <label className="cursor-pointer">
           <div className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-full text-[10px] font-black hover:scale-105 transition-all shadow-lg uppercase tracking-widest active:scale-95">
             <Upload className="h-3.5 w-3.5" />
-            Add Images
+            Add Media
           </div>
-          <input type="file" multiple className="hidden" accept="image/*" onChange={handleFileChange} />
+          <input type="file" multiple className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
         </label>
       </div>
 

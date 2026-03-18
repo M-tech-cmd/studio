@@ -6,21 +6,18 @@ import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import TextStyle from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
-import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Link2, Image as ImageIcon, Undo, Redo, Video, Music, Loader2, XCircle } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Link2, Image as ImageIcon, Undo, Redo, Video, Music } from 'lucide-react';
 import { useCallback, useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useStorage } from '@/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, type UploadTask } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
-import { Progress } from '@/components/ui/progress';
 
 const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaTypeRef = useRef<'image' | 'video' | 'audio'>('image');
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState(0);
-  const activeTempUrlRef = useRef<string | null>(null);
+  const activeTasksRef = useRef<Record<string, UploadTask>>({});
   
   const storage = useStorage();
   const { toast } = useToast();
@@ -66,16 +63,6 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     }
   }, [value, editor]);
 
-  const handleCancelSync = () => {
-    if (activeTempUrlRef.current) {
-        URL.revokeObjectURL(activeTempUrlRef.current);
-        activeTempUrlRef.current = null;
-    }
-    setIsSyncing(false);
-    setSyncProgress(0);
-    toast({ title: "Upload Cancelled" });
-  };
-
   const triggerUpload = (type: 'image' | 'video' | 'audio') => {
     mediaTypeRef.current = type;
     if (fileInputRef.current) {
@@ -91,11 +78,7 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     if (!file || !editor || !storage) return;
 
     const tempUrl = URL.createObjectURL(file);
-    activeTempUrlRef.current = tempUrl;
     const type = mediaTypeRef.current;
-
-    setIsSyncing(true);
-    setSyncProgress(10);
 
     // Instant Preview Insertion
     if (type === 'image') {
@@ -114,32 +97,28 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
       `).run();
     }
 
-    setSyncProgress(40);
-
     try {
         const storageRef = ref(storage, `editor-media/${Date.now()}_${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        setSyncProgress(80);
-        const downloadURL = await getDownloadURL(snapshot.ref);
-        
-        if (downloadURL && isSyncing) {
-            const currentContent = editor.getHTML();
-            // Swap tempUrl with final downloadURL in the content string
-            const updatedContent = currentContent.split(tempUrl).join(downloadURL);
-            editor.commands.setContent(updatedContent, false);
-            setSyncProgress(100);
-            toast({ title: "Media Synchronized" });
-        }
+        const uploadTask = uploadBytesResumable(storageRef, file);
+        activeTasksRef.current[tempUrl] = uploadTask;
+
+        uploadTask.on('state_changed', null, (err) => {
+            console.error("Editor Media Sync Failed:", err);
+        }, async () => {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            if (downloadURL) {
+                const currentContent = editor.getHTML();
+                const updatedContent = currentContent.split(tempUrl).join(downloadURL);
+                editor.commands.setContent(updatedContent, false);
+                delete activeTasksRef.current[tempUrl];
+                URL.revokeObjectURL(tempUrl);
+            }
+        });
+
     } catch (error: any) {
-        console.error("Editor Cloud Sync Failed:", error);
-        toast({ variant: 'destructive', title: "Sync Failed", description: "Failed to persist media to cloud." });
+        console.error("Editor Cloud Sync Initiation Failed:", error);
     } finally {
-        setIsSyncing(false);
-        setSyncProgress(0);
         if (fileInputRef.current) fileInputRef.current.value = '';
-        setTimeout(() => {
-            if (tempUrl) URL.revokeObjectURL(tempUrl);
-        }, 10000);
     }
   };
   
@@ -179,9 +158,9 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
             </div>
             <Separator orientation="vertical" className="mx-1 h-6" />
             <div className="flex items-center gap-2">
-                <Button variant='ghost' size="sm" type="button" onClick={() => triggerUpload('image')} title="Insert Image" disabled={isSyncing}><ImageIcon className="h-4 w-4" /></Button>
-                <Button variant='ghost' size="sm" type="button" onClick={() => triggerUpload('video')} title="Insert Video" disabled={isSyncing}><Video className="h-4 w-4" /></Button>
-                <Button variant='ghost' size="sm" type="button" onClick={() => triggerUpload('audio')} title="Insert Audio" disabled={isSyncing}><Music className="h-4 w-4" /></Button>
+                <Button variant='ghost' size="sm" type="button" onClick={() => triggerUpload('image')} title="Insert Image"><ImageIcon className="h-4 w-4" /></Button>
+                <Button variant='ghost' size="sm" type="button" onClick={() => triggerUpload('video')} title="Insert Video"><Video className="h-4 w-4" /></Button>
+                <Button variant='ghost' size="sm" type="button" onClick={() => triggerUpload('audio')} title="Insert Audio"><Music className="h-4 w-4" /></Button>
                 <Button variant={editor.isActive('link') ? 'secondary' : 'ghost'} size="sm" type="button" onClick={setLink}><Link2 className="h-4 w-4" /></Button>
             </div>
             <div className="ml-auto flex items-center gap-1">
@@ -189,19 +168,6 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
                 <Button variant='ghost' size="sm" type="button" onClick={() => editor.chain().focus().redo().run()}><Redo className="h-4 w-4" /></Button>
             </div>
         </div>
-        
-        {isSyncing && (
-            <div className="bg-primary/10 px-4 py-2 flex items-center justify-between border-t border-primary/20 animate-in slide-in-from-top-2">
-                <div className="flex items-center gap-3 flex-1">
-                    <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-primary">Syncing Media to Cloud...</span>
-                    <Progress value={syncProgress} className="h-1.5 flex-1 max-w-[200px]" />
-                </div>
-                <Button variant="ghost" size="sm" onClick={handleCancelSync} className="h-6 text-[10px] font-black text-destructive hover:text-destructive hover:bg-destructive/10 uppercase tracking-tighter">
-                    <XCircle className="h-3 w-3 mr-1" /> Cancel
-                </Button>
-            </div>
-        )}
       </div>
       <EditorContent editor={editor} />
     </div>
