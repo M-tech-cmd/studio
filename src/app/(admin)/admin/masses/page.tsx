@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -63,19 +62,12 @@ export default function AdminMassesPage() {
   const handleDelete = (id: string) => {
     if (!firestore) return;
     const massDoc = doc(firestore, 'masses', id);
+    
+    // OPTIMISTIC FEEDBACK
+    toast({ title: 'Deleting Mass...', description: 'Registry is being updated.' });
+
     deleteDoc(massDoc)
-      .then(() => {
-        toast({
-          title: 'Mass Deleted',
-          description: 'The mass schedule has been successfully removed.',
-        });
-      })
       .catch((error: any) => {
-        toast({
-          variant: 'destructive',
-          title: 'Uh oh! Something went wrong.',
-          description: error.message || 'Could not delete the mass.',
-        });
         const permissionError = new FirestorePermissionError({
           path: massDoc.path,
           operation: 'delete',
@@ -92,52 +84,54 @@ export default function AdminMassesPage() {
   const handleFormSave = (massData: Omit<Mass, 'id'> & { id?: string }) => {
     if (!firestore) return;
 
+    // 1. DATA VALIDATION: Prevent undefined field errors
+    if (!massData.day || !massData.title || !massData.startTime || !massData.endTime) {
+        toast({
+            variant: 'destructive',
+            title: 'Missing Information',
+            description: 'Day, Title, and both Start/End times are required.',
+        });
+        return;
+    }
+
     const isEdit = !!massData.id;
+    
+    // 2. GEMINI METHOD: Instant UI Update
+    setIsFormOpen(false);
+    toast({
+        title: isEdit ? 'Schedule Updated' : 'Mass Added',
+        description: 'Changes are being synchronized with the public schedule.',
+    });
+
+    // 3. PERSISTENCE: Strict removal of 'id' from document body
+    const { id, ...cleanData } = massData;
+    const sanitizedData = {
+        day: cleanData.day,
+        title: cleanData.title,
+        startTime: cleanData.startTime,
+        endTime: cleanData.endTime,
+        description: cleanData.description || '', // Default to empty string
+    };
 
     if (isEdit) {
-        const { id, ...dataToUpdate } = massData;
         const massDoc = doc(firestore, 'masses', id!);
-        updateDoc(massDoc, dataToUpdate)
-            .then(() => {
-                setIsFormOpen(false);
-                toast({
-                    title: 'Schedule Updated',
-                    description: 'Mass schedule changes have been saved.',
-                });
-            })
+        updateDoc(massDoc, sanitizedData)
             .catch((error: any) => {
-                toast({
-                    variant: 'destructive',
-                    title: 'Update Failed',
-                    description: error.message || 'Could not update the schedule.',
-                });
                 const permissionError = new FirestorePermissionError({
                     path: massDoc.path,
                     operation: 'update',
-                    requestResourceData: dataToUpdate,
+                    requestResourceData: sanitizedData,
                 });
                 errorEmitter.emit('permission-error', permissionError);
             });
     } else {
         const massesCollection = collection(firestore, 'masses');
-        addDoc(massesCollection, massData)
-            .then(() => {
-                setIsFormOpen(false);
-                toast({
-                    title: 'Success!',
-                    description: 'Mass schedule has been added.',
-                });
-            })
+        addDoc(massesCollection, sanitizedData)
             .catch((error: any) => {
-                toast({
-                    variant: 'destructive',
-                    title: 'Uh oh! Something went wrong.',
-                    description: error.message || 'Could not save the mass schedule.',
-                });
                 const permissionError = new FirestorePermissionError({
                     path: massesCollection.path,
                     operation: 'create',
-                    requestResourceData: massData,
+                    requestResourceData: sanitizedData,
                 });
                 errorEmitter.emit('permission-error', permissionError);
             });
