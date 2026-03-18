@@ -1,11 +1,10 @@
-
 'use client';
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import dynamic from 'next/dynamic';
-import { Expand, MapPin, Clock, Calendar as CalendarIcon, Upload } from 'lucide-react';
+import { Expand, MapPin, Clock, Calendar as CalendarIcon, Upload, Loader2, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Timestamp } from 'firebase/firestore';
 
@@ -40,6 +39,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useState } from 'react';
 import { LargeTextEditModal } from './LargeTextEditModal';
+import { useToast } from '@/hooks/use-toast';
 
 const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
   ssr: false,
@@ -73,6 +73,8 @@ const formatDateForInput = (date: any) => {
 
 export function EventForm({ event, onSave, onClose }: EventFormProps) {
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof eventSchema>>({
     resolver: zodResolver(eventSchema),
@@ -102,13 +104,26 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
     onSave(dataToSave as Omit<Event, 'id'> & { id?: string });
   };
 
+  const handleCancel = () => {
+    setIsSyncing(false);
+    onClose();
+  };
+
   return (
-    <Dialog open={true} onOpenChange={onClose}>
+    <Dialog open={true} onOpenChange={handleCancel}>
       <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="text-2xl font-black uppercase tracking-tighter">
-            {event ? 'Edit Event' : 'New Parish Event'}
-          </DialogTitle>
+          <div className="flex items-center justify-between pr-8">
+            <DialogTitle className="text-2xl font-black uppercase tracking-tighter">
+                {event ? 'Edit Event' : 'New Parish Event'}
+            </DialogTitle>
+            {isSyncing && (
+                <div className="flex items-center gap-2 text-primary animate-pulse">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-[10px] font-black uppercase">Syncing...</span>
+                </div>
+            )}
+          </div>
         </DialogHeader>
         
         <Tabs defaultValue="basic" className="flex-1 flex flex-col overflow-hidden">
@@ -194,7 +209,8 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
                     <MultiImageUpload 
                         images={form.watch('galleryImages')} 
                         onChange={(imgs) => form.setValue('galleryImages', imgs)} 
-                        folder="event-gallery" 
+                        folder="event-gallery"
+                        onSyncStatusChange={setIsSyncing}
                     />
                 </TabsContent>
             </ScrollArea>
@@ -209,9 +225,12 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
               title="Edit Event Content"
             />
         )}
-        <DialogFooter className="p-6 border-t bg-muted/5 mt-auto">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-full">Cancel</Button>
-            <Button type="submit" form="event-form" className="rounded-full px-8 font-bold">
+        <DialogFooter className="p-6 border-t bg-muted/5 mt-auto gap-4">
+            <Button type="button" variant="outline" onClick={handleCancel} className="rounded-full">
+                {isSyncing ? <XCircle className="mr-2 h-4 w-4" /> : null}
+                {isSyncing ? 'Cancel Sync' : 'Close Form'}
+            </Button>
+            <Button type="submit" form="event-form" className="rounded-full px-8 font-bold" disabled={isSyncing}>
                 {event ? 'Save Changes' : 'Publish Event'}
             </Button>
         </DialogFooter>

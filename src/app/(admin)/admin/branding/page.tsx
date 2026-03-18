@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Upload, RotateCcw, Palette, Link as LinkIcon, X, Palette as PaletteIcon } from 'lucide-react';
+import { Upload, RotateCcw, Palette, Link as LinkIcon, X, Palette as PaletteIcon, Loader2, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
@@ -136,6 +136,7 @@ export default function BrandingPage() {
     const router = useRouter();
     const { toast } = useToast();
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
 
     const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
     const { data: settings, isLoading } = useDoc<SiteSettings>(settingsRef);
@@ -166,27 +167,6 @@ export default function BrandingPage() {
         resolver: zodResolver(contentSchema),
         defaultValues: { title: '', content: '', imageUrl: '' }
     });
-
-    useEffect(() => {
-        if (!firestore) return;
-        const seedData = async () => {
-            const batch = writeBatch(firestore);
-            const contentRef = collection(firestore, 'site_content');
-            const blocks = [
-                { id: 'about-us', pageName: 'About Us', title: 'Our History', content: '<p>Founded in 1962, St. Martin De Porres Parish has grown from a small community into a vibrant parish family.</p>', imageUrl: 'https://picsum.photos/seed/history/800/600' },
-                { id: 'about-dev-team', pageName: 'About Us', title: 'Development Team', content: '<p>Developed by the St. Martin Youth Serving Christ (YSC) group.</p>', imageUrl: 'https://picsum.photos/seed/dev-team/800/600' },
-                { id: 'privacy-policy', pageName: 'Legal', title: 'Privacy Policy', content: '<h2>Privacy Policy</h2><p>Your privacy is important to us...</p>' },
-                { id: 'terms-of-use', pageName: 'Legal', title: 'Terms of Use', content: '<h2>Terms of Use</h2><p>Welcome to our site...</p>' }
-            ];
-            for (const b of blocks) {
-                const docRef = doc(contentRef, b.id);
-                const snap = await getDoc(docRef);
-                if (!snap.exists()) batch.set(docRef, b);
-            }
-            await batch.commit();
-        };
-        seedData();
-    }, [firestore]);
 
     useEffect(() => {
         if(settings) {
@@ -228,14 +208,17 @@ export default function BrandingPage() {
         if (!storage) return;
         const previewUrl = URL.createObjectURL(file);
         form.setValue(`${prefix}ImageUrl` as any, previewUrl);
+        setIsSyncing(true);
+        
         try {
             const storageRef = ref(storage, `banners/${prefix}_${Date.now()}_${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
-            const url = await getDownloadURL(snapshot.ref);
+            await uploadBytes(storageRef, file);
+            const url = await getDownloadURL(storageRef);
             form.setValue(`${prefix}ImageUrl` as any, url);
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
         } finally {
+            setIsSyncing(false);
             URL.revokeObjectURL(previewUrl);
         }
     };
@@ -244,14 +227,17 @@ export default function BrandingPage() {
         if (!storage) return;
         const previewUrl = URL.createObjectURL(file);
         contentForm.setValue('imageUrl', previewUrl);
+        setIsSyncing(true);
+
         try {
             const storageRef = ref(storage, `content/${Date.now()}_${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
-            const url = await getDownloadURL(snapshot.ref);
+            await uploadBytes(storageRef, file);
+            const url = await getDownloadURL(storageRef);
             contentForm.setValue('imageUrl', url);
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
         } finally {
+            setIsSyncing(false);
             URL.revokeObjectURL(previewUrl);
         }
     };
@@ -259,17 +245,22 @@ export default function BrandingPage() {
     const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !storage) return;
+        
         const previewUrl = URL.createObjectURL(file);
         setLogoPreview(previewUrl);
+        setIsSyncing(true);
+
         try {
             const storageRef = ref(storage, `branding/${Date.now()}_${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
-            const url = await getDownloadURL(snapshot.ref);
+            await uploadBytes(storageRef, file);
+            const url = await getDownloadURL(storageRef);
             form.setValue('logoUrl', url);
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Logo Sync Failed', description: error.message });
+            setLogoPreview(null);
         } finally {
-            URL.revokeObjectURL(previewUrl);
+            setIsSyncing(false);
+            // Don't revoke previewURL yet as it might still be needed for immediate display
         }
     };
 
@@ -296,7 +287,6 @@ export default function BrandingPage() {
 
     const onSubmitBranding = (values: z.infer<typeof brandingSchema>) => {
         if (!settingsRef) return;
-        // INSTANT SAVE UX
         toast({ title: 'Visuals Synchronized', description: 'Changes are being reflected across the portal.' });
         let sanitizedData = {};
         try {
@@ -305,6 +295,11 @@ export default function BrandingPage() {
             sanitizedData = values;
         }
         setDoc(settingsRef, sanitizedData, { merge: true }).then(() => router.refresh());
+    };
+
+    const handleCancelSync = () => {
+        setIsSyncing(false);
+        toast({ title: 'Sync Interrupted', description: 'Background uploads have been stopped.' });
     };
 
     const onSubmitContent = (values: any) => {
@@ -318,9 +313,18 @@ export default function BrandingPage() {
 
     return (
         <div className="space-y-6 py-6 px-4 max-w-6xl mx-auto">
-            <div className="flex items-center gap-3">
-                <PaletteIcon className="h-8 w-8 text-primary" />
-                <h1 className="text-3xl font-bold tracking-tight">Branding & Visuals</h1>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <PaletteIcon className="h-8 w-8 text-primary" />
+                    <h1 className="text-3xl font-bold tracking-tight">Branding & Visuals</h1>
+                </div>
+                {isSyncing && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full border border-primary/20 animate-in fade-in">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-primary">Media Synchronizing...</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleCancelSync}><XCircle className="h-4 w-4" /></Button>
+                    </div>
+                )}
             </div>
             
             <Tabs defaultValue="identity" className="w-full">
@@ -344,7 +348,7 @@ export default function BrandingPage() {
                                     <div className="space-y-4 pt-4 border-t">
                                         <FormLabel>Church Logo</FormLabel>
                                         <div className="flex items-center gap-6">
-                                            <div className="relative h-24 w-24 rounded-full border-2 border-primary/20 bg-muted overflow-hidden">
+                                            <div className="relative h-24 w-24 rounded-full border-2 border-primary/20 bg-muted overflow-hidden isolate">
                                                 {logoPreview ? <Image src={logoPreview} alt="Logo" fill className="object-cover" unoptimized /> : null}
                                             </div>
                                             <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer p-6 hover:bg-muted transition-colors">
@@ -369,8 +373,11 @@ export default function BrandingPage() {
                                 <SectionControls form={form} prefix="projects" label="Parish Projects" onReset={handleSectionReset} onImageUpload={handleImageUpload} />
                             </div>
 
-                            <div className="flex justify-end sticky bottom-6 z-50">
-                                <Button type="submit" size="lg" className="shadow-2xl rounded-full px-12 h-16 text-lg font-bold">
+                            <div className="flex justify-end sticky bottom-6 z-50 gap-4">
+                                <Button type="button" variant="outline" size="lg" className="rounded-full px-8 h-16 text-lg font-bold" onClick={() => router.push('/admin/dashboard')}>
+                                    Cancel Changes
+                                </Button>
+                                <Button type="submit" size="lg" className="shadow-2xl rounded-full px-12 h-16 text-lg font-bold" disabled={isSyncing}>
                                     Save Visual Identity
                                 </Button>
                             </div>
@@ -430,7 +437,10 @@ export default function BrandingPage() {
                                             </div>
                                         </>
                                     )}
-                                    <div className="flex justify-end border-t pt-6"><Button type="submit" size="lg">Update Content</Button></div>
+                                    <div className="flex justify-end border-t pt-6 gap-4">
+                                        <Button type="button" variant="outline" size="lg" onClick={() => router.push('/admin/dashboard')}>Cancel</Button>
+                                        <Button type="submit" size="lg" disabled={isSyncing}>Update Content</Button>
+                                    </div>
                                 </form>
                             </Form>
                         </CardContent>
