@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Loader2, RefreshCcw } from 'lucide-react';
+import { Upload, RefreshCcw } from 'lucide-react';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useStorage } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -23,16 +23,15 @@ interface UploadingItem {
 }
 
 /**
- * RELIABLE INSTANT MULTI-UPLOAD
- * Features parallel background workers using native Firebase observers.
- * No manual timeouts; let's Firebase handle retry logic internally.
+ * TRANSPARENT INSTANT MULTI-UPLOAD
+ * Features parallel background workers with ZERO visual blockers.
+ * Images appear instantly at 100% quality with no spinners or overlays.
  */
 export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
   const [activeUploads, setActiveUploads] = useState<UploadingItem[]>([]);
   const storage = useStorage();
   const { toast } = useToast();
   
-  // Use ref to maintain the latest list of URLs for the parallel workers to avoid stale closures
   const imagesRef = useRef<string[]>(images || []);
 
   useEffect(() => {
@@ -43,7 +42,6 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
     const files = e.target.files;
     if (!files || files.length === 0 || !storage) return;
 
-    // Hard-cap at 10 to ensure stability
     const selectedFiles = Array.from(files).slice(0, 10);
     if (files.length > 10) {
       toast({ 
@@ -53,7 +51,6 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       });
     }
 
-    // 1. Instant UI Render
     selectedFiles.forEach(file => {
       const id = Math.random().toString(36).substring(7);
       const preview = URL.createObjectURL(file);
@@ -61,7 +58,6 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       const newItem: UploadingItem = { id, preview, status: 'syncing', progress: 0, file };
       setActiveUploads(prev => [...prev, newItem]);
 
-      // 2. Parallel Background Sync (Non-blocking)
       triggerBackgroundUpload(newItem);
     });
 
@@ -72,41 +68,28 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
     if (!storage) return;
 
     const storageRef = ref(storage, `${folder}/${Date.now()}_${item.id}_${item.file.name}`);
-    
-    // Switch to uploadBytesResumable for reliable progress tracking and native retry handling
     const uploadTask = uploadBytesResumable(storageRef, item.file);
 
     uploadTask.on(
       'state_changed',
       (snapshot) => {
-        // Track real-time progress
         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
         setActiveUploads(prev => prev.map(u => 
           u.id === item.id ? { ...u, progress } : u
         ));
       },
       (error) => {
-        // Firebase native error handling (Network, Permissions, Storage full, etc.)
         console.error(`Sync worker ${item.id} failed:`, error.message);
         setActiveUploads(prev => prev.map(u => 
           u.id === item.id ? { ...u, status: 'failed' } : u
         ));
-        toast({ 
-          variant: 'destructive', 
-          title: 'Sync Interrupted', 
-          description: error.message 
-        });
       },
       async () => {
-        // 3. Finalization - Native task complete
         try {
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          
-          // Silent State Swap using the latest ref list
           const currentList = [...imagesRef.current, downloadURL];
           onChange(currentList);
 
-          // Cleanup local UI item and memory
           setActiveUploads(prev => prev.filter(u => u.id !== item.id));
           setTimeout(() => URL.revokeObjectURL(item.preview), 5000);
         } catch (err: any) {
@@ -134,11 +117,10 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
     <div className="space-y-6 pt-4">
       <div className="flex items-center justify-between bg-muted/30 p-4 rounded-2xl border border-dashed border-primary/20">
         <div className="space-y-1">
-          <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Instant Gallery Sync</Label>
-          <p className="text-[9px] text-muted-foreground italic">Parallel background workers active.</p>
+          <Label className="font-black text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Gallery Synchronization</Label>
+          <p className="text-[9px] text-muted-foreground italic">Background workers processing selected media.</p>
         </div>
         <div className="flex items-center gap-3">
-          {activeUploads.length > 0 && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
           <label className="cursor-pointer">
             <div className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-full text-[10px] font-black hover:scale-105 transition-all shadow-lg uppercase tracking-widest active:scale-95">
               <Upload className="h-3.5 w-3.5" />
@@ -150,7 +132,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {/* Cloud Images (Finished) */}
+        {/* Persistent Cloud Media */}
         {images.map((url, index) => (
           <MediaItem 
             key={`cloud-${index}-${url}`} 
@@ -159,7 +141,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
           />
         ))}
 
-        {/* Instant Previews (Syncing) */}
+        {/* Instant Local Previews (Syncing invisibly in background) */}
         {activeUploads.map((item) => (
           <div key={item.id} className="relative group isolate">
             <MediaItem 
@@ -168,14 +150,7 @@ export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadP
               onRemove={() => removePendingUpload(item.id, item.preview)} 
             />
             
-            {item.status === 'syncing' && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20 z-20 overflow-hidden rounded-b-2xl">
-                    <div 
-                        className="h-full bg-primary transition-all duration-300" 
-                        style={{ width: `${item.progress}%` }}
-                    />
-                </div>
-            )}
+            {/* NO SYNC OVERLAYS - Image remains 100% visible */}
 
             {item.status === 'failed' && (
               <button
