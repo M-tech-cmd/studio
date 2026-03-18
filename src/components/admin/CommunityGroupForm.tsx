@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -5,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import dynamic from 'next/dynamic';
-import { Expand, User, Clock, Mail } from 'lucide-react';
+import { Expand, User, Clock, Mail, Upload } from 'lucide-react';
 
 import type { CommunityGroup } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -37,7 +38,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LargeTextEditModal } from './LargeTextEditModal';
 
-// Lazy load uploader to prevent ChunkLoadError
 const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
   ssr: false,
   loading: () => <div className="h-24 w-full animate-pulse bg-muted rounded-2xl" />
@@ -84,7 +84,6 @@ export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFor
   });
 
   const onSubmit = (values: z.infer<typeof groupSchema>) => {
-    // INSTANT SAVE: Proceed with ready URLs
     const readyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
     onSave({ ...values, id: group?.id, galleryImages: readyImages });
   };
@@ -116,8 +115,10 @@ export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFor
                                 )}/>
                                 <FormField control={form.control} name="type" render={({ field }) => (
                                     <FormItem><FormLabel className="font-bold">Classification</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue/></SelectTrigger></FormControl>
-                                    <SelectContent>{['Small Christian Community', 'Group', 'Choir', 'Ministry'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></FormItem>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl><SelectTrigger className="h-12"><SelectValue/></SelectTrigger></FormControl>
+                                        <SelectContent>{['Small Christian Community', 'Group', 'Choir', 'Ministry'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                                    </Select></FormItem>
                                 )}/>
                             </div>
 

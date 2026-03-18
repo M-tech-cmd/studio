@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import dynamic from 'next/dynamic';
-import { Expand, MapPin, Clock, Calendar as CalendarIcon } from 'lucide-react';
+import { Expand, MapPin, Clock, Calendar as CalendarIcon, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { Timestamp } from 'firebase/firestore';
 
@@ -40,7 +41,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useState } from 'react';
 import { LargeTextEditModal } from './LargeTextEditModal';
 
-// Lazy load uploader to prevent ChunkLoadError
 const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
   ssr: false,
   loading: () => <div className="h-24 w-full animate-pulse bg-muted rounded-2xl" />
@@ -91,7 +91,6 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
   });
 
   const onSubmit = (values: z.infer<typeof eventSchema>) => {
-    // INSTANT SAVE: filter out local blob URLs
     const readyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
     
     const dataToSave = {

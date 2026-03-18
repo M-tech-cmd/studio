@@ -1,7 +1,9 @@
+
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { BulletinPost } from '@/lib/types';
@@ -16,7 +18,11 @@ import { Reactions } from '@/components/bulletin/Reactions';
 import { CommentSection } from '@/components/bulletin/CommentSection';
 import { AuthorBadge } from '@/components/shared/AuthorBadge';
 import Link from 'next/link';
-import { PhotoGallery } from '@/components/shared/PhotoGallery';
+
+const PhotoGallery = dynamic(() => import('@/components/shared/PhotoGallery').then(mod => mod.PhotoGallery), {
+  ssr: false,
+  loading: () => <div className="h-48 w-full animate-pulse bg-muted rounded-2xl" />
+});
 
 export default function BulletinPostPage() {
   const params = useParams();
@@ -90,7 +96,6 @@ export default function BulletinPostPage() {
                         dangerouslySetInnerHTML={{ __html: post.content }} 
                     />
                     
-                    {/* Integrated Photo Gallery - Using correct galleryImages property */}
                     <div className="mt-12 pt-12 border-t border-dashed">
                         <PhotoGallery photos={post.galleryImages} title={post.title} />
                     </div>

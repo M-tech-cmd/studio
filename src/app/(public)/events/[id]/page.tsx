@@ -3,6 +3,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { Calendar, Clock, MapPin, ArrowLeft, Info } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +14,11 @@ import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { Event } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PhotoGallery } from '@/components/shared/PhotoGallery';
+
+const PhotoGallery = dynamic(() => import('@/components/shared/PhotoGallery').then(mod => mod.PhotoGallery), {
+  ssr: false,
+  loading: () => <div className="h-48 w-full animate-pulse bg-muted rounded-2xl" />
+});
 
 export default function EventDetailPage() {
   const params = useParams();
@@ -136,7 +141,6 @@ export default function EventDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Dynamic Photo Gallery */}
           <div className="pb-20">
             <PhotoGallery photos={event.galleryImages} title={event.title} />
           </div>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -5,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import dynamic from 'next/dynamic';
-import { Expand, Target, TrendingUp } from 'lucide-react';
+import { Expand, Target, TrendingUp, Upload } from 'lucide-react';
 
 import type { DevelopmentProject } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { LargeTextEditModal } from './LargeTextEditModal';
 
-// Lazy load uploader to prevent ChunkLoadError
 const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
   ssr: false,
   loading: () => <div className="h-24 w-full animate-pulse bg-muted rounded-2xl" />
@@ -79,7 +79,6 @@ export function DevelopmentProjectForm({ project, onSave, onClose }: Development
   });
 
   const onSubmit = (values: z.infer<typeof projectSchema>) => {
-    // INSTANT SAVE: proceed with cloud URLs
     const readyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
     onSave({ ...values, id: project?.id, galleryImages: readyImages });
   };
@@ -127,8 +126,10 @@ export function DevelopmentProjectForm({ project, onSave, onClose }: Development
 
                             <FormField control={form.control} name="status" render={({ field }) => (
                                 <FormItem><FormLabel className="font-bold">Project Status</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
-                                <SelectContent>{['Upcoming', 'Ongoing', 'Completed'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></FormItem>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                    <SelectContent>{['Upcoming', 'Ongoing', 'Completed'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                                </Select></FormItem>
                             )}/>
 
                             <FormField control={form.control} name="imageUrl" render={({ field }) => (

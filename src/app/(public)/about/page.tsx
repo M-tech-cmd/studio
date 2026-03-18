@@ -1,3 +1,4 @@
+
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -41,26 +42,21 @@ function AboutContent() {
 
     if(isLoading) {
         return (
-            <>
-                <section className="py-16">
-                    <div className="container max-w-7xl mx-auto px-4">
-                        <div className="grid lg:grid-cols-[1fr_400px] gap-12 items-start">
-                            <div className="space-y-6">
-                                <Skeleton className="h-10 w-48 mb-4" />
-                                <div className="space-y-4">
-                                    <Skeleton className="h-4 w-full" />
-                                    <Skeleton className="h-4 w-full" />
-                                    <Skeleton className="h-4 w-full" />
-                                    <Skeleton className="h-4 w-5/6" />
-                                </div>
-                            </div>
-                            <div className="rounded-2xl overflow-hidden shadow-xl">
-                                <Skeleton className="w-full h-[500px]" />
+            <section className="py-16">
+                <div className="container max-w-7xl mx-auto px-4">
+                    <div className="grid lg:grid-cols-[1.5fr_1fr] gap-12 items-start">
+                        <div className="space-y-6">
+                            <Skeleton className="h-10 w-48 mb-4" />
+                            <div className="space-y-4">
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-4 w-full" />
                             </div>
                         </div>
+                        <Skeleton className="w-full h-[500px] rounded-2xl" />
                     </div>
-                </section>
-            </>
+                </div>
+            </section>
         )
     }
 
@@ -68,7 +64,7 @@ function AboutContent() {
         <>
             <section className="py-16 md:py-24">
                 <div className="container max-w-7xl mx-auto px-4">
-                    <div className="grid lg:grid-cols-[1fr_400px] gap-12 items-start">
+                    <div className="grid lg:grid-cols-[1.5fr_1fr] gap-12 items-start">
                         <div className="order-2 lg:order-1">
                             <h2 className="text-3xl md:text-4xl font-headline font-black tracking-tight mb-8 border-l-4 border-primary pl-6">
                                 Our History
@@ -79,18 +75,18 @@ function AboutContent() {
                             />
                         </div>
                         <div className="order-1 lg:order-2 lg:sticky lg:top-24">
-                            <div className="rounded-2xl overflow-hidden shadow-2xl transition-transform duration-500 hover:scale-[1.02]">
+                            <div className="rounded-2xl overflow-hidden shadow-2xl transition-transform duration-500 hover:scale-[1.02] border-2 border-white">
                                 <Image
                                 src={aboutContent?.imageUrl || "https://picsum.photos/seed/history/800/1000"}
                                 alt={aboutContent?.title || 'Church History'}
-                                data-ai-hint={(aboutContent?.imageHint || "church history") as string}
+                                data-ai-hint="church history"
                                 width={800}
                                 height={1000}
                                 className="w-full h-auto object-cover"
                                 unoptimized
                                 />
                             </div>
-                            <div className="mt-4 p-4 bg-muted/30 rounded-xl border border-dashed text-center">
+                            <div className="mt-4 p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-dashed text-center">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Established 1962</p>
                             </div>
                         </div>
@@ -113,7 +109,7 @@ function AboutContent() {
                                 <Image
                                     src={profile.imageUrl || "https://picsum.photos/seed/clergy/400/400"}
                                     alt={profile.name}
-                                    data-ai-hint={profile.imageHint}
+                                    data-ai-hint="clergy staff"
                                     fill
                                     className="object-cover transition-transform duration-700 group-hover:scale-110"
                                     unoptimized
@@ -133,11 +129,11 @@ function AboutContent() {
             <section className="py-24">
                 <div className="container max-w-7xl mx-auto px-4">
                     <div className="grid lg:grid-cols-2 gap-16 items-center">
-                        <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+                        <div className="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-white">
                             <Image
                             src={devTeamContent?.imageUrl || "https://picsum.photos/seed/dev-team/800/600"}
                             alt={devTeamContent?.title || 'Development Team'}
-                            data-ai-hint={(devTeamContent?.imageHint || "development team") as string}
+                            data-ai-hint="development team"
                             width={800}
                             height={600}
                             className="w-full h-auto object-cover"
