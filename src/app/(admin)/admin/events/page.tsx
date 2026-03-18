@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -83,35 +82,21 @@ export default function AdminEventsPage() {
   };
 
   const handleFormSave = (eventData: Omit<Event, 'id'> & { id?: string }) => {
-    if (!firestore) {
-        toast({
-            variant: 'destructive',
-            title: 'Error',
-            description: 'Database connection not found.',
-        });
-        return;
-    }
+    if (!firestore) return;
     const isNew = !eventData.id;
 
-    const successCallback = () => {
-        setIsFormOpen(false);
-        toast({
-            title: 'Success!',
-            description: 'Content is now live for members.',
-        });
-    };
+    // INSTANT FEEDBACK
+    setIsFormOpen(false);
+    toast({
+        title: 'Event Updated',
+        description: 'Changes have been synchronized with the calendar.',
+    });
 
     if (isNew) {
         const { id, ...dataToAdd } = eventData;
         const eventsCollection = collection(firestore, 'events');
         addDoc(eventsCollection, dataToAdd)
-            .then(successCallback)
             .catch((error: any) => {
-                toast({
-                    variant: 'destructive',
-                    title: 'Uh oh! Something went wrong.',
-                    description: error.message || 'Could not save the event.',
-                });
                 const permissionError = new FirestorePermissionError({
                   path: eventsCollection.path,
                   operation: 'create',
@@ -124,13 +109,7 @@ export default function AdminEventsPage() {
         if (!id) return;
         const eventDoc = doc(firestore, 'events', id);
         updateDoc(eventDoc, dataToUpdate)
-            .then(successCallback)
             .catch((error: any) => {
-                toast({
-                    variant: 'destructive',
-                    title: 'Uh oh! Something went wrong.',
-                    description: error.message || 'Could not update the event.',
-                });
                 const permissionError = new FirestorePermissionError({
                   path: eventDoc.path,
                   operation: 'update',

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -84,20 +83,18 @@ export default function AdminDevelopmentPage() {
     if (!firestore) return;
     const isNew = !projectData.id;
     
-    const successCallback = () => {
-        setIsFormOpen(false);
-        toast({
-            title: 'Success!',
-            description: 'Content is now live for members.',
-        });
-    };
+    // INSTANT FEEDBACK
+    setIsFormOpen(false);
+    toast({
+        title: 'Project Saved',
+        description: 'Updates are live for parishioners.',
+    });
     
     if (isNew) {
         const dataToAdd = { ...projectData };
         delete dataToAdd.id;
         const projectsCollection = collection(firestore, 'development_projects');
         addDoc(projectsCollection, dataToAdd)
-            .then(successCallback)
             .catch(() => {
                 const permissionError = new FirestorePermissionError({
                     path: projectsCollection.path,
@@ -111,7 +108,6 @@ export default function AdminDevelopmentPage() {
         if (!id) return;
         const projectDoc = doc(firestore, 'development_projects', id);
         updateDoc(projectDoc, dataToUpdate)
-            .then(successCallback)
             .catch(() => {
                 const permissionError = new FirestorePermissionError({
                     path: projectDoc.path,

@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -29,10 +28,8 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RichTextEditor } from '../ui/rich-text-editor';
-import { Info, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 
-// Lazy load uploader to prevent ChunkLoadError and Hydration mismatches
+// Lazy load uploader to prevent ChunkLoadError
 const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
   ssr: false,
   loading: () => <div className="h-24 w-full animate-pulse bg-muted rounded-2xl" />
@@ -52,9 +49,6 @@ type BulletinPostFormProps = {
 };
 
 export function BulletinPostForm({ post, onSave, onClose }: BulletinPostFormProps) {
-  const [isSyncing, setIsSyncing] = useState(false);
-  const { toast } = useToast();
-
   const form = useForm<z.infer<typeof postSchema>>({
     resolver: zodResolver(postSchema),
     defaultValues: {
@@ -66,14 +60,9 @@ export function BulletinPostForm({ post, onSave, onClose }: BulletinPostFormProp
   });
 
   const onSubmit = (values: z.infer<typeof postSchema>) => {
-    // SECURITY: Ensure no blob URLs are saved and sync is finished
-    if (isSyncing) {
-      toast({ variant: 'destructive', title: "Sync in progress", description: "Please wait for images to finish uploading before saving." });
-      return;
-    }
-
-    const cloudOnlyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
-    onSave({ id: post?.id, ...values, galleryImages: cloudOnlyImages });
+    // INSTANT SAVE: Filter out local blob URLs and proceed immediately
+    const readyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
+    onSave({ id: post?.id, ...values, galleryImages: readyImages });
   };
   
   return (
@@ -124,35 +113,18 @@ export function BulletinPostForm({ post, onSave, onClose }: BulletinPostFormProp
                 </TabsContent>
 
                 <TabsContent value="gallery" className="p-6 m-0">
-                    <div className="space-y-6">
-                        <div className="bg-primary/5 p-4 rounded-xl border border-dashed border-primary/20 flex gap-4 items-start">
-                            <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                            <div className="text-xs text-muted-foreground leading-relaxed">
-                                <p className="font-bold text-foreground uppercase tracking-widest text-[10px] mb-1">Interactive Photos</p>
-                                <p>Enhance your bulletin with a photo report. Upload multiple images from the event or activity. Users can click these to view them full-screen.</p>
-                            </div>
-                        </div>
-                        
-                        <MultiImageUpload 
-                            images={form.watch('galleryImages')} 
-                            onChange={(imgs) => form.setValue('galleryImages', imgs)} 
-                            onSyncStatusChange={setIsSyncing}
-                            folder="bulletin-gallery" 
-                        />
-                    </div>
+                    <MultiImageUpload 
+                        images={form.watch('galleryImages')} 
+                        onChange={(imgs) => form.setValue('galleryImages', imgs)} 
+                        folder="bulletin-gallery" 
+                    />
                 </TabsContent>
             </ScrollArea>
         </Tabs>
 
         <DialogFooter className="p-6 border-t bg-muted/5 mt-auto">
             <Button type="button" variant="outline" onClick={onClose} className="rounded-full">Cancel</Button>
-            <Button 
-              type="submit" 
-              form="bulletin-form" 
-              className="rounded-full px-8 font-bold"
-              disabled={isSyncing}
-            >
-                {isSyncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" form="bulletin-form" className="rounded-full px-8 font-bold">
                 {post ? 'Save Changes' : 'Create Post'}
             </Button>
         </DialogFooter>

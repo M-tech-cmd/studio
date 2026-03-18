@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import dynamic from 'next/dynamic';
-import { Expand, User, Clock, Mail, Info, Loader2 } from 'lucide-react';
+import { Expand, User, Clock, Mail } from 'lucide-react';
 
 import type { CommunityGroup } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,6 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LargeTextEditModal } from './LargeTextEditModal';
-import { useToast } from '@/hooks/use-toast';
 
 // Lazy load uploader to prevent ChunkLoadError
 const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
@@ -66,8 +65,6 @@ type CommunityGroupFormProps = {
 
 export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFormProps) {
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof groupSchema>>({
     resolver: zodResolver(groupSchema),
@@ -87,13 +84,9 @@ export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFor
   });
 
   const onSubmit = (values: z.infer<typeof groupSchema>) => {
-    if (isSyncing) {
-      toast({ variant: 'destructive', title: "Sync in progress", description: "Waiting for gallery media to finish." });
-      return;
-    }
-
-    const cloudOnlyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
-    onSave({ ...values, id: group?.id, galleryImages: cloudOnlyImages });
+    // INSTANT SAVE: Proceed with ready URLs
+    const readyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
+    onSave({ ...values, id: group?.id, galleryImages: readyImages });
   };
 
   return (
@@ -123,7 +116,7 @@ export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFor
                                 )}/>
                                 <FormField control={form.control} name="type" render={({ field }) => (
                                     <FormItem><FormLabel className="font-bold">Classification</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue/></SelectTrigger></FormControl>
                                     <SelectContent>{['Small Christian Community', 'Group', 'Choir', 'Ministry'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent></Select></FormItem>
                                 )}/>
                             </div>
@@ -156,21 +149,11 @@ export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFor
                 </TabsContent>
 
                 <TabsContent value="gallery" className="p-6 m-0">
-                    <div className="space-y-6">
-                        <div className="bg-primary/5 p-4 rounded-xl border border-dashed border-primary/20 flex gap-4 items-start">
-                            <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                            <div className="text-xs text-muted-foreground leading-relaxed">
-                                <p className="font-bold text-foreground uppercase tracking-widest text-[10px] mb-1">Community Moments</p>
-                                <p>Upload high-resolution photos of group meetings, outreach, or practices. These will be displayed in an interactive gallery for the parish family.</p>
-                            </div>
-                        </div>
-                        <MultiImageUpload 
-                            images={form.watch('galleryImages')} 
-                            onChange={(imgs) => form.setValue('galleryImages', imgs)} 
-                            onSyncStatusChange={setIsSyncing}
-                            folder="community-gallery" 
-                        />
-                    </div>
+                    <MultiImageUpload 
+                        images={form.watch('galleryImages')} 
+                        onChange={(imgs) => form.setValue('galleryImages', imgs)} 
+                        folder="community-gallery" 
+                    />
                 </TabsContent>
             </ScrollArea>
         </Tabs>
@@ -180,8 +163,7 @@ export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFor
         )}
         <DialogFooter className="p-6 border-t bg-muted/5 mt-auto">
             <Button type="button" variant="outline" onClick={onClose} className="rounded-full">Cancel</Button>
-            <Button type="submit" form="group-form" className="rounded-full px-8 font-bold" disabled={isSyncing}>
-                {isSyncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" form="group-form" className="rounded-full px-8 font-bold">
                 {group ? 'Save Changes' : 'Create Entity'}
             </Button>
         </DialogFooter>

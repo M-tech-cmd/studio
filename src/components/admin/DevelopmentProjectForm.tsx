@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import dynamic from 'next/dynamic';
-import { Expand, Target, TrendingUp, Info, Loader2 } from 'lucide-react';
+import { Expand, Target, TrendingUp } from 'lucide-react';
 
 import type { DevelopmentProject } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { LargeTextEditModal } from './LargeTextEditModal';
-import { useToast } from '@/hooks/use-toast';
 
 // Lazy load uploader to prevent ChunkLoadError
 const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
@@ -64,8 +63,6 @@ type DevelopmentProjectFormProps = {
 
 export function DevelopmentProjectForm({ project, onSave, onClose }: DevelopmentProjectFormProps) {
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const { toast } = useToast();
 
   const form = useForm<z.infer<typeof projectSchema>>({
     resolver: zodResolver(projectSchema),
@@ -82,13 +79,9 @@ export function DevelopmentProjectForm({ project, onSave, onClose }: Development
   });
 
   const onSubmit = (values: z.infer<typeof projectSchema>) => {
-    if (isSyncing) {
-      toast({ variant: 'destructive', title: "Sync in progress", description: "Wait for project photos to finish syncing." });
-      return;
-    }
-
-    const cloudOnlyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
-    onSave({ ...values, id: project?.id, galleryImages: cloudOnlyImages });
+    // INSTANT SAVE: proceed with cloud URLs
+    const readyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
+    onSave({ ...values, id: project?.id, galleryImages: readyImages });
   };
 
   return (
@@ -153,21 +146,11 @@ export function DevelopmentProjectForm({ project, onSave, onClose }: Development
                 </TabsContent>
 
                 <TabsContent value="gallery" className="p-6 m-0">
-                    <div className="space-y-6">
-                        <div className="bg-primary/5 p-4 rounded-xl border border-dashed border-primary/20 flex gap-4 items-start">
-                            <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                            <div className="text-xs text-muted-foreground leading-relaxed">
-                                <p className="font-bold text-foreground uppercase tracking-widest text-[10px] mb-1">Visual Progress</p>
-                                <p>Upload photos showing construction milestones or infrastructure updates. Transparency encourages more community support.</p>
-                            </div>
-                        </div>
-                        <MultiImageUpload 
-                            images={form.watch('galleryImages')} 
-                            onChange={(imgs) => form.setValue('galleryImages', imgs)} 
-                            onSyncStatusChange={setIsSyncing}
-                            folder="project-gallery" 
-                        />
-                    </div>
+                    <MultiImageUpload 
+                        images={form.watch('galleryImages')} 
+                        onChange={(imgs) => form.setValue('galleryImages', imgs)} 
+                        folder="project-gallery" 
+                    />
                 </TabsContent>
             </ScrollArea>
         </Tabs>
@@ -177,8 +160,7 @@ export function DevelopmentProjectForm({ project, onSave, onClose }: Development
         )}
         <DialogFooter className="p-6 border-t bg-muted/5 mt-auto">
           <Button type="button" variant="outline" onClick={onClose} className="rounded-full">Cancel</Button>
-          <Button type="submit" form="project-form" className="rounded-full px-8 font-bold" disabled={isSyncing}>
-            {isSyncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button type="submit" form="project-form" className="rounded-full px-8 font-bold">
             {project ? 'Save Project' : 'Launch Project'}
           </Button>
         </DialogFooter>

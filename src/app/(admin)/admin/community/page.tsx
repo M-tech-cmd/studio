@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -83,20 +82,18 @@ export default function AdminCommunityPage() {
     if (!firestore) return;
     const isNew = !groupData.id;
 
-    const successCallback = () => {
-        setIsFormOpen(false);
-        toast({
-            title: 'Success!',
-            description: 'Content is now live for members.',
-        });
-    };
+    // INSTANT FEEDBACK
+    setIsFormOpen(false);
+    toast({
+        title: 'Saved Successfully',
+        description: 'Entity details have been committed to the registry.',
+    });
 
     if (isNew) {
         const dataToAdd = { ...groupData };
         delete dataToAdd.id;
         const groupsCollection = collection(firestore, 'community_groups');
         addDoc(groupsCollection, dataToAdd)
-            .then(successCallback)
             .catch(() => {
                 const permissionError = new FirestorePermissionError({
                     path: groupsCollection.path,
@@ -110,7 +107,6 @@ export default function AdminCommunityPage() {
         if (!id) return;
         const groupDoc = doc(firestore, 'community_groups', id);
         updateDoc(groupDoc, dataToUpdate)
-            .then(successCallback)
             .catch(() => {
                 const permissionError = new FirestorePermissionError({
                     path: groupDoc.path,

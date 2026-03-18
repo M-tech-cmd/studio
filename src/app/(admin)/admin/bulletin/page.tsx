@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -87,13 +86,12 @@ export default function AdminBulletinPage() {
   const handleFormSave = (postData: Partial<BulletinPost>) => {
     if (!firestore || !user) return;
 
-    const successCallback = () => {
-        setIsFormOpen(false);
-        toast({
-            title: 'Success!',
-            description: 'Content is now live for members.',
-        });
-    };
+    // INSTANT FEEDBACK: Close form and show success immediately
+    setIsFormOpen(false);
+    toast({
+        title: 'Saved Successfully',
+        description: 'Changes are now being synchronized with the registry.',
+    });
 
     if (!postData.id) {
       const { id, ...dataToAdd } = postData;
@@ -107,13 +105,7 @@ export default function AdminBulletinPage() {
       };
       const bulletinCollection = collection(firestore, 'bulletins');
       addDoc(bulletinCollection, newPost)
-        .then(successCallback)
         .catch((error: any) => {
-            toast({
-                variant: 'destructive',
-                title: 'Uh oh! Something went wrong.',
-                description: error.message || 'Could not save the post.',
-            });
             const permissionError = new FirestorePermissionError({
                 path: bulletinCollection.path,
                 operation: 'create',
@@ -130,13 +122,7 @@ export default function AdminBulletinPage() {
         updatedAt: serverTimestamp(),
       };
       updateDoc(postDoc, updateData)
-        .then(successCallback)
         .catch((error: any) => {
-            toast({
-                variant: 'destructive',
-                title: 'Uh oh! Something went wrong.',
-                description: error.message || 'Could not update the post.',
-            });
             const permissionError = new FirestorePermissionError({
                 path: postDoc.path,
                 operation: 'update',
