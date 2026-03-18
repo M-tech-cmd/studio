@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Upload, RotateCcw, Palette, Link as LinkIcon, X, Palette as PaletteIcon, Loader2, XCircle } from 'lucide-react';
+import { Upload, RotateCcw, Link as LinkIcon, X, Palette as PaletteIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCollection, useFirestore, useMemoFirebase, useDoc, useStorage } from '@/firebase';
-import { collection, doc, setDoc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -89,7 +89,7 @@ const SectionControls = ({ form, prefix, label, onReset, onImageUpload }: { form
                         </div>
                         {imageUrl && (
                             <div className="relative aspect-video rounded-lg border bg-muted overflow-hidden">
-                                <Image src={imageUrl} alt="Section banner" fill className="object-cover" unoptimized />
+                                <Image src={imageUrl} alt="Section banner" fill className="object-contain" unoptimized />
                                 <button type="button" className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-2xl z-50 bg-white text-black hover:bg-white/90 hover:scale-110 transition-all border-2 border-black/10 flex items-center justify-center" onClick={() => form.setValue(`${prefix}ImageUrl`, '')}><X className="h-4 w-4 text-destructive stroke-[3px]" /></button>
                             </div>
                         )}
@@ -136,7 +136,6 @@ export default function BrandingPage() {
     const router = useRouter();
     const { toast } = useToast();
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
-    const [isSyncing, setIsSyncing] = useState(false);
 
     const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
     const { data: settings, isLoading } = useDoc<SiteSettings>(settingsRef);
@@ -156,7 +155,7 @@ export default function BrandingPage() {
             heroTitle: 'St. Martin De Porres Catholic Church',
             heroTitleColor: '#ffffff',
             heroDescriptionColor: '#e5e7eb',
-            heroImageUrl: 'https://picsum.photos/seed/hero/1200/800',
+            heroImageUrl: '',
             primaryColor: '#d4a574',
             secondaryColor: '#fdf2f2',
             globalTextColor: '#1e3a5f',
@@ -179,7 +178,7 @@ export default function BrandingPage() {
                 heroTitle: settings.heroTitle ?? 'St. Martin De Porres Catholic Church',
                 heroTitleColor: settings.heroTitleColor ?? '#ffffff',
                 heroDescriptionColor: settings.heroDescriptionColor ?? '#e5e7eb',
-                heroImageUrl: settings.heroImageUrl ?? 'https://picsum.photos/seed/hero/1200/800',
+                heroImageUrl: settings.heroImageUrl ?? '',
                 primaryColor: settings.primaryColor ?? '#d4a574',
                 secondaryColor: settings.secondaryColor ?? '#fdf2f2',
                 globalTextColor: settings.globalTextColor ?? '#1e3a5f',
@@ -208,7 +207,6 @@ export default function BrandingPage() {
         if (!storage) return;
         const previewUrl = URL.createObjectURL(file);
         form.setValue(`${prefix}ImageUrl` as any, previewUrl);
-        setIsSyncing(true);
         
         try {
             const storageRef = ref(storage, `banners/${prefix}_${Date.now()}_${file.name}`);
@@ -218,7 +216,6 @@ export default function BrandingPage() {
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
         } finally {
-            setIsSyncing(false);
             URL.revokeObjectURL(previewUrl);
         }
     };
@@ -227,7 +224,6 @@ export default function BrandingPage() {
         if (!storage) return;
         const previewUrl = URL.createObjectURL(file);
         contentForm.setValue('imageUrl', previewUrl);
-        setIsSyncing(true);
 
         try {
             const storageRef = ref(storage, `content/${Date.now()}_${file.name}`);
@@ -237,7 +233,6 @@ export default function BrandingPage() {
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
         } finally {
-            setIsSyncing(false);
             URL.revokeObjectURL(previewUrl);
         }
     };
@@ -248,7 +243,6 @@ export default function BrandingPage() {
         
         const previewUrl = URL.createObjectURL(file);
         setLogoPreview(previewUrl);
-        setIsSyncing(true);
 
         try {
             const storageRef = ref(storage, `branding/${Date.now()}_${file.name}`);
@@ -258,16 +252,13 @@ export default function BrandingPage() {
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Logo Sync Failed', description: error.message });
             setLogoPreview(null);
-        } finally {
-            setIsSyncing(false);
-            // Don't revoke previewURL yet as it might still be needed for immediate display
         }
     };
 
     const handleSectionReset = async (prefix: string) => {
         if (!settingsRef) return;
         const defaults: Record<string, { title: string, desc: string, img: string }> = {
-            hero: { title: 'St. Martin De Porres Catholic Church', desc: 'A community of faith, hope, and love serving the heart of Nakuru.', img: 'https://picsum.photos/seed/hero/1200/800' },
+            hero: { title: 'St. Martin De Porres Catholic Church', desc: 'A community of faith, hope, and love serving the heart of Nakuru.', img: '' },
             mass: { title: 'Weekly Mass Schedule', desc: 'Join us for worship throughout the week.', img: '' },
             events: { title: 'Upcoming Events', desc: 'Join us for worship, fellowship, and service.', img: '' },
             clergy: { title: 'Meet Our Clergy & Staff', desc: 'The dedicated team serving our parish family.', img: '' },
@@ -287,19 +278,8 @@ export default function BrandingPage() {
 
     const onSubmitBranding = (values: z.infer<typeof brandingSchema>) => {
         if (!settingsRef) return;
-        toast({ title: 'Visuals Synchronized', description: 'Changes are being reflected across the portal.' });
-        let sanitizedData = {};
-        try {
-            sanitizedData = JSON.parse(JSON.stringify(values));
-        } catch (e) {
-            sanitizedData = values;
-        }
-        setDoc(settingsRef, sanitizedData, { merge: true }).then(() => router.refresh());
-    };
-
-    const handleCancelSync = () => {
-        setIsSyncing(false);
-        toast({ title: 'Sync Interrupted', description: 'Background uploads have been stopped.' });
+        toast({ title: 'Visuals Synchronized' });
+        setDoc(settingsRef, values, { merge: true }).then(() => router.refresh());
     };
 
     const onSubmitContent = (values: any) => {
@@ -313,18 +293,9 @@ export default function BrandingPage() {
 
     return (
         <div className="space-y-6 py-6 px-4 max-w-6xl mx-auto">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <PaletteIcon className="h-8 w-8 text-primary" />
-                    <h1 className="text-3xl font-bold tracking-tight">Branding & Visuals</h1>
-                </div>
-                {isSyncing && (
-                    <div className="flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full border border-primary/20 animate-in fade-in">
-                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-primary">Media Synchronizing...</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleCancelSync}><XCircle className="h-4 w-4" /></Button>
-                    </div>
-                )}
+            <div className="flex items-center gap-3">
+                <PaletteIcon className="h-8 w-8 text-primary" />
+                <h1 className="text-3xl font-bold tracking-tight">Branding & Visuals</h1>
             </div>
             
             <Tabs defaultValue="identity" className="w-full">
@@ -377,7 +348,7 @@ export default function BrandingPage() {
                                 <Button type="button" variant="outline" size="lg" className="rounded-full px-8 h-16 text-lg font-bold" onClick={() => router.push('/admin/dashboard')}>
                                     Cancel Changes
                                 </Button>
-                                <Button type="submit" size="lg" className="shadow-2xl rounded-full px-12 h-16 text-lg font-bold" disabled={isSyncing}>
+                                <Button type="submit" size="lg" className="shadow-2xl rounded-full px-12 h-16 text-lg font-bold">
                                     Save Visual Identity
                                 </Button>
                             </div>
@@ -429,7 +400,7 @@ export default function BrandingPage() {
                                                     </div>
                                                     {contentForm.watch('imageUrl') && (
                                                         <div className="relative aspect-video rounded-lg border bg-muted overflow-hidden">
-                                                            <Image src={contentForm.watch('imageUrl')!} alt="Cover" fill className="object-cover" unoptimized />
+                                                            <Image src={contentForm.watch('imageUrl')!} alt="Cover" fill className="object-contain" unoptimized />
                                                             <button type="button" className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-2xl z-50 bg-white text-black hover:bg-white/90 hover:scale-110 transition-all border-2 border-black/10 flex items-center justify-center" onClick={() => contentForm.setValue('imageUrl', '')}><X className="h-4 w-4 text-destructive stroke-[3px]" /></button>
                                                         </div>
                                                     )}
@@ -439,7 +410,7 @@ export default function BrandingPage() {
                                     )}
                                     <div className="flex justify-end border-t pt-6 gap-4">
                                         <Button type="button" variant="outline" size="lg" onClick={() => router.push('/admin/dashboard')}>Cancel</Button>
-                                        <Button type="submit" size="lg" disabled={isSyncing}>Update Content</Button>
+                                        <Button type="submit" size="lg">Update Content</Button>
                                     </div>
                                 </form>
                             </Form>

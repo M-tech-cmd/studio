@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import type { Profile, SiteContent, SiteSettings } from '@/lib/types';
-import { collection, query, doc } from 'firebase/firestore';
+import { collection, doc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMemo } from 'react';
 import { Logo } from '@/components/shared/Logo';
@@ -74,17 +74,17 @@ function AboutContent() {
                             </h2>
                             <div
                                 className="prose prose-lg max-w-none text-muted-foreground leading-relaxed md:leading-loose text-base md:text-lg space-y-6"
-                                dangerouslySetInnerHTML={{ __html: aboutContent?.content || `<p>Founded in 1962, St. Martin De Porres Parish has grown from a small community of faithful into a vibrant and diverse parish family. Named after the patron saint of mixed-race people and social justice, our parish has always had a special commitment to unity, service, and love for all of God's children.</p>` }}
+                                dangerouslySetInnerHTML={{ __html: aboutContent?.content || `<p>Founded in 1962, St. Martin De Porres Parish has grown from a small community of faithful into a vibrant and diverse parish family.</p>` }}
                             />
                         </div>
                         <div className="order-1 lg:order-2 lg:sticky lg:top-24">
-                            <div className="rounded-2xl overflow-hidden shadow-2xl transition-transform duration-500 hover:scale-[1.02] border-2 border-white aspect-[4/5] relative bg-muted">
+                            <div className="rounded-2xl overflow-hidden shadow-2xl border-2 border-white aspect-[4/5] relative bg-muted">
                                 {aboutContent?.imageUrl ? (
                                     <Image
                                         src={aboutContent.imageUrl}
                                         alt={aboutContent.title || 'Church History'}
                                         fill
-                                        className="object-cover"
+                                        className="object-contain"
                                         unoptimized
                                     />
                                 ) : (
@@ -92,9 +92,6 @@ function AboutContent() {
                                         <Logo url={settings?.logoUrl} className="h-32 w-32 grayscale opacity-20" />
                                     </div>
                                 )}
-                            </div>
-                            <div className="mt-4 p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-dashed text-center">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Established 1962</p>
                             </div>
                         </div>
                     </div>
@@ -123,7 +120,6 @@ function AboutContent() {
                                 </div>
                                 <h3 className="text-xl font-bold text-[#1e3a5f] group-hover:text-primary transition-colors">{profile.name}</h3>
                                 <p className="text-primary font-black text-[10px] uppercase tracking-widest mt-2">{profile.title}</p>
-                                <p className="text-sm text-muted-foreground mt-4 line-clamp-2 italic px-4">"{profile.bio}"</p>
                             </CardContent>
                             </Card>
                         </Link>
@@ -141,7 +137,7 @@ function AboutContent() {
                                     src={devTeamContent.imageUrl}
                                     alt={devTeamContent.title || 'Development Team'}
                                     fill
-                                    className="object-cover transition-transform duration-1000 group-hover:scale-105"
+                                    className="object-contain transition-transform duration-1000 group-hover:scale-105"
                                     unoptimized
                                 />
                             ) : (
@@ -160,11 +156,8 @@ function AboutContent() {
                             <h3 className="text-xl font-bold text-primary mb-2 uppercase tracking-wide">{devTeamContent?.title || 'St. Martin Youth Serving Christ (YSC)'}</h3>
                             <div
                                 className="prose prose-lg text-muted-foreground leading-relaxed"
-                                dangerouslySetInnerHTML={{ __html: devTeamContent?.content || '<p>This digital infrastructure was proudly developed by the dedicated members of the St. Martin Youth Serving Christ (YSC) group, serving the digital mission of our parish.</p>' }}
+                                dangerouslySetInnerHTML={{ __html: devTeamContent?.content || '<p>This digital infrastructure was proudly developed by the dedicated members of the St. Martin Youth Serving Christ (YSC) group.</p>' }}
                             />
-                            <div className="pt-6 border-t border-dashed">
-                                <p className="text-sm font-medium italic opacity-70">"Empowering the youth to build the digital future of the church."</p>
-                            </div>
                         </div>
                     </div>
                 </div>

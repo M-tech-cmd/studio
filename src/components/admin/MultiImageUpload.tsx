@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, RefreshCcw } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { ref, getDownloadURL, uploadBytesResumable, type UploadTask } from 'firebase/storage';
 import { useStorage } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
@@ -24,8 +24,7 @@ interface UploadingItem {
 
 /**
  * ZERO-GHOST INSTANT MULTI-UPLOAD
- * - No spinners, no blurs, no blocking.
- * - Parallel background workers with Kill-Task (X) support.
+ * Removed all loading bars and spinners for a pure instant feel.
  */
 export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange }: MultiImageUploadProps) {
   const [activeUploads, setActiveUploads] = useState<UploadingItem[]>([]);
@@ -56,7 +55,6 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
       const newItem: UploadingItem = { id, preview, status: 'syncing', file };
       setActiveUploads(prev => [...prev, newItem]);
 
-      // Trigger background sync
       triggerBackgroundUpload(newItem);
     }
 
@@ -69,17 +67,12 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
     const storageRef = ref(storage.current, `${folder}/${Date.now()}_${item.id}_${item.file.name}`);
     const uploadTask = uploadBytesResumable(storageRef, item.file);
     
-    // Registry for Kill-Task logic
     tasksRef.current[item.id] = uploadTask;
 
     uploadTask.on('state_changed', 
       null, 
       (error) => {
-        if (error.code === 'storage/canceled') {
-            console.log(`Sync for ${item.id} terminated manually.`);
-            return;
-        }
-        console.error("Sync worker failed:", error);
+        if (error.code === 'storage/canceled') return;
         setActiveUploads(prev => prev.map(u => u.id === item.id ? { ...u, status: 'failed' } : u));
       }, 
       async () => {
@@ -101,7 +94,6 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
   };
 
   const removePendingUpload = (id: string, preview: string) => {
-    // KILL-TASK LOGIC
     if (tasksRef.current[id]) {
         tasksRef.current[id].cancel();
         delete tasksRef.current[id];
@@ -113,11 +105,11 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <Label className="font-black text-xs uppercase tracking-widest text-muted-foreground">Attached Media ({images.length})</Label>
+        <Label className="font-black text-xs uppercase tracking-widest text-muted-foreground">Attached Media ({images.length + activeUploads.length})</Label>
         <label className="cursor-pointer">
           <div className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-full text-[10px] font-black hover:scale-105 transition-all shadow-lg uppercase tracking-widest active:scale-95">
             <Upload className="h-3.5 w-3.5" />
-            Add Media
+            Add Photos
           </div>
           <input type="file" multiple className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
         </label>
@@ -126,31 +118,18 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {images.map((url, index) => (
           <MediaItem 
-            key={`cloud-${index}-${url}`} 
+            key={`cloud-${index}`} 
             url={url} 
             onRemove={() => removeCloudImage(index)} 
           />
         ))}
 
         {activeUploads.map((item) => (
-          <div key={item.id} className="relative group isolate">
-            <MediaItem 
-              url={item.preview} 
-              isError={item.status === 'failed'}
-              onRemove={() => removePendingUpload(item.id, item.preview)} 
-            />
-            
-            {item.status === 'failed' && (
-              <button
-                type="button"
-                onClick={() => triggerBackgroundUpload(item)}
-                className="absolute inset-0 flex flex-col items-center justify-center z-[70] bg-destructive/60 backdrop-blur-[2px] rounded-2xl transition-all hover:bg-destructive/80"
-              >
-                <RefreshCcw className="h-8 w-8 text-white mb-2" />
-                <span className="text-[9px] font-black text-white uppercase tracking-widest">Retry Sync</span>
-              </button>
-            )}
-          </div>
+          <MediaItem 
+            key={item.id}
+            url={item.preview} 
+            onRemove={() => removePendingUpload(item.id, item.preview)} 
+          />
         ))}
 
         {images.length === 0 && activeUploads.length === 0 && (

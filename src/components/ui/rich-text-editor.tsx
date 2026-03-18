@@ -6,7 +6,7 @@ import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import TextStyle from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
-import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Link2, Image as ImageIcon, Undo, Redo, Video, Music } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Link2, Image as ImageIcon, Undo, Redo, Video, Music, X } from 'lucide-react';
 import { useCallback, useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useStorage } from '@/firebase';
@@ -32,7 +32,7 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
       Image.configure({
         allowBase64: true,
         HTMLAttributes: {
-          class: 'rounded-xl shadow-lg my-4 max-w-full h-auto mx-auto border-2 border-primary/10 transition-opacity duration-500',
+          class: 'w-full h-auto object-contain rounded-xl shadow-lg my-4 border-2 border-primary/10',
         },
       }),
       Link.configure({ 
@@ -80,19 +80,26 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     const tempUrl = URL.createObjectURL(file);
     const type = mediaTypeRef.current;
 
-    // Instant Preview Insertion
+    // Insertion with Top-Left X Button Wrapper
     if (type === 'image') {
-      editor.chain().focus().setImage({ src: tempUrl }).run();
+      editor.chain().focus().insertContent(`
+        <div class="editor-media-wrapper relative group my-6 rounded-2xl overflow-hidden border-2 border-primary/10 shadow-xl bg-white isolate">
+            <img src="${tempUrl}" class="w-full h-auto object-contain block" />
+            <div class="absolute top-2 left-2 z-10 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer shadow-2xl hover:bg-black/80 transition-all no-print" onclick="this.closest('.editor-media-wrapper').remove()">X</div>
+        </div>
+      `).run();
     } else if (type === 'video') {
        editor.chain().focus().insertContent(`
-          <div class="my-6 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-xl bg-black aspect-video relative group isolate">
+          <div class="editor-media-wrapper my-6 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-xl bg-black aspect-video relative group isolate">
               <video controls src="${tempUrl}" class="w-full h-full object-contain"></video>
+              <div class="absolute top-2 left-2 z-10 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer no-print" onclick="this.closest('.editor-media-wrapper').remove()">X</div>
           </div>
        `).run();
     } else if (type === 'audio') {
       editor.chain().focus().insertContent(`
-          <div class="whatsapp-audio-bubble my-4 p-4 rounded-2xl bg-[#f0f2f5] dark:bg-slate-800 flex items-center gap-4 shadow-sm border border-slate-200/50">
+          <div class="editor-media-wrapper whatsapp-audio-bubble my-4 p-4 rounded-2xl bg-[#f0f2f5] dark:bg-slate-800 flex items-center gap-4 shadow-sm border border-slate-200/50 relative">
               <audio controls src="${tempUrl}" class="flex-1 h-10 accent-[#005c96]"></audio>
+              <div class="absolute -top-2 -left-2 z-10 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] cursor-pointer no-print" onclick="this.closest('.editor-media-wrapper').remove()">X</div>
           </div>
       `).run();
     }
@@ -102,9 +109,7 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
         const uploadTask = uploadBytesResumable(storageRef, file);
         activeTasksRef.current[tempUrl] = uploadTask;
 
-        uploadTask.on('state_changed', null, (err) => {
-            console.error("Editor Media Sync Failed:", err);
-        }, async () => {
+        uploadTask.on('state_changed', null, null, async () => {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             if (downloadURL) {
                 const currentContent = editor.getHTML();
@@ -114,9 +119,8 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
                 URL.revokeObjectURL(tempUrl);
             }
         });
-
-    } catch (error: any) {
-        console.error("Editor Cloud Sync Initiation Failed:", error);
+    } catch (error) {
+        console.error("Editor Cloud Sync Error:", error);
     } finally {
         if (fileInputRef.current) fileInputRef.current.value = '';
     }

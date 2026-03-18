@@ -1,0 +1,22 @@
+{
+  "placeholderImages": [
+    {
+      "id": "parish-hero",
+      "description": "St. Martin De Porres Church Hero",
+      "imageUrl": "https://picsum.photos/seed/church-hero/1200/800",
+      "imageHint": "catholic church"
+    },
+    {
+      "id": "staff-fallback",
+      "description": "Parish Staff Fallback",
+      "imageUrl": "https://picsum.photos/seed/staff/400/400",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "banner-fallback",
+      "description": "Section Banner Fallback",
+      "imageUrl": "https://picsum.photos/seed/banner/1200/450",
+      "imageHint": "church community"
+    }
+  ]
+}

@@ -7,21 +7,17 @@ import { cn } from '@/lib/utils';
 interface MediaItemProps {
   url: string;
   onRemove?: () => void;
-  isError?: boolean;
-  status?: 'syncing' | 'done';
   className?: string;
   showIconOverlay?: boolean;
 }
 
 /**
- * Zero-Ghost Media Item
- * Renders instantly at 100% quality. 
- * Features a top-left 'X' button for immediate task cancellation.
+ * Zero-Ghost Media Item.
+ * Stripped of all loading spinners and overlays for instant rendering.
  */
 export function MediaItem({ 
   url, 
   onRemove, 
-  isError,
   className,
   showIconOverlay = true
 }: MediaItemProps) {
@@ -34,7 +30,6 @@ export function MediaItem({
   return (
     <div className={cn(
       "group relative aspect-square rounded-2xl overflow-hidden bg-muted shadow-md isolate border-2 border-border/50 transition-all hover:ring-4 hover:ring-primary/20",
-      isError && "border-destructive/50 ring-2 ring-destructive/20",
       className
     )}>
       
@@ -45,7 +40,7 @@ export function MediaItem({
       ) : isVideo ? (
         <div className="h-full w-full bg-slate-900 flex items-center justify-center">
           <Video className="h-10 w-10 text-white/20" />
-          {showIconOverlay && !isError && (
+          {showIconOverlay && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="h-12 w-12 rounded-full bg-primary text-white flex items-center justify-center shadow-lg scale-90 group-hover:scale-100 transition-transform">
                 <Play className="h-6 w-6 fill-current ml-1" />
@@ -58,15 +53,11 @@ export function MediaItem({
           src={url}
           alt="Media item"
           fill
-          className={cn(
-            "object-cover transition-transform duration-700 group-hover:scale-110",
-            isError && "opacity-40 grayscale"
-          )}
+          className="object-cover transition-transform duration-700 group-hover:scale-110"
           unoptimized
         />
       )}
 
-      {/* KILL-TASK ACTION (Top-Left 'X') */}
       {onRemove && (
         <button
           type="button"
