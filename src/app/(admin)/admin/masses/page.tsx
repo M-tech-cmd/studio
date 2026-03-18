@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, Edit } from 'lucide-react';
 import type { Mass } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +28,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { MassForm } from '@/components/admin/MassForm';
 import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, deleteDoc, doc, orderBy, query, addDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, orderBy, query, addDoc, updateDoc } from 'firebase/firestore';
 
 export default function AdminMassesPage() {
   const firestore = useFirestore();
@@ -40,6 +40,7 @@ export default function AdminMassesPage() {
 
   const { data: masses, isLoading } = useCollection<Mass>(massesQuery);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedMass, setSelectedMass] = useState<Mass | null>(null);
   const { toast } = useToast();
   
   const orderedDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -48,6 +49,16 @@ export default function AdminMassesPage() {
     if (dayDiff !== 0) return dayDiff;
     return a.startTime.localeCompare(b.startTime);
   });
+
+  const handleAddClick = () => {
+    setSelectedMass(null);
+    setIsFormOpen(true);
+  };
+
+  const handleEditClick = (mass: Mass) => {
+    setSelectedMass(mass);
+    setIsFormOpen(true);
+  };
 
   const handleDelete = (id: string) => {
     if (!firestore) return;
@@ -75,33 +86,62 @@ export default function AdminMassesPage() {
 
   const handleFormClose = () => {
     setIsFormOpen(false);
+    setSelectedMass(null);
   };
 
-  const handleFormSave = (massData: Omit<Mass, 'id'>) => {
+  const handleFormSave = (massData: Omit<Mass, 'id'> & { id?: string }) => {
     if (!firestore) return;
 
-    const massesCollection = collection(firestore, 'masses');
-    addDoc(massesCollection, massData)
-        .then(() => {
-            setIsFormOpen(false);
-            toast({
-                title: 'Success!',
-                description: 'Mass schedule has been added.',
+    const isEdit = !!massData.id;
+
+    if (isEdit) {
+        const { id, ...dataToUpdate } = massData;
+        const massDoc = doc(firestore, 'masses', id!);
+        updateDoc(massDoc, dataToUpdate)
+            .then(() => {
+                setIsFormOpen(false);
+                toast({
+                    title: 'Schedule Updated',
+                    description: 'Mass schedule changes have been saved.',
+                });
+            })
+            .catch((error: any) => {
+                toast({
+                    variant: 'destructive',
+                    title: 'Update Failed',
+                    description: error.message || 'Could not update the schedule.',
+                });
+                const permissionError = new FirestorePermissionError({
+                    path: massDoc.path,
+                    operation: 'update',
+                    requestResourceData: dataToUpdate,
+                });
+                errorEmitter.emit('permission-error', permissionError);
             });
-        })
-        .catch((error: any) => {
-            toast({
-                variant: 'destructive',
-                title: 'Uh oh! Something went wrong.',
-                description: error.message || 'Could not save the mass schedule.',
+    } else {
+        const massesCollection = collection(firestore, 'masses');
+        addDoc(massesCollection, massData)
+            .then(() => {
+                setIsFormOpen(false);
+                toast({
+                    title: 'Success!',
+                    description: 'Mass schedule has been added.',
+                });
+            })
+            .catch((error: any) => {
+                toast({
+                    variant: 'destructive',
+                    title: 'Uh oh! Something went wrong.',
+                    description: error.message || 'Could not save the mass schedule.',
+                });
+                const permissionError = new FirestorePermissionError({
+                    path: massesCollection.path,
+                    operation: 'create',
+                    requestResourceData: massData,
+                });
+                errorEmitter.emit('permission-error', permissionError);
             });
-            const permissionError = new FirestorePermissionError({
-                path: massesCollection.path,
-                operation: 'create',
-                requestResourceData: massData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        });
+    }
   };
 
   const formatTime = (time: string) => {
@@ -122,7 +162,7 @@ export default function AdminMassesPage() {
             Add or remove weekly mass times.
           </p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)}>
+        <Button onClick={handleAddClick}>
           <PlusCircle className="mr-2 h-4 w-4" />
           Add Mass Time
         </Button>
@@ -152,28 +192,38 @@ export default function AdminMassesPage() {
                     <TableCell>{mass.title}</TableCell>
                     <TableCell>{formatTime(mass.startTime)} - {formatTime(mass.endTime)}</TableCell>
                     <TableCell className="text-right">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                           <Button variant="destructive" size="icon">
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the mass: "{mass.title} on {mass.day}".
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(mass.id)}>
-                              Continue
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={() => handleEditClick(mass)}
+                        >
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Edit</span>
+                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="icon">
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Delete</span>
+                            </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the mass: "{mass.title} on {mass.day}".
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(mass.id)}>
+                                Continue
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -185,6 +235,7 @@ export default function AdminMassesPage() {
 
       {isFormOpen && (
         <MassForm
+          mass={selectedMass}
           onSave={handleFormSave}
           onClose={handleFormClose}
         />

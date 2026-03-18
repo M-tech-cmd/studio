@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -44,36 +45,39 @@ const massSchema = z.object({
 });
 
 type MassFormProps = {
-  onSave: (data: Omit<Mass, 'id'>) => void;
+  mass?: Mass | null;
+  onSave: (data: Omit<Mass, 'id'> & { id?: string }) => void;
   onClose: () => void;
 };
 
-export function MassForm({ onSave, onClose }: MassFormProps) {
+export function MassForm({ mass, onSave, onClose }: MassFormProps) {
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
 
   const form = useForm<z.infer<typeof massSchema>>({
     resolver: zodResolver(massSchema),
     defaultValues: {
-      day: 'Sunday',
-      title: '',
-      startTime: '',
-      endTime: '',
-      description: '',
+      day: mass?.day || 'Sunday',
+      title: mass?.title || '',
+      startTime: mass?.startTime || '',
+      endTime: mass?.endTime || '',
+      description: mass?.description || '',
     },
   });
 
   const selectedDay = form.watch('day');
 
   const onSubmit = (values: z.infer<typeof massSchema>) => {
-    onSave(values);
+    onSave({ ...values, id: mass?.id });
   };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Mass Schedule</DialogTitle>
-          <DialogDescription>Add a new recurring mass time to the weekly schedule.</DialogDescription>
+          <DialogTitle>{mass ? 'Edit Mass Schedule' : 'Add Mass Schedule'}</DialogTitle>
+          <DialogDescription>
+            {mass ? 'Modify the details of this scheduled mass.' : 'Add a new recurring mass time to the weekly schedule.'}
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form id="mass-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
@@ -184,7 +188,7 @@ export function MassForm({ onSave, onClose }: MassFormProps) {
         )}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" form="mass-form">Add Mass</Button>
+          <Button type="submit" form="mass-form">{mass ? 'Update Mass' : 'Add Mass'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
