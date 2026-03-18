@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -234,42 +235,58 @@ export default function BrandingPage() {
 
     const handleImageUpload = async (prefix: string, file: File) => {
         if (!storage) return;
+        // Instant UI Preview
+        const previewUrl = URL.createObjectURL(file);
+        form.setValue(`${prefix}ImageUrl` as any, previewUrl);
+
         try {
             const storageRef = ref(storage, `banners/${prefix}_${Date.now()}_${file.name}`);
             const snapshot = await uploadBytes(storageRef, file);
             const url = await getDownloadURL(snapshot.ref);
             form.setValue(`${prefix}ImageUrl` as any, url);
-            toast({ title: 'Image Uploaded' });
+            toast({ title: 'Banner Synchronized' });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+        } finally {
+            URL.revokeObjectURL(previewUrl);
         }
     };
 
     const handleContentImageUpload = async (file: File) => {
         if (!storage) return;
+        const previewUrl = URL.createObjectURL(file);
+        contentForm.setValue('imageUrl', previewUrl);
+
         try {
             const storageRef = ref(storage, `content/${Date.now()}_${file.name}`);
             const snapshot = await uploadBytes(storageRef, file);
             const url = await getDownloadURL(snapshot.ref);
             contentForm.setValue('imageUrl', url);
-            toast({ title: 'Page Image Uploaded' });
+            toast({ title: 'Page Image Synchronized' });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+        } finally {
+            URL.revokeObjectURL(previewUrl);
         }
     };
 
     const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !storage) return;
-        setLogoPreview(URL.createObjectURL(file));
+        
+        const previewUrl = URL.createObjectURL(file);
+        setLogoPreview(previewUrl);
+        
         try {
             const storageRef = ref(storage, `branding/${Date.now()}_${file.name}`);
             const snapshot = await uploadBytes(storageRef, file);
             const url = await getDownloadURL(snapshot.ref);
             form.setValue('logoUrl', url);
-            toast({ title: 'Logo Uploaded' });
+            toast({ title: 'Logo Synchronized' });
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Logo Failed', description: error.message });
+            toast({ variant: 'destructive', title: 'Logo Sync Failed', description: error.message });
+        } finally {
+            URL.revokeObjectURL(previewUrl);
         }
     };
 

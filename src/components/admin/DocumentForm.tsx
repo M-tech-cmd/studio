@@ -104,7 +104,6 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
       
       try {
           const storageRef = ref(storage, `documents/${Date.now()}_${file.name}`);
-          // Using direct uploadBytes Promise instead of observers to prevent 0% hang
           const snapshot = await uploadBytes(storageRef, file);
           const downloadURL = await getDownloadURL(snapshot.ref);
           
