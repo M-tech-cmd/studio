@@ -38,7 +38,13 @@ export function ClientThemeWrapper({ children }: { children: React.ReactNode }) 
   const textHsl = settings?.globalTextColor ? hexToHsl(settings.globalTextColor) : null;
 
   return (
-    <body suppressHydrationWarning className="min-h-screen bg-white selection:bg-primary/30 antialiased font-body">
+    <div 
+      className="min-h-screen flex flex-col transition-colors duration-300 isolate-content antialiased font-body"
+      style={{ 
+        backgroundColor: settings?.secondaryColor || '#fdf2f2',
+        color: settings?.globalTextColor || 'inherit'
+      }}
+    >
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
           ${primaryHsl ? `--primary: ${primaryHsl}; --ring: ${primaryHsl};` : ''}
@@ -58,15 +64,7 @@ export function ClientThemeWrapper({ children }: { children: React.ReactNode }) 
           z-index: 1;
         }
       `}} />
-      <div 
-        className="min-h-screen flex flex-col transition-colors duration-300 isolate-content"
-        style={{ 
-          backgroundColor: settings?.secondaryColor || '#fdf2f2',
-          color: settings?.globalTextColor || 'inherit'
-        }}
-      >
-        {children}
-      </div>
-    </body>
+      {children}
+    </div>
   );
 }
