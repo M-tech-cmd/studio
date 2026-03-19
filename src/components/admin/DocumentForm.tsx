@@ -97,23 +97,31 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
     const file = e.target.files?.[0];
     if (!file || !storage) return;
 
-    setFileName(file.name);
-    setUploadComplete(false);
-    
     try {
         const storageRef = ref(storage, `documents/${Date.now()}_${file.name}`);
+        
+        // Use atomic uploadBytes to prevent retry loops
         const snapshot = await uploadBytes(storageRef, file);
         const downloadURL = await getDownloadURL(snapshot.ref);
         
         form.setValue('url', downloadURL);
         form.setValue('fileType', file.name.split('.').pop()?.toUpperCase() || 'FILE');
+        setFileName(file.name);
         setUploadComplete(true);
         toast({ title: 'File Ready', description: 'Document uploaded successfully.' });
-    } catch (error: any) {
-        console.error("Document upload failed:", error);
-        toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not sync document to storage.' });
+    } catch (err: any) {
+        // Detailed console logging for debugging
+        console.error('Upload error:', err.code, err.message);
+        toast({ 
+          variant: 'destructive', 
+          title: 'Upload Failed', 
+          description: err.message || 'The storage request timed out or was rejected.' 
+        });
         setFileName(null);
         setUploadComplete(false);
+    } finally {
+        // Reset file input so same file can be re-selected if needed
+        if (e.target) e.target.value = '';
     }
   };
   
