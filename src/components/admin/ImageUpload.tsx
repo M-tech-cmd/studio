@@ -22,6 +22,7 @@ interface ImageUploadProps {
 /**
  * Universal Dual-Mode Image Upload Component.
  * Features instant previews via blob URLs and silent atomic cloud sync.
+ * Absolute-positioned top-left 'X' button for instant removal.
  */
 export function ImageUpload({ value, onChange, folder, label, className }: ImageUploadProps) {
   const [preview, setPreview] = useState<string>(value || '');
@@ -47,7 +48,7 @@ export function ImageUpload({ value, onChange, folder, label, className }: Image
       const snapshot = await uploadBytes(storageRef, file);
       const downloadUrl = await getDownloadURL(snapshot.ref);
       
-      // 3. Update Parent State (Silently replace blob with real URL)
+      // 3. Update Parent State
       onChange(downloadUrl);
       URL.revokeObjectURL(blobUrl);
     } catch (error: any) {
@@ -67,6 +68,9 @@ export function ImageUpload({ value, onChange, folder, label, className }: Image
   };
 
   const clearImage = () => {
+    if (preview.startsWith('blob:')) {
+        URL.revokeObjectURL(preview);
+    }
     setPreview('');
     onChange('');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -108,8 +112,6 @@ export function ImageUpload({ value, onChange, folder, label, className }: Image
             placeholder="Paste image link here..." 
             value={preview.startsWith('blob:') ? '' : preview}
             autoComplete="off"
-            autoCorrect="off"
-            spellCheck="false"
             onChange={(e) => handleUrlChange(e.target.value)}
             className="h-12"
           />
@@ -117,7 +119,7 @@ export function ImageUpload({ value, onChange, folder, label, className }: Image
       </Tabs>
 
       {preview && (
-        <div className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-primary/10 shadow-lg bg-muted/5 group animate-in fade-in zoom-in-95">
+        <div className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-primary/10 shadow-lg bg-muted/5 group animate-in fade-in zoom-in-95 isolate">
           <Image 
             src={preview} 
             alt="Upload Preview" 
@@ -125,10 +127,11 @@ export function ImageUpload({ value, onChange, folder, label, className }: Image
             className="object-contain" 
             unoptimized 
           />
+          {/* Top-Left X Button */}
           <button
             type="button"
             onClick={clearImage}
-            className="absolute top-2 left-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center shadow-xl hover:bg-black/80 transition-all z-10"
+            className="absolute top-2 left-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center shadow-xl hover:bg-black transition-all z-50 border border-white/20"
           >
             <X className="h-5 w-5" />
           </button>

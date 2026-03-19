@@ -85,8 +85,8 @@ export default function AdminEventsPage() {
     });
 
     // 2. BACKGROUND SYNC
+    const { id, ...dataToAdd } = eventData;
     if (isNew) {
-        const { id, ...dataToAdd } = eventData;
         const eventsCollection = collection(firestore, 'events');
         addDoc(eventsCollection, dataToAdd)
             .catch((error: any) => {
@@ -97,15 +97,14 @@ export default function AdminEventsPage() {
                 }));
             });
     } else {
-        const { id, ...dataToUpdate } = eventData;
         if (!id) return;
         const eventDoc = doc(firestore, 'events', id!);
-        updateDoc(eventDoc, dataToUpdate)
+        updateDoc(eventDoc, dataToAdd)
             .catch((error: any) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
                   path: eventDoc.path,
                   operation: 'update',
-                  requestResourceData: dataToUpdate,
+                  requestResourceData: dataToAdd,
                 }));
             });
     }

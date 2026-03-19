@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 /**
  * Root Layout
  * Provides core Firebase services, theme management, and global UI components.
+ * suppressHydrationWarning is applied to the body to prevent click-listener detachment.
  */
 export default function RootLayout({
   children,

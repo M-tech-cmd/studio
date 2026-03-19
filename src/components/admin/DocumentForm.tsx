@@ -4,13 +4,13 @@ import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { FileText, Trash2, ShieldCheck, Info } from 'lucide-react';
+import { FileText, Trash2, ShieldCheck, Info, X } from 'lucide-react';
 import { format } from 'date-fns';
-import { Timestamp, collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { Timestamp, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 import type { Document } from '@/lib/types';
-import { useStorage, useFirestore } from '@/firebase';
+import { useStorage } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -21,7 +21,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Form,
   FormControl,
@@ -67,7 +66,6 @@ export function DocumentForm({ document: existingDoc, onSave, onClose }: Documen
   const [currentFileUrl, setCurrentFileUrl] = useState<string>(existingDoc?.url || '');
   
   const storage = useStorage();
-  const firestore = useFirestore();
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -99,7 +97,7 @@ export function DocumentForm({ document: existingDoc, onSave, onClose }: Documen
   const handleCommit = async () => {
     const values = form.getValues();
     
-    // Explicit Validation Check
+    // 1. Validation
     if (!values.title?.trim()) {
         form.setError('title', { message: 'Required' });
         scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -111,6 +109,11 @@ export function DocumentForm({ document: existingDoc, onSave, onClose }: Documen
         return;
     }
 
+    // 2. ATOMIC UI RESPONSE: Toast & Close immediately
+    toast({ title: 'Registry Updated', description: 'Changes are being synchronized.' });
+    onClose();
+
+    // 3. SILENT BACKGROUND SYNC
     try {
         let finalUrl = currentFileUrl;
         let finalType = existingDoc?.fileType || 'FILE';
@@ -131,11 +134,8 @@ export function DocumentForm({ document: existingDoc, onSave, onClose }: Documen
         };
 
         onSave(dataToSave as any);
-        toast({ title: 'Success', description: 'Registry updated.' });
-        onClose();
     } catch (error: any) {
-        console.error("Atomic Document Upload Error:", error.code);
-        toast({ variant: 'destructive', title: 'Save Failed', description: error.message });
+        console.error("Background Registry Sync Error:", error.code);
     }
   };
 
@@ -200,7 +200,8 @@ export function DocumentForm({ document: existingDoc, onSave, onClose }: Documen
 
                   {(localFile || currentFileUrl) && (
                     <div className="relative rounded-2xl border-2 p-5 bg-muted/5 animate-in fade-in zoom-in-95 group overflow-hidden isolate">
-                      <button type="button" onClick={() => { setLocalFile(null); setCurrentFileUrl(''); }} className="absolute top-3 left-3 z-50 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center shadow-2xl hover:bg-black transition-all">
+                      {/* Top-Left X Button */}
+                      <button type="button" onClick={() => { setLocalFile(null); setCurrentFileUrl(''); if(previewUrl) URL.revokeObjectURL(previewUrl); }} className="absolute top-3 left-3 z-50 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center shadow-2xl hover:bg-black transition-all">
                         <Trash2 className="h-4 w-4" />
                       </button>
 
