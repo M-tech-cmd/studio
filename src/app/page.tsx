@@ -1,11 +1,6 @@
 /**
- * Root Redirector.
- * The main home page logic has been moved to src/app/(public)/page.tsx
- * to ensure it benefits from the WebLayout (Maintenance Mode & Branding).
- * 
- * Note: This file is intentionally left empty/inactive to avoid route collision
- * with the route group version in src/app/(public)/page.tsx.
+ * Root Route Re-exporter.
+ * This file serves the public home page while resolving the route collision 
+ * with the version in the (public) route group.
  */
-export default function RootPage() {
-  return null;
-}
+export { default } from './(public)/page';
