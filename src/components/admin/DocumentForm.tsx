@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Upload, FileText, X, Loader2 } from 'lucide-react';
+import { Upload, FileText, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -67,7 +67,6 @@ const formatDateForInput = (date: any) => {
 export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
   const storage = useStorage();
   const { toast } = useToast();
 
@@ -115,7 +114,6 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
       return;
     }
 
-    setIsUploading(true);
     let finalUrl = values.url || '';
     let finalFileType = values.fileType || '';
 
@@ -141,14 +139,11 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
       onSave(dataToSave);
     } catch (error: any) {
       console.error('Upload error:', error.code, error.message);
-      toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
-    } finally {
-      setIsUploading(false);
+      toast({ variant: 'destructive', title: 'Failed', description: error.message });
     }
   };
 
   const isImage = (file: File | null) => file?.type.startsWith('image/');
-  const isPdf = (file: File | null) => file?.type === 'application/pdf';
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -298,11 +293,10 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
         </ScrollArea>
 
         <DialogFooter className="p-6 bg-muted/10 border-t mt-auto gap-4">
-          <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8" disabled={isUploading}>
+          <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8">
             Cancel
           </Button>
-          <Button type="submit" form="document-form" className="rounded-full h-12 px-12 font-black shadow-xl" disabled={isUploading}>
-            {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          <Button type="submit" form="document-form" className="rounded-full h-12 px-12 font-black shadow-xl">
             {document ? 'SAVE CHANGES' : 'CREATE DOCUMENT'}
           </Button>
         </DialogFooter>
