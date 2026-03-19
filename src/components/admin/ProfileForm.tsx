@@ -88,7 +88,6 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
 
 
   const onSubmit = (values: z.infer<typeof profileSchema>) => {
-    // SAFE CHECK: Ensure no field is undefined before saving to Firestore
     const dataToSave = {
       name: values.name || "",
       title: values.title || "",
@@ -104,35 +103,39 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
     onSave(dataToSave);
   };
 
+  /**
+   * AI Resource Exhaustion Guard.
+   * Ensures the Gemini call only triggers once per click.
+   * If failure occurs, user must manually re-initiate to prevent 429 errors.
+   */
   const handleGeneratePhotoClick = async () => {
+    if (isGeneratingPhoto) return; // Block double-clicks
+
     const name = form.getValues('name');
     const title = form.getValues('title');
 
     if (!name || !title) {
       toast({
         variant: 'destructive',
-        title: 'Missing Information',
+        title: 'Identity Required',
         description: 'Please enter a name and title before generating a photo.',
       });
       return;
     }
 
     setIsGeneratingPhoto(true);
-    const result = await handleGenerateProfilePhoto({ name, title });
-    setIsGeneratingPhoto(false);
-
-    if (result.success && result.data?.photoDataUri) {
-      form.setValue('imageUrl', result.data.photoDataUri);
-      toast({
-        title: 'Photo Generated',
-        description: 'A new profile photo has been generated and set.',
-      });
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'Generation Failed',
-        description: result.error || 'Could not generate the profile photo.',
-      });
+    try {
+        const result = await handleGenerateProfilePhoto({ name, title });
+        if (result.success && result.data?.photoDataUri) {
+          form.setValue('imageUrl', result.data.photoDataUri);
+          toast({ title: 'AI Rendering Complete' });
+        } else {
+          toast({ variant: 'destructive', title: 'AI Limit Reached', description: result.error });
+        }
+    } catch (err) {
+        toast({ variant: 'destructive', title: 'Generation Blocked' });
+    } finally {
+        setIsGeneratingPhoto(false);
     }
   };
 
@@ -151,22 +154,22 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>{profile ? 'Edit Profile' : 'Add New Profile'}</DialogTitle>
+      <DialogContent className="sm:max-w-3xl h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
+        <DialogHeader className="p-6 bg-primary/5 border-b">
+          <DialogTitle className="text-2xl font-black uppercase tracking-tighter">{profile ? 'Edit Registry' : 'New Staff Profile'}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="max-h-[65vh] pr-6 -mx-6">
-            <div className="px-6 py-4">
+        <ScrollArea className="flex-1">
+            <div className="p-8">
                 <Form {...form}>
-                <form id="profile-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form id="profile-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField
                       control={form.control}
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Full Name *</FormLabel>
-                          <FormControl><Input placeholder="E.g., Deacon James Thompson" {...field} /></FormControl>
+                          <FormLabel className="font-bold">Full Name *</FormLabel>
+                          <FormControl><Input placeholder="E.g., Deacon James Thompson" {...field} className="h-12 text-lg" /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -176,8 +179,8 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
                       name="title"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Title/Position *</FormLabel>
-                          <FormControl><Input placeholder="E.g., Permanent Deacon" {...field} /></FormControl>
+                          <FormLabel className="font-bold">Title/Position *</FormLabel>
+                          <FormControl><Input placeholder="E.g., Permanent Deacon" {...field} className="h-12 text-lg" /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -189,9 +192,9 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
                     name="role"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Role</FormLabel>
+                        <FormLabel className="font-bold">Registry Role</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger className="h-12"><SelectValue placeholder="Select a role" /></SelectTrigger></FormControl>
                           <SelectContent>
                             {['Pastor', 'Associate Pastor', 'Deacon', 'Staff', 'Ministry Leader'].map((role) => (
                               <SelectItem key={role} value={role}>{role}</SelectItem>
@@ -209,25 +212,25 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
                     render={({ field }) => (
                       <FormItem>
                         <div className="flex justify-between items-center">
-                          <FormLabel>Biography</FormLabel>
+                          <FormLabel className="font-bold">Biography</FormLabel>
                             <Button type="button" variant="ghost" size="icon" onClick={() => setIsBioModalOpen(true)}>
                                 <Expand className="h-4 w-4" />
                             </Button>
                         </div>
-                        <FormControl><Textarea placeholder="Tell us about this person" className="resize-y" rows={4} {...field} /></FormControl>
+                        <FormControl><Textarea placeholder="Tell us about this person" className="resize-none h-32" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField
                       control={form.control}
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl><Input type="email" placeholder="person@example.com" {...field} /></FormControl>
+                          <FormLabel className="font-bold">Email</FormLabel>
+                          <FormControl><Input type="email" placeholder="person@example.com" {...field} className="h-12" /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -237,11 +240,12 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
                       name="phone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Phone</FormLabel>
+                          <FormLabel className="font-bold">Phone</FormLabel>
                           <FormControl>
                             <PhoneInput
                               placeholder="712 345 678"
                               {...field}
+                              className="h-12"
                             />
                           </FormControl>
                           <FormMessage />
@@ -251,48 +255,47 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
                   </div>
 
                   {imagePreview && (imagePreview.startsWith('http') || imagePreview.startsWith('data:')) && (
-                    <div className="mt-4">
-                        <FormLabel>Image Preview</FormLabel>
-                        <div className="mt-2 relative w-40 h-40 rounded-full border p-2 mx-auto isolate">
+                    <div className="mt-4 p-6 bg-muted/20 rounded-2xl border-2 border-dashed border-muted">
+                        <FormLabel className="font-bold uppercase tracking-widest text-[10px]">Photo Preview</FormLabel>
+                        <div className="mt-4 relative w-48 h-48 rounded-full border-4 border-white shadow-xl mx-auto isolate overflow-hidden bg-white">
                             {imageError ? (
-                                <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-muted text-muted-foreground">
-                                    <ImageIcon className="h-16 w-16" />
-                                    <p className="mt-2 text-xs text-center">Invalid Image</p>
+                                <div className="flex h-full w-full flex-col items-center justify-center text-muted-foreground">
+                                    <ImageIcon className="h-16 w-16 opacity-20" />
                                 </div>
                             ) : (
                                 <Image 
                                     src={imagePreview} 
-                                    alt="Profile image preview" 
+                                    alt="Profile" 
                                     fill 
-                                    className="object-cover rounded-full" 
+                                    className="object-cover" 
                                     unoptimized
                                     onError={() => setImageError(true)}
                                 />
                             )}
-                            <Button 
-                              variant="secondary" 
-                              size="icon" 
-                              className="absolute top-0 right-0 h-8 w-8 rounded-full shadow-lg z-50 bg-white text-black border border-black/10 hover:bg-white/90" 
+                            <button 
+                              type="button"
+                              className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-2xl z-50 bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-all" 
                               onClick={() => { form.setValue('imageUrl', ''); setImageError(false); }}
                             >
                               <X className="h-4 w-4" />
-                            </Button>
+                            </button>
                         </div>
                     </div>
                    )}
 
-                  <div>
-                    <FormLabel>Profile Photo</FormLabel>
-                    <div className="flex items-center gap-4 mt-2">
-                        <Button type="button" variant="outline" size="icon" onClick={handleGeneratePhotoClick} disabled={isGeneratingPhoto}>
-                            {isGeneratingPhoto ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5"/>}
+                  <div className="space-y-4">
+                    <FormLabel className="font-bold">Profile Assets</FormLabel>
+                    <div className="flex flex-wrap gap-4">
+                        <Button type="button" variant="outline" className="h-12 px-6 rounded-full gap-2 border-2 border-primary/20 hover:bg-primary/5 transition-all" onClick={handleGeneratePhotoClick} disabled={isGeneratingPhoto}>
+                            {isGeneratingPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-primary"/>}
+                            {isGeneratingPhoto ? 'Generating AI Photo...' : 'Generate with AI'}
                         </Button>
                         <div className="flex-grow">
                              <input id="file-upload" type="file" className="hidden" onChange={handleFileChange} accept="image/*"/>
-                             <Button asChild variant="outline" className="w-full">
-                                <label htmlFor="file-upload" className="cursor-pointer">
-                                    <Upload className="mr-2 h-4 w-4" />
-                                    Upload Photo
+                             <Button asChild variant="secondary" className="h-12 px-8 rounded-full w-full cursor-pointer">
+                                <label htmlFor="file-upload" className="flex items-center justify-center gap-2">
+                                    <Upload className="h-4 w-4" />
+                                    Upload Official Photo
                                 </label>
                             </Button>
                         </div>
@@ -303,10 +306,11 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
                     control={form.control}
                     name="active"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                      <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-2xl border-2 p-6 bg-white shadow-sm">
+                        <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="h-6 w-6" /></FormControl>
                         <div className="space-y-1 leading-none">
-                          <FormLabel>Active profile (visible on website)</FormLabel>
+                          <FormLabel className="font-bold">Activate Profile</FormLabel>
+                          <p className="text-xs text-muted-foreground">This person will appear in the public staff directory.</p>
                         </div>
                       </FormItem>
                     )}
@@ -323,12 +327,14 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
                 onSave={(newValue) => {
                     form.setValue('bio', newValue);
                 }}
-                title="Edit Biography"
+                title="Edit Staff Biography"
             />
         )}
-        <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" form="profile-form">{profile ? 'Update Profile' : 'Create Profile'}</Button>
+        <DialogFooter className="p-6 bg-muted/10 border-t mt-auto gap-4">
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8">Cancel</Button>
+            <Button type="submit" form="profile-form" className="rounded-full h-12 px-12 font-black shadow-xl">
+                {profile ? 'SAVE CHANGES' : 'COMMIT TO REGISTRY'}
+            </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

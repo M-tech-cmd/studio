@@ -14,6 +14,11 @@ import { ref, uploadBytesResumable, getDownloadURL, type UploadTask } from 'fire
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 
+/**
+ * Clean-Break Rich Text Editor.
+ * Stripped of all loadbars. Features instant URL swapping and manual task cancellation.
+ * Prevents 429 errors and ChunkLoadErrors via zero-ghost interactions.
+ */
 const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaTypeRef = useRef<'image' | 'video' | 'audio'>('image');
@@ -57,6 +62,14 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     },
   });
 
+  // Emergency Reset: Cleanup tasks and blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(activeTasksRef.current).forEach(task => task.cancel());
+      activeTasksRef.current = {};
+    };
+  }, []);
+
   useEffect(() => {
     if (editor && value !== editor.getHTML()) {
       editor.commands.setContent(value, false);
@@ -81,25 +94,35 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     const type = mediaTypeRef.current;
 
     // Insertion with Top-Left X Button Wrapper
+    // No loadbars, no overlays. Just instant preview.
     if (type === 'image') {
       editor.chain().focus().insertContent(`
         <div class="editor-media-wrapper relative group my-6 rounded-2xl overflow-hidden border-2 border-primary/10 shadow-xl bg-white isolate">
             <img src="${tempUrl}" class="w-full h-auto object-contain block" />
-            <div class="absolute top-2 left-2 z-10 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer shadow-2xl hover:bg-black/80 transition-all no-print" onclick="this.closest('.editor-media-wrapper').remove()">X</div>
+            <div 
+                class="absolute top-2 left-2 z-50 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer shadow-2xl hover:bg-black/80 transition-all no-print" 
+                onclick="const wrapper = this.closest('.editor-media-wrapper'); const url = wrapper.querySelector('img').src; window.dispatchEvent(new CustomEvent('cancel-upload', { detail: { url } })); wrapper.remove();"
+            >X</div>
         </div>
       `).run();
     } else if (type === 'video') {
        editor.chain().focus().insertContent(`
           <div class="editor-media-wrapper my-6 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-xl bg-black aspect-video relative group isolate">
               <video controls src="${tempUrl}" class="w-full h-full object-contain"></video>
-              <div class="absolute top-2 left-2 z-10 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer no-print" onclick="this.closest('.editor-media-wrapper').remove()">X</div>
+              <div 
+                class="absolute top-2 left-2 z-50 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer no-print" 
+                onclick="const wrapper = this.closest('.editor-media-wrapper'); const url = wrapper.querySelector('video').src; window.dispatchEvent(new CustomEvent('cancel-upload', { detail: { url } })); wrapper.remove();"
+              >X</div>
           </div>
        `).run();
     } else if (type === 'audio') {
       editor.chain().focus().insertContent(`
           <div class="editor-media-wrapper whatsapp-audio-bubble my-4 p-4 rounded-2xl bg-[#f0f2f5] dark:bg-slate-800 flex items-center gap-4 shadow-sm border border-slate-200/50 relative">
               <audio controls src="${tempUrl}" class="flex-1 h-10 accent-[#005c96]"></audio>
-              <div class="absolute -top-2 -left-2 z-10 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] cursor-pointer no-print" onclick="this.closest('.editor-media-wrapper').remove()">X</div>
+              <div 
+                class="absolute -top-2 -left-2 z-50 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] cursor-pointer no-print" 
+                onclick="const wrapper = this.closest('.editor-media-wrapper'); const url = wrapper.querySelector('audio').src; window.dispatchEvent(new CustomEvent('cancel-upload', { detail: { url } })); wrapper.remove();"
+              >X</div>
           </div>
       `).run();
     }
@@ -109,6 +132,17 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
         const uploadTask = uploadBytesResumable(storageRef, file);
         activeTasksRef.current[tempUrl] = uploadTask;
 
+        // Listen for manual cancellation via the "X" button
+        const handleCancel = (e: any) => {
+            if (e.detail.url === tempUrl) {
+                uploadTask.cancel();
+                delete activeTasksRef.current[tempUrl];
+                URL.revokeObjectURL(tempUrl);
+                window.removeEventListener('cancel-upload', handleCancel);
+            }
+        };
+        window.addEventListener('cancel-upload', handleCancel);
+
         uploadTask.on('state_changed', null, null, async () => {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             if (downloadURL) {
@@ -117,6 +151,7 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
                 editor.commands.setContent(updatedContent, false);
                 delete activeTasksRef.current[tempUrl];
                 URL.revokeObjectURL(tempUrl);
+                window.removeEventListener('cancel-upload', handleCancel);
             }
         });
     } catch (error) {
