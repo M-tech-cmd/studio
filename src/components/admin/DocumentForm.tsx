@@ -37,15 +37,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { LargeTextEditModal } from './LargeTextEditModal';
 
 const documentSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters.'),
+  title: z.string().min(1, 'Document Title is required.'),
   description: z.string().optional(),
   category: z.enum(['Bulletin', 'Newsletter', 'Form', 'Policy', 'Announcement', 'Other']),
-  url: z.string().url('A file upload is required.'),
+  url: z.string().min(1, 'A file upload is required.'),
   date: z.string({ required_error: 'Date is required.' }).min(1, 'Date is required.'),
   public: z.boolean().default(true),
   fileType: z.string().min(1, "File type is required.")
@@ -65,7 +65,7 @@ const formatDateForInput = (date: any) => {
 
 export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
   const [fileName, setFileName] = useState<string | null>(document ? document.url.split('/').pop()?.split('?')[0].split('%2F').pop() || "Attached File" : null);
-  const [uploadComplete, setUploadComplete] = useState(false);
+  const [uploadComplete, setUploadComplete] = useState(!!document);
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
   const storage = useStorage();
   const { toast } = useToast();
@@ -95,59 +95,106 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && storage) {
-      setFileName(file.name);
-      setUploadComplete(false);
-      
-      try {
-          const storageRef = ref(storage, `documents/${Date.now()}_${file.name}`);
-          const snapshot = await uploadBytes(storageRef, file);
-          const downloadURL = await getDownloadURL(snapshot.ref);
-          
-          form.setValue('url', downloadURL);
-          form.setValue('fileType', file.name.split('.').pop()?.toUpperCase() || 'FILE');
-          setUploadComplete(true);
-          toast({ title: 'File Ready', description: 'Upload finished successfully.' });
-      } catch (error: any) {
-          console.error("Upload failed:", error);
-          toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
-          setFileName(null);
-      }
+    if (!file || !storage) return;
+
+    setFileName(file.name);
+    setUploadComplete(false);
+    
+    try {
+        const storageRef = ref(storage, `documents/${Date.now()}_${file.name}`);
+        const snapshot = await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        
+        form.setValue('url', downloadURL);
+        form.setValue('fileType', file.name.split('.').pop()?.toUpperCase() || 'FILE');
+        setUploadComplete(true);
+        toast({ title: 'File Ready', description: 'Document uploaded successfully.' });
+    } catch (error: any) {
+        console.error("Document upload failed:", error);
+        toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not sync document to storage.' });
+        setFileName(null);
+        setUploadComplete(false);
     }
   };
   
-  const fileUrl = form.watch('url');
-
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{document ? 'Edit Document' : 'Add New Document'}</DialogTitle>
+      <DialogContent className="sm:max-w-md h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-0">
+          <DialogTitle className="text-2xl font-black uppercase tracking-tighter">
+            {document ? 'Edit Registry Item' : 'New Parish Document'}
+          </DialogTitle>
         </DialogHeader>
-        <ScrollArea className="max-h-[65vh] -mx-6 pr-2">
-            <div className="px-6 py-4">
+        
+        <ScrollArea className="flex-1">
+            <div className="p-6 space-y-8">
                 <Form {...form}>
-                <form id="document-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <form id="document-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                    {/* DOCUMENT TITLE - REQUIRED & FIRST */}
                     <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Document Title *</FormLabel>
-                        <FormControl>
-                            <Input placeholder="E.g., Weekly Parish Bulletin" {...field} autoComplete="off" />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
+                        control={form.control}
+                        name="title"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="font-bold">Document Title *</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="E.g., Weekly Parish Bulletin" {...field} autoComplete="off" className="h-12 text-lg font-bold" />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
                     />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <FormField
+                            control={form.control}
+                            name="category"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel className="font-bold">Category</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                    <SelectTrigger className="h-12">
+                                        <SelectValue placeholder="Select a category" />
+                                    </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                    {['Bulletin', 'Newsletter', 'Form', 'Policy', 'Announcement', 'Other'].map(
+                                        (cat) => (
+                                        <SelectItem key={cat} value={cat}>
+                                            {cat}
+                                        </SelectItem>
+                                        )
+                                    )}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="date"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel className="font-bold">Date *</FormLabel>
+                                <FormControl>
+                                        <Input type="date" {...field} className="h-12" />
+                                    </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+
                     <FormField
                       control={form.control}
                       name="description"
                       render={({ field }) => (
                         <FormItem>
                           <div className="flex justify-between items-center">
-                            <FormLabel>Description</FormLabel>
+                            <FormLabel className="font-bold">Summary / Description</FormLabel>
                             <Button type="button" variant="ghost" size="icon" onClick={() => setIsDescriptionModalOpen(true)}>
                                 <Expand className="h-4 w-4" />
                             </Button>
@@ -155,7 +202,7 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
                           <FormControl>
                             <Textarea
                               placeholder="A short description of the document"
-                              className="resize-y"
+                              className="resize-none"
                               rows={3}
                               {...field}
                             />
@@ -164,114 +211,92 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name="date"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Date *</FormLabel>
-                           <FormControl>
-                                <Input type="date" {...field} />
-                            </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                            {['Bulletin', 'Newsletter', 'Form', 'Policy', 'Announcement', 'Other'].map(
-                                (cat) => (
-                                <SelectItem key={cat} value={cat}>
-                                    {cat}
-                                </SelectItem>
-                                )
-                            )}
-                            </SelectContent>
-                        </Select>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
 
-                    <div className="space-y-3">
-                        <FormLabel>Upload File (PDF, Word, etc.)</FormLabel>
+                    <div className="space-y-4 pt-4 border-t border-dashed">
+                        <FormLabel className="font-black text-xs uppercase tracking-widest text-muted-foreground">Digital File Attachment</FormLabel>
+                        
                         <div className="flex items-center justify-center w-full">
-                            <Button asChild variant="outline" className="w-full h-12 border-dashed border-2">
-                                <label htmlFor="doc-upload" className="cursor-pointer w-full flex items-center justify-center gap-2">
-                                    <Upload className="mr-2 h-5 w-5" />
+                            <Button asChild variant="outline" className="w-full h-14 border-dashed border-2 rounded-2xl hover:bg-muted/50">
+                                <label htmlFor="doc-upload" className="cursor-pointer w-full flex items-center justify-center gap-2 font-bold">
+                                    <Upload className="mr-2 h-5 w-5 text-primary" />
                                     {fileName ? "Change Selection" : "Click to Select File"}
                                 </label>
                             </Button>
-                            <input id="doc-upload" type="file" className="hidden" onChange={handleFileChange} />
+                            <input 
+                                id="doc-upload" 
+                                type="file" 
+                                className="hidden" 
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,image/*"
+                                onChange={handleFileChange} 
+                            />
                         </div>
                         
-                        {uploadComplete && (
-                            <div className="flex items-center gap-2 text-green-600 text-sm font-bold bg-green-50 p-2 rounded border border-green-100">
-                                <CheckCircle2 className="h-4 w-4" />
-                                <span>File Uploaded & Ready!</span>
-                            </div>
-                        )}
-
-                        {fileUrl && (
-                            <div className="mt-2 flex items-center justify-between rounded-md border p-3 bg-muted/20">
-                                <div className="flex items-center gap-3">
-                                    <FileText className="h-5 w-5 text-primary"/>
-                                    <span className="text-sm font-medium truncate max-w-[200px]">{fileName}</span>
+                        {fileName && (
+                            <div className="flex items-center justify-between rounded-2xl border-2 p-4 bg-muted/5 animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+                                        <FileText className="h-5 w-5"/>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-bold truncate">{fileName}</p>
+                                        <p className="text-[10px] font-black uppercase tracking-tighter opacity-50">
+                                            {form.watch('fileType') || 'Attachment'}
+                                        </p>
+                                    </div>
                                 </div>
+                                {uploadComplete && (
+                                    <div className="flex items-center gap-1 text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100 shadow-sm">
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        <span className="text-[10px] font-black uppercase">Cloud Synced</span>
+                                    </div>
+                                )}
                             </div>
                         )}
+                        <FormField control={form.control} name="url" render={() => <FormMessage />} />
                     </div>
+
                     <FormField
-                    control={form.control}
-                    name="public"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-                        <FormControl>
-                            <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                            <FormLabel>
-                            Public document (visible to all website visitors)
-                            </FormLabel>
-                        </div>
-                        </FormItem>
-                    )}
+                        control={form.control}
+                        name="public"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-2xl border-2 p-6 bg-white shadow-sm">
+                            <FormControl>
+                                <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                className="h-6 w-6"
+                                />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                                <FormLabel className="font-bold">
+                                Public document
+                                </FormLabel>
+                                <p className="text-xs text-muted-foreground italic">Visible to all website visitors once published.</p>
+                            </div>
+                            </FormItem>
+                        )}
                     />
                 </form>
                 </Form>
             </div>
         </ScrollArea>
+
         {isDescriptionModalOpen && (
           <LargeTextEditModal
             isOpen={isDescriptionModalOpen}
             onClose={() => setIsDescriptionModalOpen(false)}
             initialValue={form.getValues('description') || ''}
-            onSave={(newValue) => {
-              form.setValue('description', newValue);
-            }}
-            title="Edit Description"
+            onSave={(newValue) => form.setValue('description', newValue)}
+            title="Edit Document Description"
           />
         )}
-        <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
+
+        <DialogFooter className="p-6 bg-muted/5 border-t">
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8">
+                Cancel
             </Button>
-            <Button type="submit" form="document-form">
-            {document ? 'Update Document' : 'Create Document'}
+            <Button type="submit" form="document-form" className="rounded-full h-12 px-12 font-black shadow-xl">
+                {document ? 'SAVE CHANGES' : 'CREATE DOCUMENT'}
             </Button>
         </DialogFooter>
       </DialogContent>
