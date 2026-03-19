@@ -1,11 +1,10 @@
-
 'use client';
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Upload, X, Link as LinkIcon, FileText, Expand, Loader2, CheckCircle2 } from 'lucide-react';
+import { Upload, FileText, Expand, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -66,7 +65,6 @@ const formatDateForInput = (date: any) => {
 
 export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
   const [fileName, setFileName] = useState<string | null>(document ? document.url.split('/').pop()?.split('?')[0].split('%2F').pop() || "Attached File" : null);
-  const [isUploading, setIsUploading] = useState(false);
   const [uploadComplete, setUploadComplete] = useState(false);
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
   const storage = useStorage();
@@ -99,7 +97,6 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
     const file = e.target.files?.[0];
     if (file && storage) {
       setFileName(file.name);
-      setIsUploading(true);
       setUploadComplete(false);
       
       try {
@@ -115,8 +112,6 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
           console.error("Upload failed:", error);
           toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
           setFileName(null);
-      } finally {
-          setIsUploading(false);
       }
     }
   };
@@ -140,7 +135,7 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
                         <FormItem>
                         <FormLabel>Document Title *</FormLabel>
                         <FormControl>
-                            <Input placeholder="E.g., Weekly Parish Bulletin" {...field} />
+                            <Input placeholder="E.g., Weekly Parish Bulletin" {...field} autoComplete="off" />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -213,8 +208,8 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
                         <FormLabel>Upload File (PDF, Word, etc.)</FormLabel>
                         <div className="flex items-center justify-center w-full">
                             <Button asChild variant="outline" className="w-full h-12 border-dashed border-2">
-                                <label htmlFor="doc-upload" className="cursor-pointer w-full flex items-center justify-center">
-                                    {isUploading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Upload className="mr-2 h-5 w-5" />}
+                                <label htmlFor="doc-upload" className="cursor-pointer w-full flex items-center justify-center gap-2">
+                                    <Upload className="mr-2 h-5 w-5" />
                                     {fileName ? "Change Selection" : "Click to Select File"}
                                 </label>
                             </Button>
@@ -228,17 +223,12 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
                             </div>
                         )}
 
-                        {fileUrl && !isUploading && (
+                        {fileUrl && (
                             <div className="mt-2 flex items-center justify-between rounded-md border p-3 bg-muted/20">
                                 <div className="flex items-center gap-3">
                                     <FileText className="h-5 w-5 text-primary"/>
                                     <span className="text-sm font-medium truncate max-w-[200px]">{fileName}</span>
                                 </div>
-                                <Button asChild variant="ghost" size="icon" className="h-8 w-8">
-                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer">
-                                        <LinkIcon className="h-4 w-4"/>
-                                    </a>
-                                </Button>
                             </div>
                         )}
                     </div>
@@ -280,7 +270,7 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
             <Button type="button" variant="outline" onClick={onClose}>
             Cancel
             </Button>
-            <Button type="submit" form="document-form" disabled={isUploading}>
+            <Button type="submit" form="document-form">
             {document ? 'Update Document' : 'Create Document'}
             </Button>
         </DialogFooter>

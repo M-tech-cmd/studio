@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import Image from 'next/image';
-import { Upload, X, Sparkles, Loader2, Expand, Image as ImageIcon } from 'lucide-react';
+import { Sparkles, Loader2, Expand } from 'lucide-react';
 
 import type { Profile } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -39,6 +38,7 @@ import { PhoneInput } from '../ui/phone-input';
 import { handleGenerateProfilePhoto } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { LargeTextEditModal } from './LargeTextEditModal';
+import { ImageUpload } from './ImageUpload';
 
 
 const profileSchema = z.object({
@@ -48,7 +48,7 @@ const profileSchema = z.object({
   bio: z.string().min(10, 'Biography is required.'),
   email: z.string().email('Please enter a valid email.'),
   phone: z.string().min(1, 'Phone number is required.'),
-  imageUrl: z.string().url('Please enter a valid URL or upload a photo.').optional().or(z.literal('')),
+  imageUrl: z.string().min(1, 'Profile photo is required.'),
   imageHint: z.string().optional(),
   active: z.boolean().default(true),
 });
@@ -62,7 +62,6 @@ type ProfileFormProps = {
 export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
   const [isGeneratingPhoto, setIsGeneratingPhoto] = useState(false);
   const [isBioModalOpen, setIsBioModalOpen] = useState(false);
-  const [imageError, setImageError] = useState(false);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof profileSchema>>({
@@ -80,36 +79,12 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
     },
   });
 
-  const imagePreview = form.watch('imageUrl');
-
-  useEffect(() => {
-    setImageError(false);
-  }, [imagePreview]);
-
-
   const onSubmit = (values: z.infer<typeof profileSchema>) => {
-    const dataToSave = {
-      name: values.name || "",
-      title: values.title || "",
-      role: values.role || "Staff",
-      bio: values.bio || "",
-      email: values.email || "",
-      phone: values.phone || "",
-      imageUrl: values.imageUrl || "",
-      imageHint: values.imageHint || "",
-      active: values.active ?? true,
-      id: profile?.id,
-    };
-    onSave(dataToSave);
+    onSave({ ...values, id: profile?.id });
   };
 
-  /**
-   * AI Resource Exhaustion Guard.
-   * Ensures the Gemini call only triggers once per click.
-   * If failure occurs, user must manually re-initiate to prevent 429 errors.
-   */
   const handleGeneratePhotoClick = async () => {
-    if (isGeneratingPhoto) return; // Block double-clicks
+    if (isGeneratingPhoto) return;
 
     const name = form.getValues('name');
     const title = form.getValues('title');
@@ -138,19 +113,6 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
         setIsGeneratingPhoto(false);
     }
   };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        form.setValue('imageUrl', dataUrl);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-  
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -254,53 +216,31 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
                     />
                   </div>
 
-                  {imagePreview && (imagePreview.startsWith('http') || imagePreview.startsWith('data:')) && (
-                    <div className="mt-4 p-6 bg-muted/20 rounded-2xl border-2 border-dashed border-muted">
-                        <FormLabel className="font-bold uppercase tracking-widest text-[10px]">Photo Preview</FormLabel>
-                        <div className="mt-4 relative w-48 h-48 rounded-full border-4 border-white shadow-xl mx-auto isolate overflow-hidden bg-white">
-                            {imageError ? (
-                                <div className="flex h-full w-full flex-col items-center justify-center text-muted-foreground">
-                                    <ImageIcon className="h-16 w-16 opacity-20" />
-                                </div>
-                            ) : (
-                                <Image 
-                                    src={imagePreview} 
-                                    alt="Profile" 
-                                    fill 
-                                    className="object-cover" 
-                                    unoptimized
-                                    onError={() => setImageError(true)}
-                                />
-                            )}
-                            <button 
-                              type="button"
-                              className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-2xl z-50 bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-all" 
-                              onClick={() => { form.setValue('imageUrl', ''); setImageError(false); }}
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                        </div>
-                    </div>
-                   )}
-
-                  <div className="space-y-4">
-                    <FormLabel className="font-bold">Profile Assets</FormLabel>
-                    <div className="flex flex-wrap gap-4">
-                        <Button type="button" variant="outline" className="h-12 px-6 rounded-full gap-2 border-2 border-primary/20 hover:bg-primary/5 transition-all" onClick={handleGeneratePhotoClick} disabled={isGeneratingPhoto}>
-                            {isGeneratingPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-primary"/>}
-                            {isGeneratingPhoto ? 'Generating AI Photo...' : 'Generate with AI'}
+                  <FormField
+                    control={form.control}
+                    name="imageUrl"
+                    render={({ field }) => (
+                      <FormItem className="space-y-4">
+                        <ImageUpload 
+                          value={field.value} 
+                          onChange={field.onChange} 
+                          folder="staff" 
+                          label="Official Profile Photo *" 
+                        />
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          className="w-full h-12 rounded-xl gap-2 border-2 border-primary/20 hover:bg-primary/5 transition-all" 
+                          onClick={handleGeneratePhotoClick} 
+                          disabled={isGeneratingPhoto}
+                        >
+                          {isGeneratingPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-primary"/>}
+                          {isGeneratingPhoto ? 'Generating AI Photo...' : 'Or Generate Professional Photo with AI'}
                         </Button>
-                        <div className="flex-grow">
-                             <input id="file-upload" type="file" className="hidden" onChange={handleFileChange} accept="image/*"/>
-                             <Button asChild variant="secondary" className="h-12 px-8 rounded-full w-full cursor-pointer">
-                                <label htmlFor="file-upload" className="flex items-center justify-center gap-2">
-                                    <Upload className="h-4 w-4" />
-                                    Upload Official Photo
-                                </label>
-                            </Button>
-                        </div>
-                    </div>
-                  </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}

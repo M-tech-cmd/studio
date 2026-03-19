@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Upload, RotateCcw, Link as LinkIcon, X, Palette as PaletteIcon } from 'lucide-react';
+import { RotateCcw, Palette as PaletteIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
@@ -17,11 +16,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useCollection, useFirestore, useMemoFirebase, useDoc, useStorage } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ImageUpload } from '@/components/admin/ImageUpload';
 
 const brandingSchema = z.object({
   brandName: z.string().min(1, "Brand name is required"),
@@ -50,8 +49,7 @@ const contentSchema = z.object({
     imageUrl: z.string().optional(),
 });
 
-const SectionControls = ({ form, prefix, label, onReset, onImageUpload }: { form: any, prefix: string, label: string, onReset: (p: string) => void, onImageUpload: (p: string, f: File) => Promise<void> }) => {
-    const imageUrl = form.watch(`${prefix}ImageUrl`);
+const SectionControls = ({ form, prefix, label, onReset }: { form: any, prefix: string, label: string, onReset: (p: string) => void }) => {
     return (
         <Card className="mb-6 border-l-4 border-l-primary shadow-sm">
             <CardHeader className="py-4 flex flex-row items-center justify-between bg-muted/10">
@@ -62,39 +60,20 @@ const SectionControls = ({ form, prefix, label, onReset, onImageUpload }: { form
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
                 <div className="grid md:grid-cols-2 gap-6">
-                    <FormField control={form.control} name={`${prefix}Title`} render={({field}) => <FormItem><FormLabel>Section Title</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder={`e.g., ${label}`} /></FormControl></FormItem>} />
+                    <FormField control={form.control} name={`${prefix}Title`} render={({field}) => <FormItem><FormLabel>Section Title</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder={`e.g., ${label}`} autoComplete="off" /></FormControl></FormItem>} />
                     <FormField control={form.control} name={`${prefix}Description`} render={({field}) => <FormItem><FormLabel>Section Description</FormLabel><FormControl><Textarea {...field} value={field.value || ''} placeholder="Add a short subtitle for this section..." /></FormControl></FormItem>} />
                 </div>
                 
-                <div className="space-y-4">
-                    <FormLabel>Section Banner Image</FormLabel>
-                    <div className="grid md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Tabs defaultValue="upload" className="w-full">
-                                <TabsList className="grid w-full grid-cols-2">
-                                    <TabsTrigger value="upload"><Upload className="h-4 w-4 mr-2"/> Upload</TabsTrigger>
-                                    <TabsTrigger value="url"><LinkIcon className="h-4 w-4 mr-2"/> URL</TabsTrigger>
-                                </TabsList>
-                                <TabsContent value="upload">
-                                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted transition-colors">
-                                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                                        <span className="text-xs font-semibold">Click to upload banner</span>
-                                        <input type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files?.[0] && onImageUpload(prefix, e.target.files[0])} />
-                                    </label>
-                                </TabsContent>
-                                <TabsContent value="url">
-                                    <FormField control={form.control} name={`${prefix}ImageUrl`} render={({field}) => <FormControl><Input {...field} value={field.value || ''} placeholder="https://..." /></FormControl>} />
-                                </TabsContent>
-                            </Tabs>
-                        </div>
-                        {imageUrl && (
-                            <div className="relative aspect-video rounded-lg border bg-muted overflow-hidden">
-                                <Image src={imageUrl} alt="Section banner" fill className="object-contain" unoptimized />
-                                <button type="button" className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-2xl z-50 bg-white text-black hover:bg-white/90 hover:scale-110 transition-all border-2 border-black/10 flex items-center justify-center" onClick={() => form.setValue(`${prefix}ImageUrl`, '')}><X className="h-4 w-4 text-destructive stroke-[3px]" /></button>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <FormField control={form.control} name={`${prefix}ImageUrl`} render={({field}) => (
+                    <FormItem>
+                        <ImageUpload 
+                          value={field.value || ''} 
+                          onChange={field.onChange} 
+                          folder="banners" 
+                          label="Section Banner Image" 
+                        />
+                    </FormItem>
+                )} />
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-dashed">
                     <FormField control={form.control} name={`${prefix}TitleColor`} render={({field}) => (
@@ -132,10 +111,8 @@ const SectionControls = ({ form, prefix, label, onReset, onImageUpload }: { form
 
 export default function BrandingPage() {
     const firestore = useFirestore();
-    const storage = useStorage();
     const router = useRouter();
     const { toast } = useToast();
-    const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
     const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
     const { data: settings, isLoading } = useDoc<SiteSettings>(settingsRef);
@@ -183,7 +160,6 @@ export default function BrandingPage() {
                 secondaryColor: settings.secondaryColor ?? '#fdf2f2',
                 globalTextColor: settings.globalTextColor ?? '#1e3a5f',
             });
-            setLogoPreview(settings.logoUrl || null);
         }
     }, [settings, form]);
 
@@ -202,58 +178,6 @@ export default function BrandingPage() {
             });
         }
     }, [selectedContent, contentForm]);
-
-    const handleImageUpload = async (prefix: string, file: File) => {
-        if (!storage) return;
-        const previewUrl = URL.createObjectURL(file);
-        form.setValue(`${prefix}ImageUrl` as any, previewUrl);
-        
-        try {
-            const storageRef = ref(storage, `banners/${prefix}_${Date.now()}_${file.name}`);
-            await uploadBytes(storageRef, file);
-            const url = await getDownloadURL(storageRef);
-            form.setValue(`${prefix}ImageUrl` as any, url);
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
-        } finally {
-            URL.revokeObjectURL(previewUrl);
-        }
-    };
-
-    const handleContentImageUpload = async (file: File) => {
-        if (!storage) return;
-        const previewUrl = URL.createObjectURL(file);
-        contentForm.setValue('imageUrl', previewUrl);
-
-        try {
-            const storageRef = ref(storage, `content/${Date.now()}_${file.name}`);
-            await uploadBytes(storageRef, file);
-            const url = await getDownloadURL(storageRef);
-            contentForm.setValue('imageUrl', url);
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
-        } finally {
-            URL.revokeObjectURL(previewUrl);
-        }
-    };
-
-    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !storage) return;
-        
-        const previewUrl = URL.createObjectURL(file);
-        setLogoPreview(previewUrl);
-
-        try {
-            const storageRef = ref(storage, `branding/${Date.now()}_${file.name}`);
-            await uploadBytes(storageRef, file);
-            const url = await getDownloadURL(storageRef);
-            form.setValue('logoUrl', url);
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Logo Sync Failed', description: error.message });
-            setLogoPreview(null);
-        }
-    };
 
     const handleSectionReset = async (prefix: string) => {
         if (!settingsRef) return;
@@ -278,15 +202,25 @@ export default function BrandingPage() {
 
     const onSubmitBranding = (values: z.infer<typeof brandingSchema>) => {
         if (!settingsRef) return;
+        // Strip local blobs
+        const sanitizedValues = { ...values };
+        Object.keys(sanitizedValues).forEach(k => {
+            const val = (sanitizedValues as any)[k];
+            if (typeof val === 'string' && val.startsWith('blob:')) {
+                (sanitizedValues as any)[k] = '';
+            }
+        });
         toast({ title: 'Visuals Synchronized' });
-        setDoc(settingsRef, values, { merge: true }).then(() => router.refresh());
+        setDoc(settingsRef, sanitizedValues, { merge: true }).then(() => router.refresh());
     };
 
     const onSubmitContent = (values: any) => {
         if (!firestore || !selectedContent) return;
         toast({ title: 'Page Content Updated' });
+        const sanitizedValues = { ...values };
+        if (sanitizedValues.imageUrl?.startsWith('blob:')) sanitizedValues.imageUrl = '';
         const contentRef = doc(firestore, 'site_content', selectedContent.id);
-        updateDoc(contentRef, values).then(() => router.refresh());
+        updateDoc(contentRef, sanitizedValues).then(() => router.refresh());
     };
 
     if (isLoading || contentLoading) return <Skeleton className="h-96 w-full" />;
@@ -311,37 +245,34 @@ export default function BrandingPage() {
                                 <CardHeader className="bg-primary/5"><CardTitle>Primary Identity</CardTitle></CardHeader>
                                 <CardContent className="space-y-6 pt-6">
                                     <div className="grid md:grid-cols-2 gap-6">
-                                        <FormField control={form.control} name="brandName" render={({field}) => <FormItem><FormLabel>Parish Brand Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl></FormItem>} />
-                                        <FormField control={form.control} name="heroTitle" render={({field}) => <FormItem><FormLabel>Hero Welcome Title</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl></FormItem>} />
+                                        <FormField control={form.control} name="brandName" render={({field}) => <FormItem><FormLabel>Parish Brand Name</FormLabel><FormControl><Input {...field} value={field.value || ''} autoComplete="off" /></FormControl></FormItem>} />
+                                        <FormField control={form.control} name="heroTitle" render={({field}) => <FormItem><FormLabel>Hero Welcome Title</FormLabel><FormControl><Input {...field} value={field.value || ''} autoComplete="off" /></FormControl></FormItem>} />
                                     </div>
                                     <FormField control={form.control} name="parishDescription" render={({field}) => <FormItem><FormLabel>Parish Tagline</FormLabel><FormControl><Textarea {...field} value={field.value || ''} /></FormControl></FormItem>} />
                                     
-                                    <div className="space-y-4 pt-4 border-t">
-                                        <FormLabel>Church Logo</FormLabel>
-                                        <div className="flex items-center gap-6">
-                                            <div className="relative h-24 w-24 rounded-full border-2 border-primary/20 bg-muted overflow-hidden isolate">
-                                                {logoPreview ? <Image src={logoPreview} alt="Logo" fill className="object-cover" unoptimized /> : null}
-                                            </div>
-                                            <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer p-6 hover:bg-muted transition-colors">
-                                                <Upload className="w-8 h-8 mb-2 text-primary" />
-                                                <span className="text-sm font-semibold">Upload New Logo</span>
-                                                <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
-                                            </label>
-                                        </div>
-                                    </div>
+                                    <FormField control={form.control} name="logoUrl" render={({field}) => (
+                                        <FormItem>
+                                            <ImageUpload 
+                                              value={field.value || ''} 
+                                              onChange={field.onChange} 
+                                              folder="branding" 
+                                              label="Official Church Logo" 
+                                            />
+                                        </FormItem>
+                                    )} />
                                 </CardContent>
                             </Card>
 
-                            <SectionControls form={form} prefix="hero" label="Main Hero Banner" onReset={handleSectionReset} onImageUpload={handleImageUpload} />
+                            <SectionControls form={form} prefix="hero" label="Main Hero Banner" onReset={handleSectionReset} />
                             
                             <div className="space-y-6">
                                 <div className="border-b pb-4"><h3 className="text-2xl font-bold">Section-Specific Styling</h3></div>
-                                <SectionControls form={form} prefix="mass" label="Mass Schedule" onReset={handleSectionReset} onImageUpload={handleImageUpload} />
-                                <SectionControls form={form} prefix="events" label="Upcoming Events" onReset={handleSectionReset} onImageUpload={handleImageUpload} />
-                                <SectionControls form={form} prefix="clergy" label="Meet Our Clergy" onReset={handleSectionReset} onImageUpload={handleImageUpload} />
-                                <SectionControls form={form} prefix="community" label="Parish Communities" onReset={handleSectionReset} onImageUpload={handleImageUpload} />
-                                <SectionControls form={form} prefix="bulletin" label="Latest Updates" onReset={handleSectionReset} onImageUpload={handleImageUpload} />
-                                <SectionControls form={form} prefix="projects" label="Parish Projects" onReset={handleSectionReset} onImageUpload={handleImageUpload} />
+                                <SectionControls form={form} prefix="mass" label="Mass Schedule" onReset={handleSectionReset} />
+                                <SectionControls form={form} prefix="events" label="Upcoming Events" onReset={handleSectionReset} />
+                                <SectionControls form={form} prefix="clergy" label="Meet Our Clergy" onReset={handleSectionReset} />
+                                <SectionControls form={form} prefix="community" label="Parish Communities" onReset={handleSectionReset} />
+                                <SectionControls form={form} prefix="bulletin" label="Latest Updates" onReset={handleSectionReset} />
+                                <SectionControls form={form} prefix="projects" label="Parish Projects" onReset={handleSectionReset} />
                             </div>
 
                             <div className="flex justify-end sticky bottom-6 z-50 gap-4">
@@ -372,40 +303,22 @@ export default function BrandingPage() {
                                     {selectedContent && (
                                         <>
                                             <FormField control={contentForm.control} name="title" render={({ field }) => (
-                                                <FormItem><FormLabel>Headline</FormLabel><FormControl><Input {...field} className="h-12 text-lg" /></FormControl></FormItem>
+                                                <FormItem><FormLabel>Headline</FormLabel><FormControl><Input {...field} className="h-12 text-lg" autoComplete="off" /></FormControl></FormItem>
                                             )}/>
                                             <FormField control={contentForm.control} name="content" render={({ field }) => (
                                                 <FormItem><FormLabel>Page Content</FormLabel><FormControl><RichTextEditor value={field.value || ''} onChange={field.onChange} /></FormControl></FormItem>
                                             )}/>
                                             
-                                            <div className="space-y-4 pt-4 border-t">
-                                                <FormLabel>Cover Image</FormLabel>
-                                                <div className="grid md:grid-cols-2 gap-6">
-                                                    <div className="space-y-4">
-                                                        <Tabs defaultValue="upload" className="w-full">
-                                                            <TabsList className="grid w-full grid-cols-2">
-                                                                <TabsTrigger value="upload"><Upload className="h-4 w-4 mr-2"/> Upload</TabsTrigger>
-                                                                <TabsTrigger value="url"><LinkIcon className="h-4 w-4 mr-2"/> URL</TabsTrigger>
-                                                            </TabsList>
-                                                            <TabsContent value="upload" className="pt-2">
-                                                                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted transition-colors">
-                                                                    <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                                                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files?.[0] && handleContentImageUpload(e.target.files[0])} />
-                                                                </label>
-                                                            </TabsContent>
-                                                            <TabsContent value="url" className="pt-2">
-                                                                <FormField control={contentForm.control} name="imageUrl" render={({field}) => <FormControl><Input {...field} value={field.value || ''} placeholder="https://..." /></FormControl>}/>
-                                                            </TabsContent>
-                                                        </Tabs>
-                                                    </div>
-                                                    {contentForm.watch('imageUrl') && (
-                                                        <div className="relative aspect-video rounded-lg border bg-muted overflow-hidden">
-                                                            <Image src={contentForm.watch('imageUrl')!} alt="Cover" fill className="object-contain" unoptimized />
-                                                            <button type="button" className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-2xl z-50 bg-white text-black hover:bg-white/90 hover:scale-110 transition-all border-2 border-black/10 flex items-center justify-center" onClick={() => contentForm.setValue('imageUrl', '')}><X className="h-4 w-4 text-destructive stroke-[3px]" /></button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
+                                            <FormField control={contentForm.control} name="imageUrl" render={({field}) => (
+                                                <FormItem>
+                                                    <ImageUpload 
+                                                      value={field.value || ''} 
+                                                      onChange={field.onChange} 
+                                                      folder="content" 
+                                                      label="Cover Image" 
+                                                    />
+                                                </FormItem>
+                                            )} />
                                         </>
                                     )}
                                     <div className="flex justify-end border-t pt-6 gap-4">

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -6,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import dynamic from 'next/dynamic';
-import { Expand, Target, TrendingUp, Upload } from 'lucide-react';
+import { Expand, Target, TrendingUp } from 'lucide-react';
 
 import type { DevelopmentProject } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -38,6 +37,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { LargeTextEditModal } from './LargeTextEditModal';
+import { ImageUpload } from './ImageUpload';
 
 const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
   ssr: false,
@@ -50,7 +50,7 @@ const projectSchema = z.object({
   goalAmount: z.coerce.number().min(1, 'Goal required.'),
   currentAmount: z.coerce.number().min(0).default(0),
   status: z.enum(['Upcoming', 'Ongoing', 'Completed']),
-  imageUrl: z.string().url('Image URL required.'),
+  imageUrl: z.string().min(1, 'Banner image is required.'),
   public: z.boolean().default(true),
   galleryImages: z.array(z.string()).default([]),
 });
@@ -133,7 +133,15 @@ export function DevelopmentProjectForm({ project, onSave, onClose }: Development
                             )}/>
 
                             <FormField control={form.control} name="imageUrl" render={({ field }) => (
-                                <FormItem><FormLabel className="font-bold">Banner Image URL *</FormLabel><FormControl><Input placeholder="https://..." {...field} /></FormControl></FormItem>
+                                <FormItem>
+                                    <ImageUpload 
+                                      value={field.value} 
+                                      onChange={field.onChange} 
+                                      folder="projects" 
+                                      label="Project Image *" 
+                                    />
+                                    <FormMessage />
+                                </FormItem>
                             )}/>
 
                             <FormField control={form.control} name="public" render={({ field }) => (
