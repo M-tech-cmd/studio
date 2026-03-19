@@ -6,23 +6,23 @@ import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import TextStyle from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
-import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Link2, Image as ImageIcon, Undo, Redo, Video, Music, X } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Link2, Image as ImageIcon, Undo, Redo, Video, Music } from 'lucide-react';
 import { useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useStorage } from '@/firebase';
-import { ref, uploadBytesResumable, getDownloadURL, UploadTask } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 
 const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaTypeRef = useRef<'image' | 'video' | 'audio'>('image');
-  const activeTasksRef = useRef<Map<string, UploadTask>>(new Map());
   
   const storage = useStorage();
   const { toast } = useToast();
 
   const editor = useEditor({
+    immediatelyRender: false, // Fixes SSR hydration mismatch
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
@@ -57,38 +57,6 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     },
   });
 
-  // Global Listener for Top-Left "X" Buttons (Kill-Task Mechanism)
-  useEffect(() => {
-    const handleEditorClick = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        const deleteBtn = target.closest('[data-delete-media]');
-        if (deleteBtn) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const tempUrl = deleteBtn.getAttribute('data-temp-url');
-            if (tempUrl && activeTasksRef.current.has(tempUrl)) {
-                console.log("Editor: Killing background sync for", tempUrl);
-                activeTasksRef.current.get(tempUrl)?.cancel();
-                activeTasksRef.current.delete(tempUrl);
-                URL.revokeObjectURL(tempUrl);
-            }
-
-            if (editor) {
-                editor.commands.deleteSelection();
-            }
-        }
-    };
-
-    document.addEventListener('click', handleEditorClick);
-    return () => {
-        document.removeEventListener('click', handleEditorClick);
-        // Emergency Cleanup: Cancel all pending tasks on unmount
-        activeTasksRef.current.forEach(task => task.cancel());
-        activeTasksRef.current.clear();
-    };
-  }, [editor]);
-
   useEffect(() => {
     if (editor && value !== editor.getHTML()) {
       editor.commands.setContent(value, false);
@@ -112,61 +80,33 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     const tempUrl = URL.createObjectURL(file);
     const type = mediaTypeRef.current;
 
-    // Insertion with Top-Left "Kill-Task" X Button
-    const xButtonHtml = `
-        <button type="button" data-delete-media="true" data-temp-url="${tempUrl}" class="absolute top-2 left-2 z-50 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black transition-all shadow-xl">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-        </button>
-    `;
-
+    // Instant local preview injection
     if (type === 'image') {
-      editor.chain().focus().insertContent(`
-        <div class="editor-media-wrapper relative group my-6 rounded-2xl overflow-hidden border-2 border-primary/10 shadow-xl bg-white isolate">
-            ${xButtonHtml}
-            <img src="${tempUrl}" class="w-full h-auto object-contain block" />
-        </div>
-      `).run();
+      editor.chain().focus().insertContent(`<img src="${tempUrl}" class="w-full h-auto rounded-xl opacity-50" />`).run();
     } else if (type === 'video') {
-       editor.chain().focus().insertContent(`
-          <div class="editor-media-wrapper my-6 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-xl bg-black aspect-video relative group isolate">
-              ${xButtonHtml}
-              <video controls src="${tempUrl}" class="w-full h-full object-contain"></video>
-          </div>
-       `).run();
+       editor.chain().focus().insertContent(`<video controls src="${tempUrl}" class="w-full rounded-xl opacity-50"></video>`).run();
     } else if (type === 'audio') {
-      editor.chain().focus().insertContent(`
-          <div class="editor-media-wrapper whatsapp-audio-bubble my-4 p-4 rounded-2xl bg-[#f0f2f5] dark:bg-slate-800 flex items-center gap-4 shadow-sm border border-slate-200/50 relative isolate">
-              ${xButtonHtml.replace('top-2 left-2', '-top-2 -left-2')}
-              <audio controls src="${tempUrl}" class="flex-1 h-10 accent-[#005c96]"></audio>
-          </div>
-      `).run();
+      editor.chain().focus().insertContent(`<audio controls src="${tempUrl}" class="w-full opacity-50"></audio>`).run();
     }
 
     try {
         const storageRef = ref(storage, `editor-media/${Date.now()}_${file.name}`);
-        const uploadTask = uploadBytesResumable(storageRef, file);
+        // Atomic uploadBytes (single pass, no retry)
+        const snapshot = await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(snapshot.ref);
         
-        // Track task for potential Kill-Task interruption
-        activeTasksRef.current.set(tempUrl, uploadTask);
-
-        uploadTask.then(async (snapshot) => {
-            const downloadURL = await getDownloadURL(snapshot.ref);
-            if (downloadURL && editor) {
-                const currentContent = editor.getHTML();
-                const updatedContent = currentContent.split(tempUrl).join(downloadURL);
-                editor.commands.setContent(updatedContent, false);
-                activeTasksRef.current.delete(tempUrl);
-                URL.revokeObjectURL(tempUrl);
-            }
-        }).catch((err) => {
-            if (err.code !== 'storage/canceled') {
-                console.error("Editor Cloud Sync Error:", err.code);
-                toast({ variant: 'destructive', title: 'Sync Blocked', description: 'Network timeout during background save.' });
-            }
-        });
-
+        if (downloadURL) {
+            const currentContent = editor.getHTML();
+            const updatedContent = currentContent.split(tempUrl).join(downloadURL);
+            editor.commands.setContent(updatedContent, false);
+            URL.revokeObjectURL(tempUrl);
+        }
     } catch (error: any) {
-        console.error("Editor Initialization Error:", error.code);
+        console.error("Editor Upload Failed:", error.code);
+        toast({ variant: 'destructive', title: 'Upload Failed', description: 'Network issue during media sync.' });
+        // Clean up preview on failure
+        const content = editor.getHTML();
+        editor.commands.setContent(content.split(tempUrl).join(''), false);
     } finally {
         if (fileInputRef.current) fileInputRef.current.value = '';
     }

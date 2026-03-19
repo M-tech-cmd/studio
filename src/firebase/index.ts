@@ -3,21 +3,24 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  getFirestore, 
+  persistentLocalCache, 
+  persistentIndexedDbWebProvider,
+  Firestore
+} from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getDatabase } from 'firebase/database';
-
-// Global guard to ensure persistence is only attempted once per page lifecycle
-let persistencePromise: Promise<void> | null = null;
 
 export function initializeFirebase() {
   let firebaseApp: FirebaseApp;
   
   if (!getApps().length) {
     try {
-      firebaseApp = initializeApp();
-    } catch (e) {
       firebaseApp = initializeApp(firebaseConfig);
+    } catch (e) {
+      firebaseApp = getApp();
     }
   } else {
     firebaseApp = getApp();
@@ -27,20 +30,18 @@ export function initializeFirebase() {
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
-  const firestore = getFirestore(firebaseApp);
+  let firestore: Firestore;
   
-  // Enable multi-tab offline persistence to prevent "Primary Lease" and "Internal Assertion" errors
-  if (typeof window !== 'undefined' && !persistencePromise) {
-    persistencePromise = enableMultiTabIndexedDbPersistence(firestore).catch((err) => {
-      if (err.code === 'failed-precondition') {
-        // Multiple tabs open, persistence can only be enabled in one tab at a time.
-        // multi-tab persistence (IndexedDb) handles this gracefully.
-        console.warn('Firestore persistence: Multiple tabs detected.');
-      } else if (err.code === 'unimplemented') {
-        // The current browser doesn't support all of the features required to enable persistence
-        console.warn('Firestore persistence: Browser not supported.');
-      }
+  try {
+    // Modern persistent cache implementation (fixes deprecation warnings)
+    firestore = initializeFirestore(firebaseApp, {
+      localCache: persistentLocalCache({
+        tabManager: persistentIndexedDbWebProvider()
+      })
     });
+  } catch (e) {
+    // If already initialized (e.g. during HMR), get existing instance
+    firestore = getFirestore(firebaseApp);
   }
 
   return {

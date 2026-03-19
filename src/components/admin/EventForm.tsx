@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import dynamic from 'next/dynamic';
-import { Expand, MapPin, Clock, Calendar as CalendarIcon, XCircle } from 'lucide-react';
+import { Expand, MapPin, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { Timestamp } from 'firebase/firestore';
 
@@ -73,7 +73,6 @@ const formatDateForInput = (date: any) => {
 
 export function EventForm({ event, onSave, onClose }: EventFormProps) {
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
 
   const form = useForm<z.infer<typeof eventSchema>>({
     resolver: zodResolver(eventSchema),
@@ -92,6 +91,7 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
   });
 
   const onSubmit = (values: z.infer<typeof eventSchema>) => {
+    // Decoupled Save: Proceed immediately with what's in local state
     const readyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
     
     const dataToSave = {
@@ -108,15 +108,15 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
       <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="text-2xl font-black uppercase tracking-tighter">
-              {event ? 'Edit Event' : 'New Parish Event'}
+              Registry Event
           </DialogTitle>
         </DialogHeader>
         
         <Tabs defaultValue="basic" className="flex-1 flex flex-col overflow-hidden">
             <div className="px-6 border-b">
                 <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="basic">Basic Information</TabsTrigger>
-                    <TabsTrigger value="gallery">Gallery & Archives</TabsTrigger>
+                    <TabsTrigger value="basic">Details</TabsTrigger>
+                    <TabsTrigger value="gallery">Archives</TabsTrigger>
                 </TabsList>
             </div>
 
@@ -134,9 +134,9 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
                                 )}/>
                                 <FormField control={form.control} name="category" render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="font-bold">Event Type</FormLabel>
+                                        <FormLabel className="font-bold">Type</FormLabel>
                                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                            <FormControl><SelectTrigger className="h-12"><SelectValue/></SelectTrigger></FormControl>
                                             <SelectContent>
                                                 {['Mass', 'Ministry', 'Community', 'Special', 'Youth', 'Other'].map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
                                             </SelectContent>
@@ -179,7 +179,7 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
                                       value={field.value} 
                                       onChange={field.onChange} 
                                       folder="events" 
-                                      label="Event Banner Image *" 
+                                      label="Banner Photo *" 
                                     />
                                     <FormMessage />
                                 </FormItem>
@@ -188,7 +188,7 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
                             <FormField control={form.control} name="featured" render={({ field }) => (
                                 <FormItem className="flex flex-row items-center space-x-3 rounded-xl border-2 p-4 bg-muted/5">
                                     <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                                    <div className="space-y-1 leading-none"><FormLabel className="font-bold">High Priority Event</FormLabel></div>
+                                    <div className="space-y-1 leading-none"><FormLabel className="font-bold">High Priority</FormLabel></div>
                                 </FormItem>
                             )}/>
                         </form>
@@ -200,7 +200,6 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
                         images={form.watch('galleryImages')} 
                         onChange={(imgs) => form.setValue('galleryImages', imgs)} 
                         folder="event-gallery"
-                        onSyncStatusChange={setIsSyncing}
                     />
                 </TabsContent>
             </ScrollArea>
@@ -212,14 +211,12 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
               onClose={() => setIsDescriptionModalOpen(false)}
               initialValue={form.getValues('description') || ''}
               onSave={(newValue) => form.setValue('description', newValue)}
-              title="Edit Event Content"
+              title="Edit Content"
             />
         )}
         <DialogFooter className="p-6 border-t bg-muted/5 mt-auto gap-4">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-full">Cancel</Button>
-            <Button type="submit" form="event-form" className="rounded-full px-8 font-bold">
-                {event ? 'Save Changes' : 'Publish Event'}
-            </Button>
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8 font-bold border-2">Cancel</Button>
+            <Button type="submit" form="event-form" className="rounded-full h-12 px-12 font-black shadow-xl">PUBLISH EVENT</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

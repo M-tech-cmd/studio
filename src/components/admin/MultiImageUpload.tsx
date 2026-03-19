@@ -12,7 +12,6 @@ interface MultiImageUploadProps {
   images: string[];
   onChange: (images: string[]) => void;
   folder: string;
-  onSyncStatusChange?: (isSyncing: boolean) => void;
 }
 
 interface UploadingItem {
@@ -22,23 +21,19 @@ interface UploadingItem {
 }
 
 /**
- * Zero-Ghost Instant Multi-Upload.
- * All loading UI removed. Atomic uploadBytes handles synchronization silently.
+ * Standardized Atomic Multi-Image Upload.
+ * Uses uploadBytes for single-pass reliability.
+ * No blocking state - allows user to save form while uploads run.
  */
-export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange }: MultiImageUploadProps) {
+export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
   const [activeUploads, setActiveUploads] = useState<UploadingItem[]>([]);
   const storage = useStorage();
   const { toast } = useToast();
-  
   const imagesRef = useRef<string[]>(images || []);
 
   useEffect(() => {
     imagesRef.current = images || [];
   }, [images]);
-
-  useEffect(() => {
-    onSyncStatusChange?.(activeUploads.length > 0);
-  }, [activeUploads, onSyncStatusChange]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -53,7 +48,7 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
       const newItem: UploadingItem = { id, preview, file };
       setActiveUploads(prev => [...prev, newItem]);
 
-      // Atomic Background Sync
+      // Silent Atomic Sync
       triggerBackgroundUpload(newItem);
     }
 
@@ -65,6 +60,7 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
 
     try {
       const storageRef = ref(storage, `${folder}/${Date.now()}_${item.id}_${item.file.name}`);
+      // Single attempt, no retry pattern
       const snapshot = await uploadBytes(storageRef, item.file);
       const downloadURL = await getDownloadURL(snapshot.ref);
       
@@ -74,8 +70,8 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
       setActiveUploads(prev => prev.filter(u => u.id !== item.id));
       URL.revokeObjectURL(item.preview);
     } catch (error: any) {
-      console.error("Multi-sync failed:", error);
-      toast({ variant: 'destructive', title: 'Upload Failed', description: 'Some images could not be saved.' });
+      console.error("Atomic upload failed:", error.code);
+      toast({ variant: 'destructive', title: 'Upload Error', description: 'One or more items could not be synced.' });
       setActiveUploads(prev => prev.filter(u => u.id !== item.id));
     }
   };
@@ -98,7 +94,7 @@ export function MultiImageUpload({ images, onChange, folder, onSyncStatusChange 
         <label className="cursor-pointer">
           <div className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-full text-[10px] font-black hover:scale-105 transition-all shadow-lg uppercase tracking-widest active:scale-95">
             <Upload className="h-3.5 w-3.5" />
-            Add Photos
+            Add Media
           </div>
           <input type="file" multiple className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
         </label>
