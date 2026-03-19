@@ -1,16 +1,17 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Upload, FileText, X } from 'lucide-react';
+import { Upload, FileText, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 import type { Document } from '@/lib/types';
-import { useStorage } from '@/firebase';
+import { useStorage, useFirestore } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -37,7 +38,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
@@ -46,10 +46,8 @@ const documentSchema = z.object({
   title: z.string().min(1, 'Document Title is required.'),
   description: z.string().default(''),
   category: z.enum(['Bulletin', 'Newsletter', 'Form', 'Policy', 'Announcement', 'Other']),
-  date: z.string({ required_error: 'Date is required.' }).min(1, 'Date is required.'),
+  date: z.string().min(1, 'Date is required.'),
   public: z.boolean().default(true),
-  url: z.string().optional(),
-  fileType: z.string().optional(),
 });
 
 type DocumentFormProps = {
@@ -64,22 +62,24 @@ const formatDateForInput = (date: any) => {
     return format(d, 'yyyy-MM-dd');
 };
 
-export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
+export function DocumentForm({ document: existingDoc, onSave, onClose }: DocumentFormProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  
   const storage = useStorage();
+  const firestore = useFirestore();
   const { toast } = useToast();
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<z.infer<typeof documentSchema>>({
     resolver: zodResolver(documentSchema),
     defaultValues: {
-      title: document?.title || '',
-      description: document?.description || '',
-      category: document?.category || 'Bulletin',
-      date: document ? formatDateForInput(document.date) : format(new Date(), 'yyyy-MM-dd'),
-      public: document ? document.public : true,
-      url: document?.url || '',
-      fileType: document?.fileType || ''
+      title: existingDoc?.title || '',
+      description: existingDoc?.description || '',
+      category: existingDoc?.category || 'Bulletin',
+      date: existingDoc ? formatDateForInput(existingDoc.date) : format(new Date(), 'yyyy-MM-dd'),
+      public: existingDoc ? existingDoc.public : true,
     },
   });
 
@@ -93,6 +93,7 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setFileError(null);
     setSelectedFile(file);
     if (file.type.startsWith('image/')) {
       const url = URL.createObjectURL(file);
@@ -108,16 +109,35 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
     setPreviewUrl(null);
   };
 
-  const onSubmit = async (values: z.infer<typeof documentSchema>) => {
-    if (!selectedFile && !document?.url) {
-      toast({ variant: 'destructive', title: 'File required', description: 'Please select a document to upload.' });
-      return;
+  const handleSubmit = async () => {
+    const values = form.getValues();
+    
+    console.log('Submit clicked', { 
+        title: values.title, 
+        file: selectedFile, 
+        category: values.category, 
+        date: values.date 
+    });
+
+    // Manual Validation & Scroll
+    const isTitleValid = !!values.title?.trim();
+    const isFileValid = !!selectedFile || !!existingDoc?.url;
+
+    if (!isTitleValid || !isFileValid) {
+        if (!isTitleValid) form.setError('title', { message: 'Document Title is required' });
+        if (!isFileValid) setFileError('Please select a file to upload');
+        
+        // Scroll modal to top to show errors
+        if (scrollRef.current) {
+            scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        return;
     }
 
-    let finalUrl = values.url || '';
-    let finalFileType = values.fileType || '';
-
     try {
+      let finalUrl = existingDoc?.url || '';
+      let finalFileType = existingDoc?.fileType || '';
+
       if (selectedFile && storage) {
         const storageRef = ref(storage, `documents/${Date.now()}_${selectedFile.name}`);
         const snapshot = await uploadBytes(storageRef, selectedFile);
@@ -131,41 +151,56 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
         category: values.category,
         url: finalUrl,
         fileType: finalFileType,
-        date: new Date(`${values.date}T00:00:00`),
+        date: new Timestamp(new Date(`${values.date}T00:00:00`).getTime() / 1000, 0),
         public: values.public,
-        id: document?.id,
+        updatedAt: serverTimestamp(),
+        createdAt: existingDoc?.id ? undefined : serverTimestamp(),
       };
 
-      onSave(dataToSave);
+      if (firestore) {
+          if (existingDoc?.id) {
+              await updateDoc(doc(firestore, 'documents', existingDoc.id), dataToSave);
+          } else {
+              await addDoc(collection(firestore, 'documents'), dataToSave);
+          }
+      }
+
+      toast({ title: existingDoc ? 'Document updated' : 'Document created' });
+      onClose();
     } catch (error: any) {
-      console.error('Upload error:', error.code, error.message);
+      console.error('Upload/Save error:', error.code, error.message);
       toast({ variant: 'destructive', title: 'Failed', description: error.message });
     }
   };
 
-  const isImage = (file: File | null) => file?.type.startsWith('image/');
-
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-xl h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
-        <DialogHeader className="p-6 bg-primary/5 border-b">
+      <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
           <DialogTitle className="text-2xl font-black uppercase tracking-tighter">
-            {document ? 'Edit Registry' : 'New Document'}
+            {existingDoc ? 'Edit Registry' : 'New Document'}
           </DialogTitle>
         </DialogHeader>
         
-        <ScrollArea className="flex-1">
-          <div className="p-8">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-8">
             <Form {...form}>
-              <form id="document-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <form id="document-form" className="space-y-8">
                 <FormField
                   control={form.control}
                   name="title"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="font-bold">Document Title *</FormLabel>
-                      <FormControl><Input placeholder="E.g., Weekly Bulletin" {...field} className="h-12 text-lg font-bold" /></FormControl>
-                      <FormMessage />
+                      <FormControl>
+                        <Input 
+                            placeholder="E.g., Weekly Bulletin" 
+                            {...field} 
+                            className="h-12 text-lg font-bold border-2 focus-visible:ring-primary" 
+                        />
+                      </FormControl>
+                      <FormMessage className="text-destructive font-bold flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" /> {form.formState.errors.title?.message}
+                      </FormMessage>
                     </FormItem>
                   )}
                 />
@@ -178,7 +213,7 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
                       <FormItem>
                         <FormLabel className="font-bold">Category</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl><SelectTrigger className="h-12"><SelectValue /></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger className="h-12 border-2"><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent>
                             {['Bulletin', 'Newsletter', 'Form', 'Policy', 'Announcement', 'Other'].map(cat => (
                               <SelectItem key={cat} value={cat}>{cat}</SelectItem>
@@ -194,7 +229,7 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="font-bold">Date *</FormLabel>
-                        <FormControl><Input type="date" {...field} className="h-12" /></FormControl>
+                        <FormControl><Input type="date" {...field} className="h-12 border-2" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -207,30 +242,41 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="font-bold">Summary / Description</FormLabel>
-                      <FormControl><Textarea placeholder="Brief overview of content" rows={3} {...field} /></FormControl>
+                      <FormControl>
+                        <Textarea 
+                            placeholder="Brief overview of content" 
+                            rows={3} 
+                            {...field} 
+                            className="border-2 focus-visible:ring-primary"
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
                 <div className="space-y-4 pt-4 border-t border-dashed">
-                  <FormLabel className="font-black text-xs uppercase tracking-widest text-muted-foreground">Document File</FormLabel>
+                  <FormLabel className="font-black text-xs uppercase tracking-widest text-muted-foreground">Document File *</FormLabel>
                   
-                  <div className="flex flex-col items-center justify-center w-full">
-                    <Button asChild variant="outline" className="w-full h-24 border-dashed border-2 rounded-2xl hover:bg-muted/50">
-                      <label className="cursor-pointer flex flex-col items-center justify-center gap-1">
-                        <Upload className="h-6 w-6 text-primary mb-1" />
-                        <span className="font-bold">Select Document</span>
-                        <input 
-                          type="file" 
-                          className="hidden" 
-                          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,image/*"
-                          onChange={handleFileChange} 
-                        />
-                      </label>
-                    </Button>
-                    <p className="text-[10px] text-muted-foreground mt-2 font-medium">Supports PDF, Word, Excel, PowerPoint, images and more</p>
-                  </div>
+                  {!selectedFile && !existingDoc?.url && (
+                    <div className="flex flex-col items-center justify-center w-full">
+                        <Button asChild variant="outline" className="w-full h-24 border-dashed border-2 rounded-2xl hover:bg-muted/50 transition-colors">
+                        <label className="cursor-pointer flex flex-col items-center justify-center gap-1">
+                            <Upload className="h-6 w-6 text-primary mb-1" />
+                            <span className="font-bold">Select Document</span>
+                            <input 
+                            type="file" 
+                            className="hidden" 
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,image/*"
+                            onChange={handleFileChange} 
+                            />
+                        </label>
+                        </Button>
+                        <p className="text-[10px] text-muted-foreground mt-2 font-medium">Supports PDF, Word, Excel, PowerPoint, images and more</p>
+                    </div>
+                  )}
+
+                  {fileError && <p className="text-xs font-bold text-destructive flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {fileError}</p>}
 
                   {selectedFile && (
                     <div className="relative rounded-2xl border-2 p-4 bg-muted/5 animate-in fade-in slide-in-from-top-2">
@@ -244,7 +290,7 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
                         <X className="h-3 w-3" />
                       </Button>
                       <div className="flex items-center gap-4">
-                        {isImage(selectedFile) && previewUrl ? (
+                        {selectedFile.type.startsWith('image/') && previewUrl ? (
                           <div className="relative h-16 w-16 rounded-lg overflow-hidden border">
                             <Image src={previewUrl} alt="Preview" fill className="object-cover" unoptimized />
                           </div>
@@ -263,13 +309,24 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
                     </div>
                   )}
 
-                  {!selectedFile && document?.url && (
+                  {!selectedFile && existingDoc?.url && (
                     <div className="rounded-2xl border-2 p-4 bg-primary/5 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <FileText className="h-6 w-6 text-primary" />
-                            <span className="text-sm font-bold">Existing Attachment</span>
+                            <div>
+                                <span className="text-sm font-bold block">Current Attachment</span>
+                                <span className="text-[10px] text-muted-foreground font-medium">Click "Change File" to replace</span>
+                            </div>
                         </div>
-                        <Badge variant="outline" className="text-[10px] font-black uppercase border-primary/30 text-primary">Synced</Badge>
+                        <label className="cursor-pointer">
+                            <Badge variant="outline" className="text-[10px] font-black uppercase border-primary/30 text-primary hover:bg-primary/10 transition-colors">Change File</Badge>
+                            <input 
+                                type="file" 
+                                className="hidden" 
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,image/*"
+                                onChange={handleFileChange} 
+                            />
+                        </label>
                     </div>
                   )}
                 </div>
@@ -289,15 +346,18 @@ export function DocumentForm({ document, onSave, onClose }: DocumentFormProps) {
                 />
               </form>
             </Form>
-          </div>
-        </ScrollArea>
+        </div>
 
-        <DialogFooter className="p-6 bg-muted/10 border-t mt-auto gap-4">
-          <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8">
+        <DialogFooter className="p-6 bg-muted/10 border-t shrink-0 gap-4">
+          <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8 font-bold border-2">
             Cancel
           </Button>
-          <Button type="submit" form="document-form" className="rounded-full h-12 px-12 font-black shadow-xl">
-            {document ? 'SAVE CHANGES' : 'CREATE DOCUMENT'}
+          <Button 
+            type="button" 
+            onClick={handleSubmit} 
+            className="rounded-full h-12 px-12 font-black shadow-xl"
+          >
+            {existingDoc ? 'SAVE CHANGES' : 'CREATE DOCUMENT'}
           </Button>
         </DialogFooter>
       </DialogContent>
