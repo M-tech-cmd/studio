@@ -1,8 +1,11 @@
 /**
- * Root page logic has been moved to src/app/(public)/page.tsx 
- * to utilize the route group layout (Maintenance Mode, Site Theme, etc.).
+ * Root Redirector.
+ * The main home page logic has been moved to src/app/(public)/page.tsx
+ * to ensure it benefits from the WebLayout (Maintenance Mode & Branding).
  * 
- * This file is purposefully kept without a default export to prevent 
- * route collisions with the (public) route group.
+ * Note: This file is intentionally left empty/inactive to avoid route collision
+ * with the route group version in src/app/(public)/page.tsx.
  */
-export const dynamic = 'force-dynamic';
+export default function RootPage() {
+  return null;
+}

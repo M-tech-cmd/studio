@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -337,7 +338,7 @@ function ParishProjects({ settings, isLoading }: { settings?: SiteSettings, isLo
                 {projectsLoading ? (
                     <div className="grid md:grid-cols-2 gap-8">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-48 w-full bg-card/50" />)}</div>
                 ) : (
-                    <div className="grid md:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {projects?.map(project => (
                             <Link key={project.id} href={`/development/${project.id}`}>
                                 <Card className="h-full hover:shadow-xl transition-all bg-card overflow-hidden hover:-translate-y-1 rounded-2xl border-none shadow-md">
@@ -370,7 +371,7 @@ export default function HomePage() {
     const { data: settings, isLoading = true } = useDoc<SiteSettings>(settingsRef);
 
     return (
-        <main className="flex-grow bg-transparent flex flex-col">
+        <div className="flex flex-col bg-transparent">
             <HeroSection />
             <MassScheduleSection settings={settings || undefined} isLoading={isLoading} />
             <UpcomingEvents settings={settings || undefined} isLoading={isLoading} />
@@ -397,6 +398,6 @@ export default function HomePage() {
                     </div>
                 </div>
             </section>
-        </main>
+        </div>
     );
 }

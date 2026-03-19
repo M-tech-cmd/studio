@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -6,7 +7,7 @@ import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import TextStyle from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
-import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Link2, Image as ImageIcon, Undo, Redo, Video, Music } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Link2, Image as ImageIcon, Undo, Redo, Video, Music, X } from 'lucide-react';
 import { useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useStorage } from '@/firebase';
@@ -56,6 +57,24 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     },
   });
 
+  // Global Listener for Top-Left "X" Buttons
+  useEffect(() => {
+    const handleEditorClick = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('[data-delete-media]')) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (editor) {
+                // Tiptap selects the node the button is inside of
+                editor.commands.deleteSelection();
+            }
+        }
+    };
+
+    document.addEventListener('click', handleEditorClick);
+    return () => document.removeEventListener('click', handleEditorClick);
+  }, [editor]);
+
   useEffect(() => {
     if (editor && value !== editor.getHTML()) {
       editor.commands.setContent(value, false);
@@ -79,35 +98,32 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     const tempUrl = URL.createObjectURL(file);
     const type = mediaTypeRef.current;
 
-    // Insertion with Top-Left X Button Wrapper
+    // Insertion with Top-Left "X" Button
     if (type === 'image') {
       editor.chain().focus().insertContent(`
         <div class="editor-media-wrapper relative group my-6 rounded-2xl overflow-hidden border-2 border-primary/10 shadow-xl bg-white isolate">
+            <button type="button" data-delete-media="true" class="absolute top-2 left-2 z-50 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
             <img src="${tempUrl}" class="w-full h-auto object-contain block" />
-            <div 
-                class="absolute top-2 left-2 z-50 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer shadow-2xl hover:bg-black/80 transition-all no-print" 
-                onclick="this.closest('.editor-media-wrapper').remove();"
-            >X</div>
         </div>
       `).run();
     } else if (type === 'video') {
        editor.chain().focus().insertContent(`
           <div class="editor-media-wrapper my-6 rounded-2xl overflow-hidden border-2 border-primary/20 shadow-xl bg-black aspect-video relative group isolate">
+              <button type="button" data-delete-media="true" class="absolute top-2 left-2 z-50 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
               <video controls src="${tempUrl}" class="w-full h-full object-contain"></video>
-              <div 
-                class="absolute top-2 left-2 z-50 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs cursor-pointer no-print" 
-                onclick="this.closest('.editor-media-wrapper').remove();"
-              >X</div>
           </div>
        `).run();
     } else if (type === 'audio') {
       editor.chain().focus().insertContent(`
-          <div class="editor-media-wrapper whatsapp-audio-bubble my-4 p-4 rounded-2xl bg-[#f0f2f5] dark:bg-slate-800 flex items-center gap-4 shadow-sm border border-slate-200/50 relative">
+          <div class="editor-media-wrapper whatsapp-audio-bubble my-4 p-4 rounded-2xl bg-[#f0f2f5] dark:bg-slate-800 flex items-center gap-4 shadow-sm border border-slate-200/50 relative isolate">
+              <button type="button" data-delete-media="true" class="absolute -top-2 -left-2 z-50 h-5 w-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black transition-all shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
               <audio controls src="${tempUrl}" class="flex-1 h-10 accent-[#005c96]"></audio>
-              <div 
-                class="absolute -top-2 -left-2 z-50 bg-black/60 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] cursor-pointer no-print" 
-                onclick="this.closest('.editor-media-wrapper').remove();"
-              >X</div>
           </div>
       `).run();
     }
@@ -124,8 +140,8 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
             URL.revokeObjectURL(tempUrl);
         }
     } catch (error: any) {
-        console.error("Editor Cloud Sync Error:", error);
-        toast({ variant: 'destructive', title: 'Media Sync Failed', description: error.message });
+        console.error("Editor Cloud Sync Error:", error.code);
+        toast({ variant: 'destructive', title: 'Media Sync Failed', description: 'Network timeout during background save.' });
     } finally {
         if (fileInputRef.current) fileInputRef.current.value = '';
     }
