@@ -8,6 +8,7 @@ import { doc } from 'firebase/firestore';
 import type { SiteSettings, SocialPlatform } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 import { OfficeHoursStatus } from '../shared/OfficeHoursStatus';
+import { useState, useEffect } from 'react';
 
 const socialIcons: { [key in SocialPlatform]: React.ElementType } = {
   'Facebook': Facebook,
@@ -21,6 +22,11 @@ function FooterContent() {
   const firestore = useFirestore();
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
   const { data: settings, isLoading } = useDoc<SiteSettings>(settingsRef);
+  const [currentYear, setCurrentYear] = useState<number | null>(null);
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
   
   const navLinks = [
     { href: '/', label: 'Home' },
@@ -121,7 +127,7 @@ function FooterContent() {
         </div>
 
         <div className="mt-10 pt-6 border-t text-center text-xs text-muted-foreground space-y-2">
-           <p>&copy; {settings?.copyrightYear || new Date().getFullYear()} {settings?.brandName || 'St. Martin De Porres Catholic Church'}. All Rights Reserved.</p>
+           <p>&copy; {settings?.copyrightYear || currentYear} {settings?.brandName || 'St. Martin De Porres Catholic Church'}. All Rights Reserved.</p>
            {isLoading ? <Skeleton className="h-4 w-48 mx-auto" /> : (
                settings?.developerCredit?.name && (
                 <p>Developed by <a href={settings.developerCredit.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">{settings.developerCredit.name}</a></p>
