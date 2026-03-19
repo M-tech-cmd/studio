@@ -55,24 +55,16 @@ export default function AdminEventsPage() {
   const handleDelete = (id: string) => {
     if (!firestore) return;
     const eventDoc = doc(firestore, 'events', id);
+    
+    // INSTANT FEEDBACK
+    toast({ title: 'Deleting Event...', description: 'Registry is being updated.' });
+
     deleteDoc(eventDoc)
-        .then(() => {
-            toast({
-              title: 'Event Deleted',
-              description: 'The event has been successfully removed.',
-            });
-        })
         .catch((error: any) => {
-            toast({
-                variant: 'destructive',
-                title: 'Uh oh! Something went wrong.',
-                description: error.message || 'Could not delete the event.',
-            });
-            const permissionError = new FirestorePermissionError({
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: eventDoc.path,
                 operation: 'delete',
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            }));
         });
   };
 
@@ -85,37 +77,36 @@ export default function AdminEventsPage() {
     if (!firestore) return;
     const isNew = !eventData.id;
 
-    // INSTANT FEEDBACK
+    // 1. INSTANT UI FEEDBACK (Non-Blocking)
     setIsFormOpen(false);
     toast({
-        title: 'Event Updated',
+        title: isNew ? 'Event Scheduled' : 'Event Updated',
         description: 'Changes have been synchronized with the calendar.',
     });
 
+    // 2. BACKGROUND SYNC
     if (isNew) {
         const { id, ...dataToAdd } = eventData;
         const eventsCollection = collection(firestore, 'events');
         addDoc(eventsCollection, dataToAdd)
             .catch((error: any) => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                   path: eventsCollection.path,
                   operation: 'create',
                   requestResourceData: dataToAdd,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
     } else {
         const { id, ...dataToUpdate } = eventData;
         if (!id) return;
-        const eventDoc = doc(firestore, 'events', id);
+        const eventDoc = doc(firestore, 'events', id!);
         updateDoc(eventDoc, dataToUpdate)
             .catch((error: any) => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                   path: eventDoc.path,
                   operation: 'update',
                   requestResourceData: dataToUpdate,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
     }
   };

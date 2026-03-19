@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { useFirestore, useMemoFirebase, useDoc, useCollection, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -192,17 +192,25 @@ export default function BrandingPage() {
         };
         const d = defaults[prefix] || { title: '', desc: '', img: '' };
         const resetData = { [`${prefix}Title`]: d.title, [`${prefix}Description`]: d.desc, [`${prefix}TitleColor`]: '', [`${prefix}DescriptionColor`]: '', [`${prefix}BoxColor`]: '', [`${prefix}ImageUrl`]: d.img };
+        
+        // INSTANT FEEDBACK
+        toast({ title: 'Section Reset Initialized' });
+        
         updateDoc(settingsRef, resetData).then(() => {
             form.setValue(`${prefix}Title` as any, d.title);
             form.setValue(`${prefix}Description` as any, d.desc);
             form.setValue(`${prefix}ImageUrl` as any, d.img);
-            toast({ title: 'Section Reset' });
         });
     };
 
     const onSubmitBranding = (values: z.infer<typeof brandingSchema>) => {
         if (!settingsRef) return;
-        // Strip local blobs
+        
+        // INSTANT UI FEEDBACK
+        toast({ title: 'Visuals Synchronized', description: 'Changes are live for parishioners.' });
+        router.push('/admin/dashboard');
+
+        // SILENT BACKGROUND SYNC
         const sanitizedValues = { ...values };
         Object.keys(sanitizedValues).forEach(k => {
             const val = (sanitizedValues as any)[k];
@@ -210,17 +218,35 @@ export default function BrandingPage() {
                 (sanitizedValues as any)[k] = '';
             }
         });
-        toast({ title: 'Visuals Synchronized' });
-        setDoc(settingsRef, sanitizedValues, { merge: true }).then(() => router.refresh());
+        
+        setDoc(settingsRef, sanitizedValues, { merge: true }).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: settingsRef.path,
+                operation: 'update',
+                requestResourceData: sanitizedValues
+            }));
+        });
     };
 
     const onSubmitContent = (values: any) => {
         if (!firestore || !selectedContent) return;
+        
+        // INSTANT FEEDBACK
         toast({ title: 'Page Content Updated' });
+        router.push('/admin/dashboard');
+
+        // BACKGROUND SYNC
         const sanitizedValues = { ...values };
         if (sanitizedValues.imageUrl?.startsWith('blob:')) sanitizedValues.imageUrl = '';
         const contentRef = doc(firestore, 'site_content', selectedContent.id);
-        updateDoc(contentRef, sanitizedValues).then(() => router.refresh());
+        
+        updateDoc(contentRef, sanitizedValues).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: contentRef.path,
+                operation: 'update',
+                requestResourceData: sanitizedValues
+            }));
+        });
     };
 
     if (isLoading || contentLoading) return <Skeleton className="h-96 w-full" />;

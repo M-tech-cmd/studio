@@ -58,19 +58,16 @@ export default function AdminDevelopmentPage() {
   const handleDelete = (id: string) => {
     if (!firestore) return;
     const projectDoc = doc(firestore, 'development_projects', id);
+    
+    // INSTANT FEEDBACK
+    toast({ title: 'Removing Project...', description: 'Registry sync initiated.' });
+
     deleteDoc(projectDoc)
-        .then(() => {
-            toast({
-              title: 'Project Deleted',
-              description: 'The development project has been successfully removed.',
-            });
-        })
         .catch(() => {
-            const permissionError = new FirestorePermissionError({
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: projectDoc.path,
                 operation: 'delete',
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            }));
         });
   };
 
@@ -83,38 +80,37 @@ export default function AdminDevelopmentPage() {
     if (!firestore) return;
     const isNew = !projectData.id;
     
-    // INSTANT FEEDBACK
+    // 1. INSTANT UI FEEDBACK (Non-Blocking)
     setIsFormOpen(false);
     toast({
-        title: 'Project Saved',
-        description: 'Updates are live for parishioners.',
+        title: isNew ? 'Project Launched' : 'Project Updated',
+        description: 'Updates are being synchronized with the registry.',
     });
     
+    // 2. SILENT BACKGROUND SYNC
     if (isNew) {
         const dataToAdd = { ...projectData };
         delete dataToAdd.id;
         const projectsCollection = collection(firestore, 'development_projects');
         addDoc(projectsCollection, dataToAdd)
             .catch(() => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: projectsCollection.path,
                     operation: 'create',
                     requestResourceData: dataToAdd,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
     } else {
         const { id, ...dataToUpdate } = projectData;
         if (!id) return;
-        const projectDoc = doc(firestore, 'development_projects', id);
+        const projectDoc = doc(firestore, 'development_projects', id!);
         updateDoc(projectDoc, dataToUpdate)
             .catch(() => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: projectDoc.path,
                     operation: 'update',
                     requestResourceData: dataToUpdate,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
     }
   };
@@ -125,12 +121,11 @@ export default function AdminDevelopmentPage() {
     const updatedData = { public: !project.public };
     updateDoc(projectDoc, updatedData)
         .catch(() => {
-            const permissionError = new FirestorePermissionError({
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: projectDoc.path,
                 operation: 'update',
                 requestResourceData: updatedData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            }));
         });
   };
 

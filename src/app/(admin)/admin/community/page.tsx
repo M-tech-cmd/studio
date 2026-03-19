@@ -57,19 +57,16 @@ export default function AdminCommunityPage() {
   const handleDelete = (id: string) => {
     if (!firestore) return;
     const groupDoc = doc(firestore, 'community_groups', id);
+    
+    // INSTANT FEEDBACK
+    toast({ title: 'Removing Entity...', description: 'Syncing with registry.' });
+
     deleteDoc(groupDoc)
-        .then(() => {
-            toast({
-              title: 'Group Deleted',
-              description: 'The community group has been successfully removed.',
-            });
-        })
         .catch(() => {
-            const permissionError = new FirestorePermissionError({
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: groupDoc.path,
                 operation: 'delete',
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            }));
         });
   };
 
@@ -82,38 +79,37 @@ export default function AdminCommunityPage() {
     if (!firestore) return;
     const isNew = !groupData.id;
 
-    // INSTANT FEEDBACK
+    // 1. INSTANT UI FEEDBACK (Non-Blocking)
     setIsFormOpen(false);
     toast({
-        title: 'Saved Successfully',
-        description: 'Entity details have been committed to the registry.',
+        title: isNew ? 'Community Added' : 'Profile Updated',
+        description: 'Changes are now being synchronized with the registry.',
     });
 
+    // 2. SILENT BACKGROUND SYNC
     if (isNew) {
         const dataToAdd = { ...groupData };
         delete dataToAdd.id;
         const groupsCollection = collection(firestore, 'community_groups');
         addDoc(groupsCollection, dataToAdd)
             .catch(() => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: groupsCollection.path,
                     operation: 'create',
                     requestResourceData: dataToAdd,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
     } else {
         const { id, ...dataToUpdate } = groupData;
         if (!id) return;
-        const groupDoc = doc(firestore, 'community_groups', id);
+        const groupDoc = doc(firestore, 'community_groups', id!);
         updateDoc(groupDoc, dataToUpdate)
             .catch(() => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: groupDoc.path,
                     operation: 'update',
                     requestResourceData: dataToUpdate,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
     }
   };

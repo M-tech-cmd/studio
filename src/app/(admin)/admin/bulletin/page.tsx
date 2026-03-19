@@ -57,24 +57,16 @@ export default function AdminBulletinPage() {
   const handleDelete = (id: string) => {
     if (!firestore) return;
     const postDoc = doc(firestore, 'bulletins', id);
+    
+    // INSTANT FEEDBACK
+    toast({ title: 'Removing Post...', description: 'Syncing changes.' });
+
     deleteDoc(postDoc)
-      .then(() => {
-        toast({
-          title: 'Post Deleted',
-          description: 'The bulletin post has been successfully removed.',
-        });
-      })
       .catch((error: any) => {
-        toast({
-          variant: 'destructive',
-          title: 'Uh oh! Something went wrong.',
-          description: error.message || 'Could not delete the post.',
-        });
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: postDoc.path,
           operation: 'delete',
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       });
   };
 
@@ -86,13 +78,14 @@ export default function AdminBulletinPage() {
   const handleFormSave = (postData: Partial<BulletinPost>) => {
     if (!firestore || !user) return;
 
-    // INSTANT FEEDBACK: Close form and show success immediately
+    // 1. INSTANT FEEDBACK
     setIsFormOpen(false);
     toast({
         title: 'Saved Successfully',
         description: 'Changes are now being synchronized with the registry.',
     });
 
+    // 2. SILENT BACKGROUND SYNC
     if (!postData.id) {
       const { id, ...dataToAdd } = postData;
       const newPost = {
@@ -106,12 +99,11 @@ export default function AdminBulletinPage() {
       const bulletinCollection = collection(firestore, 'bulletins');
       addDoc(bulletinCollection, newPost)
         .catch((error: any) => {
-            const permissionError = new FirestorePermissionError({
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: bulletinCollection.path,
                 operation: 'create',
                 requestResourceData: newPost,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            }));
         });
     } else {
       const { id, ...dataToUpdate } = postData;
@@ -123,12 +115,11 @@ export default function AdminBulletinPage() {
       };
       updateDoc(postDoc, updateData)
         .catch((error: any) => {
-            const permissionError = new FirestorePermissionError({
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: postDoc.path,
                 operation: 'update',
                 requestResourceData: updateData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            }));
         });
     }
   };

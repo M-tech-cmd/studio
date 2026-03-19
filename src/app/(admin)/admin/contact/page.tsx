@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Clock, RotateCcw, MapPin } from 'lucide-react';
@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { useFirestore, useMemoFirebase, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -80,22 +80,36 @@ export default function ContactSettingsPage() {
     const handleInstantResetHours = async () => {
         if (!settingsRef) return;
         const defaultHours = { monday_friday: {open: '08:00', close: '18:00'}, saturday: {open: '09:00', close: '12:00'}, sunday: {open: '07:00', close: '20:00'} };
+        
+        // INSTANT UI UPDATE
         form.setValue('officeHours', defaultHours);
-        updateDoc(settingsRef, { officeHours: defaultHours });
-        toast({ title: 'Hours Reset' });
+        toast({ title: 'Hours Reset Locally' });
+
+        // SILENT SYNC
+        updateDoc(settingsRef, { officeHours: defaultHours }).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: settingsRef.path,
+                operation: 'update',
+                requestResourceData: { officeHours: defaultHours }
+            }));
+        });
     };
 
     const onSubmit = (values: z.infer<typeof contactSchema>) => {
         if (!settingsRef) return;
-        // INSTANT SAVE UX
+        
+        // 1. INSTANT SAVE UI FEEDBACK
         toast({ title: 'Registry Synchronized', description: 'Contact details have been updated successfully.' });
-        let sanitizedData = {};
-        try {
-            sanitizedData = JSON.parse(JSON.stringify(values));
-        } catch (e) {
-            sanitizedData = values;
-        }
-        setDoc(settingsRef, sanitizedData, { merge: true }).then(() => router.refresh());
+        router.push('/admin/dashboard');
+
+        // 2. SILENT BACKGROUND SYNC
+        setDoc(settingsRef, values, { merge: true }).catch(err => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: settingsRef.path,
+                operation: 'update',
+                requestResourceData: values
+            }));
+        });
     };
 
     if (isLoading) return <Skeleton className="h-96 w-full" />;

@@ -60,19 +60,16 @@ export function ProfilesClient() {
   const handleDelete = (id: string) => {
     if (!firestore) return;
     const profileDoc = doc(firestore, 'profiles', id);
+    
+    // INSTANT FEEDBACK
+    toast({ title: 'Removing Profile...', description: 'Registry update initiated.' });
+
     deleteDoc(profileDoc)
-        .then(() => {
-            toast({
-              title: 'Profile Deleted',
-              description: 'The profile has been successfully removed.',
-            });
-        })
         .catch(() => {
-            const permissionError = new FirestorePermissionError({
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: profileDoc.path,
                 operation: 'delete',
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            }));
         });
   };
 
@@ -85,41 +82,37 @@ export function ProfilesClient() {
     if (!firestore) return;
     const isNew = !profileData.id;
 
-    const successCallback = () => {
-        setIsFormOpen(false);
-        toast({
-            title: 'Success!',
-            description: 'Registry updated instantly.',
-        });
-    };
+    // 1. INSTANT UI FEEDBACK (Non-Blocking)
+    setIsFormOpen(false);
+    toast({
+        title: isNew ? 'Profile Created' : 'Identity Updated',
+        description: 'Registry changes are now being synchronized.',
+    });
 
+    // 2. BACKGROUND DATA SYNC
     if (isNew) {
         const dataToAdd = { ...profileData };
         delete dataToAdd.id;
         const profilesCollection = collection(firestore, 'profiles');
         addDoc(profilesCollection, dataToAdd)
-            .then(successCallback)
             .catch(() => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: profilesCollection.path,
                     operation: 'create',
                     requestResourceData: dataToAdd,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
     } else {
         const { id, ...dataToUpdate } = profileData;
         if (!id) return;
-        const profileDoc = doc(firestore, 'profiles', id);
+        const profileDoc = doc(firestore, 'profiles', id!);
         updateDoc(profileDoc, dataToUpdate)
-            .then(successCallback)
             .catch(() => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: profileDoc.path,
                     operation: 'update',
                     requestResourceData: dataToUpdate,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
     }
   };
@@ -157,7 +150,7 @@ export function ProfilesClient() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                    <TableCell colSpan={5} className="text-center py-20 text-muted-foreground animate-pulse">Synchronizing registry...</TableCell>
+                    <TableCell colSpan={5} className="text-center py-20 animate-pulse opacity-50">Synchronizing registry...</TableCell>
                 </TableRow>
               ) : (
                 (profiles || []).map((profile) => (

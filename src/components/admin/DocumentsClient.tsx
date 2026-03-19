@@ -62,19 +62,16 @@ export function DocumentsClient() {
   const handleDelete = (id: string) => {
     if (!firestore) return;
     const docRef = doc(firestore, 'documents', id);
+    
+    // INSTANT FEEDBACK
+    toast({ title: 'Removing Document...', description: 'Registry sync initiated.' });
+
     deleteDoc(docRef)
-        .then(() => {
-            toast({
-              title: 'Document Deleted',
-              description: 'The document has been successfully removed.',
-            });
-        })
         .catch(() => {
-            const permissionError = new FirestorePermissionError({
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: docRef.path,
                 operation: 'delete',
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            }));
         });
   };
 
@@ -87,40 +84,36 @@ export function DocumentsClient() {
     if (!firestore) return;
     const isNew = !docData.id;
 
-    const successCallback = () => {
-        setIsFormOpen(false);
-        toast({
-            title: 'Success!',
-            description: 'Registry synchronized successfully.',
-        });
-    };
+    // 1. INSTANT UI FEEDBACK (Non-Blocking)
+    setIsFormOpen(false);
+    toast({
+        title: 'Registry Updated',
+        description: 'Document changes are now being synchronized.',
+    });
 
+    // 2. SILENT BACKGROUND SYNC
     if (isNew) {
         const { id, ...dataToAdd } = docData;
         const docsCollection = collection(firestore, 'documents');
         addDoc(docsCollection, dataToAdd)
-            .then(successCallback)
             .catch(() => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: docsCollection.path,
                     operation: 'create',
                     requestResourceData: dataToAdd,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
     } else {
         const { id, ...dataToUpdate } = docData;
         if (!id) return;
-        const docRef = doc(firestore, 'documents', id);
+        const docRef = doc(firestore, 'documents', id!);
         updateDoc(docRef, dataToUpdate)
-            .then(successCallback)
             .catch(() => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: docRef.path,
                     operation: 'update',
                     requestResourceData: dataToUpdate,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
     }
   };
@@ -131,12 +124,11 @@ export function DocumentsClient() {
     const updatedData = { public: !docToUpdate.public };
     updateDoc(docRef, updatedData)
         .catch(() => {
-            const permissionError = new FirestorePermissionError({
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: docRef.path,
                 operation: 'update',
                 requestResourceData: updatedData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+            }));
         });
   };
   

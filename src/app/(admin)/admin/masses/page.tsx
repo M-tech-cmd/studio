@@ -33,7 +33,6 @@ export default function AdminMassesPage() {
   const firestore = useFirestore();
   const massesQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    // Note: Firestore can't order by day name string correctly. We'll sort client-side.
     return query(collection(firestore, 'masses'), orderBy('startTime'));
   }, [firestore]);
 
@@ -63,7 +62,7 @@ export default function AdminMassesPage() {
     if (!firestore) return;
     const massDoc = doc(firestore, 'masses', id);
     
-    // OPTIMISTIC FEEDBACK
+    // INSTANT FEEDBACK
     toast({ title: 'Deleting Mass...', description: 'Registry is being updated.' });
 
     deleteDoc(massDoc)
@@ -84,56 +83,44 @@ export default function AdminMassesPage() {
   const handleFormSave = (massData: Omit<Mass, 'id'> & { id?: string }) => {
     if (!firestore) return;
 
-    // 1. DATA VALIDATION: Prevent undefined field errors
-    if (!massData.day || !massData.title || !massData.startTime || !massData.endTime) {
-        toast({
-            variant: 'destructive',
-            title: 'Missing Information',
-            description: 'Day, Title, and both Start/End times are required.',
-        });
-        return;
-    }
-
     const isEdit = !!massData.id;
     
-    // 2. GEMINI METHOD: Instant UI Update
+    // 1. INSTANT UI FEEDBACK (Non-Blocking)
     setIsFormOpen(false);
     toast({
         title: isEdit ? 'Schedule Updated' : 'Mass Added',
         description: 'Changes are being synchronized with the public schedule.',
     });
 
-    // 3. PERSISTENCE: Strict removal of 'id' from document body
+    // 2. BACKGROUND DATA SYNC
     const { id, ...cleanData } = massData;
     const sanitizedData = {
         day: cleanData.day,
         title: cleanData.title,
         startTime: cleanData.startTime,
         endTime: cleanData.endTime,
-        description: cleanData.description || '', // Default to empty string
+        description: cleanData.description || '',
     };
 
     if (isEdit) {
         const massDoc = doc(firestore, 'masses', id!);
         updateDoc(massDoc, sanitizedData)
             .catch((error: any) => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: massDoc.path,
                     operation: 'update',
                     requestResourceData: sanitizedData,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
     } else {
         const massesCollection = collection(firestore, 'masses');
         addDoc(massesCollection, sanitizedData)
             .catch((error: any) => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: massesCollection.path,
                     operation: 'create',
                     requestResourceData: sanitizedData,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
             });
     }
   };

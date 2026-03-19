@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Save, Loader2 } from 'lucide-react';
+import { PlusCircle, Trash2, Save } from 'lucide-react';
 import { useDoc, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError, useUser } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import type { SiteSettings, PaymentMethod } from '@/lib/types';
@@ -28,7 +28,6 @@ export default function AdminPaymentsPage() {
 
     const { data: settings, isLoading: loading } = useDoc<SiteSettings>(settingsRef);
     const [methods, setMethods] = useState<PaymentMethod[]>([]);
-    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (settings?.paymentMethods) {
@@ -55,14 +54,18 @@ export default function AdminPaymentsPage() {
     const handleSaveChanges = () => {
         if (!firestore || !settingsRef) return;
 
+        // AUTH CHECK
         const isSuperAdmin = user?.email === 'kimaniemma20@gmail.com' || user?.uid === 'BKSmmIdohYQHlao5V9eZ9JQyaEV2';
         if (!isSuperAdmin && !settings?.isAdmin) {
              toast({ variant: 'destructive', title: "Unauthorized", description: "Access restricted to admins." });
             return;
         }
 
-        setIsSaving(true);
-        // Filter out local blob URLs before saving
+        // 1. INSTANT UI FEEDBACK (Non-Blocking)
+        toast({ title: 'Success!', description: 'Payment methods updated in registry.' });
+        router.push('/admin/dashboard');
+
+        // 2. SILENT BACKGROUND SYNC
         const sanitizedMethods = methods.map(m => ({
             ...m,
             imageUrl: m.imageUrl?.startsWith('blob:') ? '' : m.imageUrl
@@ -70,19 +73,13 @@ export default function AdminPaymentsPage() {
         const updatedData = { paymentMethods: sanitizedMethods };
         
         updateDoc(settingsRef, updatedData)
-            .then(() => {
-                toast({ title: 'Success!', description: 'Payment methods updated.' });
-                router.refresh();
-            })
             .catch((error) => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: settingsRef.path,
                     operation: 'update',
                     requestResourceData: updatedData,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            })
-            .finally(() => setIsSaving(false));
+                }));
+            });
     }
 
     if (loading) return <div className="space-y-6 py-10"><Skeleton className="h-10 w-1/2" /><Skeleton className="h-64 w-full" /></div>;
@@ -139,8 +136,8 @@ export default function AdminPaymentsPage() {
             </div>
             
             <div className="flex justify-end sticky bottom-6 z-50">
-                <Button size="lg" className="shadow-2xl rounded-full h-14 px-10" onClick={handleSaveChanges} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+                <Button size="lg" className="shadow-2xl rounded-full h-14 px-10" onClick={handleSaveChanges}>
+                    <Save className="mr-2 h-5 w-5" />
                     Save Payment Settings
                 </Button>
             </div>
