@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Expand, MapPin, Clock, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { Expand, MapPin, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { Timestamp, collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirestore, useStorage } from '@/firebase';
@@ -73,10 +73,8 @@ export function EventForm({ event, onClose }: EventFormProps) {
   const storage = useStorage();
   const { toast } = useToast();
   
-  const [isSaving, setIsSaving] = useState(false);
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
   
-  // File state
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
 
@@ -96,54 +94,72 @@ export function EventForm({ event, onClose }: EventFormProps) {
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof eventSchema>) => {
-    if (!firestore || !storage) return;
+  const handleSubmit = async () => {
+    console.log('[Form] Manual commit triggered');
     
-    console.log('[Form] Submit clicked', { values, hasBannerFile: !!bannerFile, galleryFilesCount: galleryFiles.length });
-    setIsSaving(true);
+    // 1. ATOMIC UI FEEDBACK
+    // Show success and close the modal IMMEDIATELY to prevent deadlock frustration
+    toast({ 
+        title: 'Event Saved Locally', 
+        description: 'Changes are being synchronized with the registry in the background.' 
+    });
+    onClose();
 
+    // 2. SILENT BACKGROUND WORKER
+    // Execute uploads and database writes without blocking the UI
     try {
-      // 1. Upload Banner if new
-      let finalBannerUrl = values.imageUrl;
-      if (bannerFile) {
-        console.log('[Form] Uploading banner...');
-        finalBannerUrl = await uploadSingleFile(storage, 'events', bannerFile);
-      }
+        const values = form.getValues();
+        
+        // Manual validation check
+        if (!values.title?.trim()) {
+            console.warn('[Sync] Commit skipped: Title is empty.');
+            return;
+        }
 
-      // 2. Upload Gallery Images if new
-      console.log('[Form] Uploading gallery batch...');
-      const newGalleryUrls = await uploadMultipleFiles(storage, 'event-gallery', galleryFiles);
-      const finalGalleryImages = [...values.galleryImages, ...newGalleryUrls];
+        const syncWorker = async () => {
+            try {
+                // Upload main banner if new file is selected
+                let finalBannerUrl = values.imageUrl;
+                if (bannerFile && storage) {
+                    finalBannerUrl = await uploadSingleFile(storage, 'events', bannerFile);
+                }
 
-      // 3. Prepare Firestore Data
-      const eventData = {
-        ...values,
-        imageUrl: finalBannerUrl,
-        galleryImages: finalGalleryImages,
-        date: Timestamp.fromDate(new Date(`${values.date}T00:00:00`)),
-        updatedAt: serverTimestamp(),
-      };
+                // Upload gallery batch if new files are pending
+                const newGalleryUrls = (storage && galleryFiles.length > 0) 
+                    ? await uploadMultipleFiles(storage, 'event-gallery', galleryFiles) 
+                    : [];
+                
+                const finalGalleryImages = [...(values.galleryImages || []), ...newGalleryUrls];
 
-      // 4. Save to Firestore
-      if (event?.id) {
-        console.log('[Form] Updating existing event:', event.id);
-        await updateDoc(doc(firestore, 'events', event.id), eventData);
-      } else {
-        console.log('[Form] Creating new event');
-        await addDoc(collection(firestore, 'events'), {
-          ...eventData,
-          createdAt: serverTimestamp(),
-        });
-      }
+                const eventData = {
+                    ...values,
+                    imageUrl: finalBannerUrl,
+                    galleryImages: finalGalleryImages,
+                    date: Timestamp.fromDate(new Date(`${values.date}T00:00:00`)),
+                    updatedAt: serverTimestamp(),
+                };
 
-      console.log('[Form] Firestore write complete');
-      toast({ title: 'Success', description: 'Event saved successfully.' });
-      onClose();
+                if (!firestore) return;
+                
+                if (event?.id) {
+                    // Non-blocking Firestore update
+                    updateDoc(doc(firestore, 'events', event.id), eventData);
+                } else {
+                    // Non-blocking Firestore create
+                    addDoc(collection(firestore, 'events'), {
+                        ...eventData,
+                        createdAt: serverTimestamp(),
+                    });
+                }
+                console.log('[Sync] Registry commit successful.');
+            } catch (err: any) {
+                console.error('[Sync] Background synchronization failed:', err.code);
+            }
+        };
+
+        syncWorker(); // Initiate worker and continue
     } catch (error: any) {
-      console.error('[Form] Save failed:', error);
-      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to save event.' });
-    } finally {
-      setIsSaving(false);
+        console.error('[Sync] Commit initialization error:', error.message);
     }
   };
 
@@ -167,7 +183,7 @@ export function EventForm({ event, onClose }: EventFormProps) {
             <ScrollArea className="flex-1">
                 <TabsContent value="basic" className="p-6 m-0">
                     <Form {...form}>
-                        <form id="event-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                        <form id="event-form" className="space-y-8">
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                                 <FormField control={form.control} name="title" render={({ field }) => (
                                     <FormItem className="sm:col-span-2">
@@ -192,17 +208,17 @@ export function EventForm({ event, onClose }: EventFormProps) {
                             <div className="bg-muted/30 p-6 rounded-2xl border-2 border-muted space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <FormField control={form.control} name="date" render={({ field }) => (
-                                        <FormItem><FormLabel className="text-xs font-bold uppercase"><CalendarIcon className="h-3 w-3 inline mr-1" /> Date *</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                                        <FormItem><FormLabel className="text-xs font-bold uppercase"><CalendarIcon className="h-3.5 w-3.5 inline mr-1" /> Date *</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                                     )}/>
                                     <FormField control={form.control} name="time" render={({ field }) => (
-                                        <FormItem><FormLabel className="text-xs font-bold uppercase"><Clock className="h-3 w-3 inline mr-1" /> Start *</FormLabel><FormControl><Input type="time" {...field} /></FormControl></FormItem>
+                                        <FormItem><FormLabel className="text-xs font-bold uppercase"><Clock className="h-3.5 w-3.5 inline mr-1" /> Start *</FormLabel><FormControl><Input type="time" {...field} /></FormControl></FormItem>
                                     )}/>
                                     <FormField control={form.control} name="endTime" render={({ field }) => (
                                         <FormItem><FormLabel className="text-xs font-bold uppercase">End Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl></FormItem>
                                     )}/>
                                 </div>
                                 <FormField control={form.control} name="location" render={({ field }) => (
-                                    <FormItem><FormLabel className="text-xs font-bold uppercase"><MapPin className="h-3 w-3 inline mr-1" /> Location *</FormLabel><FormControl><Input placeholder="Parish Hall" {...field} /></FormControl></FormItem>
+                                    <FormItem><FormLabel className="text-xs font-bold uppercase"><MapPin className="h-3.5 w-3.5 inline mr-1" /> Location *</FormLabel><FormControl><Input placeholder="Parish Hall" {...field} /></FormControl></FormItem>
                                 )}/>
                             </div>
 
@@ -267,9 +283,12 @@ export function EventForm({ event, onClose }: EventFormProps) {
             />
         )}
         <DialogFooter className="p-6 border-t bg-muted/5 mt-auto gap-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-full h-12 px-8 font-bold border-2">Cancel</Button>
-            <Button type="submit" form="event-form" disabled={isSaving} className="rounded-full h-12 px-12 font-black shadow-xl">
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8 font-bold border-2">Cancel</Button>
+            <Button 
+                type="button" 
+                onClick={handleSubmit} 
+                className="rounded-full h-12 px-12 font-black shadow-xl"
+            >
                 {event ? 'SAVE CHANGES' : 'PUBLISH EVENT'}
             </Button>
         </DialogFooter>

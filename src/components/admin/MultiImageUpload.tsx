@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, X } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { MediaItem } from '../shared/MediaItem';
 
@@ -15,12 +15,12 @@ interface MultiImageUploadProps {
 /**
  * Multi-Image Selection Component.
  * Optimized for "Zero-Ghost" instant previews.
- * Deferring upload logic to parent forms via upload-utils.ts to prevent deadlocks.
+ * Deferring upload logic to parent forms via upload-utils.ts using atomic uploadBytes.
  */
 export function MultiImageUpload({ existingImages, newFiles, onChange, label }: MultiImageUploadProps) {
   const [previews, setPreviews] = useState<{ id: string; url: string }[]>([]);
 
-  // Local object URL cleanup to prevent memory leaks
+  // Local object URL cleanup
   useEffect(() => {
     return () => {
       previews.forEach(p => {
@@ -45,7 +45,7 @@ export function MultiImageUpload({ existingImages, newFiles, onChange, label }: 
 
     setPreviews(prev => [...prev, ...newPreviews]);
     
-    // Bubble the file objects up to the form for the background worker
+    // Bubble the file objects up to the form for the silent background sync
     onChange(existingImages, [...newFiles, ...selectedFiles]);
 
     // Reset input so the same file can be re-selected if deleted
@@ -102,9 +102,6 @@ export function MultiImageUpload({ existingImages, newFiles, onChange, label }: 
               url={preview.url} 
               onRemove={() => removeNew(preview.id, index)} 
             />
-            <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded text-[8px] font-black text-white uppercase tracking-tighter pointer-events-none">
-              Pending Sync
-            </div>
           </div>
         ))}
 
