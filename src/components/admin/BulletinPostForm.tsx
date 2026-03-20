@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -27,7 +26,6 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-  FormDescription,
 } from '@/components/ui/form';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -53,6 +51,7 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
   const storage = useStorage();
   const { toast } = useToast();
   
+  const [isSaving, setIsSaving] = useState(false);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
 
   const form = useForm<z.infer<typeof postSchema>>({
@@ -66,50 +65,49 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
   });
 
   const handleSubmit = async () => {
-    // 1. ATOMIC UI FEEDBACK
-    toast({ title: 'Bulletin Processed', description: 'Changes are being synchronized with the public feed.' });
-    onClose();
+    if (!firestore || !storage) return;
+    
+    const values = form.getValues();
+    if (!values.title?.trim()) return;
 
-    // 2. BACKGROUND SYNC WORKER
+    setIsSaving(true);
+
     try {
-        const values = form.getValues();
-        if (!values.title?.trim()) return;
+        // 1. Await media uploads
+        const newUrls = (galleryFiles.length > 0) 
+            ? await uploadMultipleFiles(storage, 'bulletin-gallery', galleryFiles) 
+            : [];
+        
+        const finalGallery = [...(values.galleryImages || []), ...newUrls];
 
-        const syncWorker = async () => {
-            try {
-                const newUrls = (storage && galleryFiles.length > 0) 
-                    ? await uploadMultipleFiles(storage, 'bulletin-gallery', galleryFiles) 
-                    : [];
-                
-                const finalGallery = [...(values.galleryImages || []), ...newUrls];
-
-                const postData = {
-                    ...values,
-                    galleryImages: finalGallery,
-                    updatedAt: serverTimestamp(),
-                };
-
-                if (!firestore) return;
-
-                if (post?.id) {
-                    updateDoc(doc(firestore, 'bulletins', post.id), postData);
-                } else {
-                    addDoc(collection(firestore, 'bulletins'), {
-                        ...postData,
-                        authorId: author.uid,
-                        authorName: author.name,
-                        createdAt: serverTimestamp(),
-                        reactions: {},
-                    });
-                }
-            } catch (err) {
-                console.error('[Sync] Bulletin worker error:', err);
-            }
+        // 2. Prepare Payload
+        const postData = {
+            ...values,
+            galleryImages: finalGallery,
+            updatedAt: serverTimestamp(),
         };
 
-        syncWorker();
-    } catch (error) {
-        console.error('[Sync] Failed to initiate bulletin sync');
+        // 3. Execute Write
+        if (post?.id) {
+            await updateDoc(doc(firestore, 'bulletins', post.id), postData);
+        } else {
+            await addDoc(collection(firestore, 'bulletins'), {
+                ...postData,
+                authorId: author.uid,
+                authorName: author.name,
+                createdAt: serverTimestamp(),
+                reactions: {},
+            });
+        }
+
+        // 4. Strict Success
+        toast({ title: 'Success: Saved to Database' });
+        onClose();
+    } catch (error: any) {
+        console.error('[BulletinForm] Error:', error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to publish to the community feed.' });
+    } finally {
+        setIsSaving(false);
     }
   };
   
@@ -137,7 +135,7 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
                             <FormField control={form.control} name="title" render={({ field }) => (
                             <FormItem>
                                 <FormLabel className="font-bold">Announcement Title</FormLabel>
-                                <FormControl><Input placeholder="Enter a descriptive title" {...field} className="h-12 text-lg font-bold" /></FormControl>
+                                <FormControl><Input placeholder="Enter a descriptive title" {...field} disabled={isSaving} className="h-12 text-lg font-bold" /></FormControl>
                                 <FormMessage />
                             </FormItem>
                             )}/>
@@ -145,7 +143,7 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
                             <FormField control={form.control} name="category" render={({ field }) => (
                             <FormItem>
                                 <FormLabel className="font-bold">Category</FormLabel>
-                                <FormControl><Input placeholder="e.g., Fundraising, Youth, Parish News" {...field} /></FormControl>
+                                <FormControl><Input placeholder="e.g., Fundraising, Youth, Parish News" {...field} disabled={isSaving} /></FormControl>
                                 <FormMessage />
                             </FormItem>
                             )}/>
@@ -176,8 +174,14 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
         </Tabs>
 
         <DialogFooter className="p-6 border-t bg-muted/5 mt-auto gap-4">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8 font-bold border-2">Cancel</Button>
-            <Button type="button" onClick={handleSubmit} className="rounded-full h-12 px-12 font-black shadow-xl">
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8 font-bold border-2" disabled={isSaving}>Cancel</Button>
+            <Button 
+                type="button" 
+                onClick={handleSubmit} 
+                className="rounded-full h-12 px-12 font-black shadow-xl"
+                disabled={isSaving}
+            >
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {post ? 'SAVE CHANGES' : 'PUBLISH TO BULLETIN'}
             </Button>
         </DialogFooter>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -67,6 +66,7 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
   const storage = useStorage();
   const { toast } = useToast();
 
+  const [isSaving, setIsSaving] = useState(false);
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
@@ -89,53 +89,52 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
   });
 
   const handleSubmit = async () => {
-    // 1. ATOMIC UI RESPONSE
-    toast({ title: 'Community Processed', description: 'Registry changes are now being synchronized.' });
-    onClose();
+    if (!firestore || !storage) return;
+    
+    const values = form.getValues();
+    if (!values.name?.trim()) return;
 
-    // 2. BACKGROUND SYNC WORKER
+    setIsSaving(true);
+
     try {
-        const values = form.getValues();
-        if (!values.name?.trim()) return;
+        // 1. Await media uploads
+        let finalBannerUrl = values.imageUrl;
+        if (bannerFile) {
+            finalBannerUrl = await uploadSingleFile(storage, 'communities', bannerFile);
+        }
 
-        const syncWorker = async () => {
-            try {
-                let finalBannerUrl = values.imageUrl;
-                if (bannerFile && storage) {
-                    finalBannerUrl = await uploadSingleFile(storage, 'communities', bannerFile);
-                }
+        const newGalleryUrls = (galleryFiles.length > 0) 
+            ? await uploadMultipleFiles(storage, 'community-gallery', galleryFiles) 
+            : [];
+        
+        const finalGallery = [...(values.galleryImages || []), ...newGalleryUrls];
 
-                const newGalleryUrls = (storage && galleryFiles.length > 0) 
-                    ? await uploadMultipleFiles(storage, 'community-gallery', galleryFiles) 
-                    : [];
-                
-                const finalGallery = [...(values.galleryImages || []), ...newGalleryUrls];
-
-                const groupData = {
-                    ...values,
-                    imageUrl: finalBannerUrl,
-                    galleryImages: finalGallery,
-                    updatedAt: serverTimestamp(),
-                };
-
-                if (!firestore) return;
-
-                if (group?.id) {
-                    updateDoc(doc(firestore, 'community_groups', group.id), groupData);
-                } else {
-                    addDoc(collection(firestore, 'community_groups'), {
-                        ...groupData,
-                        createdAt: serverTimestamp(),
-                    });
-                }
-            } catch (err) {
-                console.error('[Sync] Community worker error:', err);
-            }
+        // 2. Database Payload
+        const groupData = {
+            ...values,
+            imageUrl: finalBannerUrl,
+            galleryImages: finalGallery,
+            updatedAt: serverTimestamp(),
         };
 
-        syncWorker();
-    } catch (error) {
-        console.error('[Sync] Failed to initiate community sync');
+        // 3. Firestore Write
+        if (group?.id) {
+            await updateDoc(doc(firestore, 'community_groups', group.id), groupData);
+        } else {
+            await addDoc(collection(firestore, 'community_groups'), {
+                ...groupData,
+                createdAt: serverTimestamp(),
+            });
+        }
+
+        // 4. Strict Success
+        toast({ title: 'Success: Saved to Database' });
+        onClose();
+    } catch (error: any) {
+        console.error('[CommunityForm] Error:', error);
+        toast({ variant: 'destructive', title: 'Sync Error', description: 'Failed to commit changes to the registry.' });
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -162,11 +161,11 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
                         <form id="group-form" className="space-y-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField control={form.control} name="name" render={({ field }) => (
-                                    <FormItem><FormLabel className="font-bold">Group Name *</FormLabel><FormControl><Input {...field} className="h-12 font-bold" /></FormControl></FormItem>
+                                    <FormItem><FormLabel className="font-bold">Group Name *</FormLabel><FormControl><Input {...field} disabled={isSaving} className="h-12 font-bold" /></FormControl></FormItem>
                                 )}/>
                                 <FormField control={form.control} name="type" render={({ field }) => (
                                     <FormItem><FormLabel className="font-bold">Classification</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSaving}>
                                         <FormControl><SelectTrigger className="h-12"><SelectValue/></SelectTrigger></FormControl>
                                         <SelectContent>{['Small Christian Community', 'Group', 'Choir', 'Ministry'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                                     </Select></FormItem>
@@ -175,21 +174,21 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-dashed">
                                 <FormField control={form.control} name="leader" render={({ field }) => (
-                                    <FormItem><FormLabel className="font-bold flex items-center gap-2"><User className="h-4 w-4" /> Leader *</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                                    <FormItem><FormLabel className="font-bold flex items-center gap-2"><User className="h-4 w-4" /> Leader *</FormLabel><FormControl><Input {...field} disabled={isSaving} /></FormControl></FormItem>
                                 )}/>
                                 <FormField control={form.control} name="contact" render={({ field }) => (
-                                    <FormItem><FormLabel className="font-bold flex items-center gap-2"><Mail className="h-4 w-4" /> Contact Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl></FormItem>
+                                    <FormItem><FormLabel className="font-bold flex items-center gap-2"><Mail className="h-4 w-4" /> Contact Email *</FormLabel><FormControl><Input type="email" {...field} disabled={isSaving} /></FormControl></FormItem>
                                 )}/>
                             </div>
 
                             <FormField control={form.control} name="schedule" render={({ field }) => (
-                                <FormItem><FormLabel className="font-bold flex items-center gap-2"><Clock className="h-4 w-4" /> Active Schedule *</FormLabel><FormControl><Input placeholder="e.g. Every Sunday after 2nd Mass" {...field} /></FormControl></FormItem>
+                                <FormItem><FormLabel className="font-bold flex items-center gap-2"><Clock className="h-4 w-4" /> Active Schedule *</FormLabel><FormControl><Input placeholder="e.g. Every Sunday after 2nd Mass" {...field} disabled={isSaving} /></FormControl></FormItem>
                             )}/>
 
                             <FormField control={form.control} name="description" render={({ field }) => (
                                 <FormItem>
-                                    <div className="flex justify-between items-center"><FormLabel className="font-bold">Vision & Description *</FormLabel><Button type="button" variant="ghost" size="icon" onClick={() => setIsDescriptionModalOpen(true)}><Expand className="h-4 w-4" /></Button></div>
-                                    <FormControl><Textarea rows={4} {...field} /></FormControl>
+                                    <div className="flex justify-between items-center"><FormLabel className="font-bold">Vision & Description *</FormLabel><Button type="button" variant="ghost" size="icon" onClick={() => setIsDescriptionModalOpen(true)} disabled={isSaving}><Expand className="h-4 w-4" /></Button></div>
+                                    <FormControl><Textarea rows={4} {...field} disabled={isSaving} /></FormControl>
                                 </FormItem>
                             )}/>
 
@@ -230,8 +229,14 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
           <LargeTextEditModal isOpen={isDescriptionModalOpen} onClose={() => setIsDescriptionModalOpen(false)} initialValue={form.getValues('description') || ''} onSave={(newValue) => form.setValue('description', newValue)} title="Edit Description" />
         )}
         <DialogFooter className="p-6 border-t bg-muted/5 mt-auto gap-4">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8">Cancel</Button>
-            <Button type="button" onClick={handleSubmit} className="rounded-full h-12 px-12 font-black shadow-xl">
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8" disabled={isSaving}>Cancel</Button>
+            <Button 
+                type="button" 
+                onClick={handleSubmit} 
+                className="rounded-full h-12 px-12 font-black shadow-xl"
+                disabled={isSaving}
+            >
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {group ? 'SAVE PROFILE' : 'REGISTER ENTITY'}
             </Button>
         </DialogFooter>

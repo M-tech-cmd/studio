@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -12,6 +11,7 @@ import { uploadSingleFile, uploadMultipleFiles } from '@/lib/upload-utils';
 
 import type { DevelopmentProject } from '@/lib/types';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -38,7 +38,6 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Checkbox } from '@/components/ui/checkbox';
 import { LargeTextEditModal } from './LargeTextEditModal';
 import { ImageUpload } from './ImageUpload';
 import { MultiImageUpload } from './MultiImageUpload';
@@ -65,6 +64,7 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
   const storage = useStorage();
   const { toast } = useToast();
 
+  const [isSaving, setIsSaving] = useState(false);
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
@@ -84,53 +84,52 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
   });
 
   const handleSubmit = async () => {
-    // 1. ATOMIC UI RESPONSE
-    toast({ title: 'Registry Synchronized', description: 'Project updates are being processed in the background.' });
-    onClose();
+    if (!firestore || !storage) return;
+    
+    const values = form.getValues();
+    if (!values.title?.trim()) return;
 
-    // 2. BACKGROUND SYNC WORKER
+    setIsSaving(true);
+
     try {
-        const values = form.getValues();
-        if (!values.title?.trim()) return;
+        // 1. Await media uploads
+        let finalBannerUrl = values.imageUrl;
+        if (bannerFile) {
+            finalBannerUrl = await uploadSingleFile(storage, 'projects', bannerFile);
+        }
 
-        const syncWorker = async () => {
-            try {
-                let finalBannerUrl = values.imageUrl;
-                if (bannerFile && storage) {
-                    finalBannerUrl = await uploadSingleFile(storage, 'projects', bannerFile);
-                }
+        const newGalleryUrls = (galleryFiles.length > 0) 
+            ? await uploadMultipleFiles(storage, 'project-gallery', galleryFiles) 
+            : [];
+        
+        const finalGallery = [...(values.galleryImages || []), ...newGalleryUrls];
 
-                const newGalleryUrls = (storage && galleryFiles.length > 0) 
-                    ? await uploadMultipleFiles(storage, 'project-gallery', galleryFiles) 
-                    : [];
-                
-                const finalGallery = [...(values.galleryImages || []), ...newGalleryUrls];
-
-                const projectData = {
-                    ...values,
-                    imageUrl: finalBannerUrl,
-                    galleryImages: finalGallery,
-                    updatedAt: serverTimestamp(),
-                };
-
-                if (!firestore) return;
-                
-                if (project?.id) {
-                    updateDoc(doc(firestore, 'development_projects', project.id), projectData);
-                } else {
-                    addDoc(collection(firestore, 'development_projects'), {
-                        ...projectData,
-                        createdAt: serverTimestamp(),
-                    });
-                }
-            } catch (err) {
-                console.error('[Sync] Project worker error:', err);
-            }
+        // 2. Prepare Payload
+        const projectData = {
+            ...values,
+            imageUrl: finalBannerUrl,
+            galleryImages: finalGallery,
+            updatedAt: serverTimestamp(),
         };
 
-        syncWorker();
-    } catch (error) {
-        console.error('[Sync] Failed to initiate project sync');
+        // 3. Commit to Firestore
+        if (project?.id) {
+            await updateDoc(doc(firestore, 'development_projects', project.id), projectData);
+        } else {
+            await addDoc(collection(firestore, 'development_projects'), {
+                ...projectData,
+                createdAt: serverTimestamp(),
+            });
+        }
+
+        // 4. Strict Success Toast
+        toast({ title: 'Success: Saved to Database' });
+        onClose();
+    } catch (error: any) {
+        console.error('[ProjectForm] Error:', error);
+        toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not reach the registry database.' });
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -156,28 +155,28 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
                     <Form {...form}>
                         <form id="project-form" className="space-y-8">
                             <FormField control={form.control} name="title" render={({ field }) => (
-                                <FormItem><FormLabel className="font-bold">Project Title *</FormLabel><FormControl><Input {...field} className="h-12 text-lg font-bold" /></FormControl></FormItem>
+                                <FormItem><FormLabel className="font-bold">Project Title *</FormLabel><FormControl><Input {...field} disabled={isSaving} className="h-12 text-lg font-bold" /></FormControl></FormItem>
                             )}/>
                             
                             <FormField control={form.control} name="description" render={({ field }) => (
                                 <FormItem>
-                                    <div className="flex justify-between items-center"><FormLabel className="font-bold">Narrative Case *</FormLabel><Button type="button" variant="ghost" size="icon" onClick={() => setIsDescriptionModalOpen(true)}><Expand className="h-4 w-4" /></Button></div>
-                                    <FormControl><Textarea rows={5} {...field} /></FormControl>
+                                    <div className="flex justify-between items-center"><FormLabel className="font-bold">Narrative Case *</FormLabel><Button type="button" variant="ghost" size="icon" onClick={() => setIsDescriptionModalOpen(true)} disabled={isSaving}><Expand className="h-4 w-4" /></Button></div>
+                                    <FormControl><Textarea rows={5} {...field} disabled={isSaving} /></FormControl>
                                 </FormItem>
                             )}/>
 
                             <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/10 grid grid-cols-2 gap-6 shadow-inner">
                                 <FormField control={form.control} name="currentAmount" render={({ field }) => (
-                                    <FormItem><FormLabel className="text-xs font-black uppercase tracking-widest opacity-60"><TrendingUp className="h-3 w-3 inline mr-1" /> Raised (KES)</FormLabel><FormControl><Input type="number" {...field} className="h-12 font-bold" /></FormControl></FormItem>
+                                    <FormItem><FormLabel className="text-xs font-black uppercase tracking-widest opacity-60"><TrendingUp className="h-3 w-3 inline mr-1" /> Raised (KES)</FormLabel><FormControl><Input type="number" {...field} disabled={isSaving} className="h-12 font-bold" /></FormControl></FormItem>
                                 )}/>
                                 <FormField control={form.control} name="goalAmount" render={({ field }) => (
-                                    <FormItem><FormLabel className="text-xs font-black uppercase tracking-widest opacity-60"><Target className="h-3 w-3 inline mr-1" /> Total Goal (KES)</FormLabel><FormControl><Input type="number" {...field} className="h-12 font-bold" /></FormControl></FormItem>
+                                    <FormItem><FormLabel className="text-xs font-black uppercase tracking-widest opacity-60"><Target className="h-3 w-3 inline mr-1" /> Total Goal (KES)</FormLabel><FormControl><Input type="number" {...field} disabled={isSaving} className="h-12 font-bold" /></FormControl></FormItem>
                                 )}/>
                             </div>
 
                             <FormField control={form.control} name="status" render={({ field }) => (
                                 <FormItem><FormLabel className="font-bold">Project Lifecycle</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSaving}>
                                     <FormControl><SelectTrigger className="h-12"><SelectValue/></SelectTrigger></FormControl>
                                     <SelectContent>{['Upcoming', 'Ongoing', 'Completed'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                                 </Select></FormItem>
@@ -201,7 +200,7 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
 
                             <FormField control={form.control} name="public" render={({ field }) => (
                                 <FormItem className="flex flex-row items-center space-x-3 rounded-2xl border-2 p-6 bg-white shadow-sm">
-                                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="h-6 w-6" /></FormControl>
+                                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isSaving} className="h-6 w-6" /></FormControl>
                                     <div className="space-y-1 leading-none"><FormLabel className="font-bold">Live Visibility</FormLabel><p className="text-xs text-muted-foreground">Visible to the public once committed.</p></div>
                                 </FormItem>
                             )}/>
@@ -227,8 +226,14 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
           <LargeTextEditModal isOpen={isDescriptionModalOpen} onClose={() => setIsDescriptionModalOpen(false)} initialValue={form.getValues('description') || ''} onSave={(newValue) => form.setValue('description', newValue)} title="Edit Project Case" />
         )}
         <DialogFooter className="p-6 border-t bg-muted/5 mt-auto gap-4">
-          <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8">Cancel</Button>
-          <Button type="button" onClick={handleSubmit} className="rounded-full h-12 px-12 font-black shadow-xl">
+          <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8" disabled={isSaving}>Cancel</Button>
+          <Button 
+            type="button" 
+            onClick={handleSubmit} 
+            className="rounded-full h-12 px-12 font-black shadow-xl"
+            disabled={isSaving}
+          >
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             {project ? 'SAVE CHANGES' : 'COMMIT PROJECT'}
           </Button>
         </DialogFooter>
