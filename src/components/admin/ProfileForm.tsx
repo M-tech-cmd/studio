@@ -91,23 +91,19 @@ export function ProfileForm({ profile, onClose }: ProfileFormProps) {
     if (!firestore || !storage) return;
     
     setIsSaving(true);
-    console.log('[Profile] Saving registry entry...', { name: values.name, hasFile: !!photoFile });
 
     try {
-      // 1. Photo
       let finalPhotoUrl = values.imageUrl;
       if (photoFile) {
         finalPhotoUrl = await uploadSingleFile(storage, 'staff', photoFile);
       }
 
-      // 2. Data
       const profileData = {
         ...values,
         imageUrl: finalPhotoUrl,
         updatedAt: serverTimestamp(),
       };
 
-      // 3. Firestore
       if (profile?.id) {
         await updateDoc(doc(firestore, 'profiles', profile.id), profileData);
       } else {
@@ -121,7 +117,17 @@ export function ProfileForm({ profile, onClose }: ProfileFormProps) {
       onClose();
     } catch (error: any) {
       console.error('[Profile] Save failed:', error);
-      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to save profile.' });
+      const isConnectionError = error.message?.includes('ERR_PROXY_CONNECTION_FAILED') || 
+                                 error.message?.includes('Network Error') ||
+                                 error.code === 'storage/retry-limit-exceeded';
+
+      toast({ 
+          variant: 'destructive', 
+          title: isConnectionError ? 'Connection Error' : 'Error', 
+          description: isConnectionError 
+              ? 'Connection Error: Please check your firewall or Firebase CORS settings.' 
+              : 'Failed to save profile.' 
+      });
     } finally {
       setIsSaving(false);
     }
@@ -147,7 +153,7 @@ export function ProfileForm({ profile, onClose }: ProfileFormProps) {
         const result = await handleGenerateProfilePhoto({ name, title });
         if (result.success && result.data?.photoDataUri) {
           form.setValue('imageUrl', result.data.photoDataUri);
-          setPhotoFile(null); // Clear any pending file if AI generated one
+          setPhotoFile(null); 
           toast({ title: 'AI Rendering Complete' });
         } else {
           toast({ variant: 'destructive', title: 'AI Limit Reached', description: result.error });

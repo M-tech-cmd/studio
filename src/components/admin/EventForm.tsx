@@ -103,7 +103,6 @@ export function EventForm({ event, onClose }: EventFormProps) {
     setIsSaving(true);
 
     try {
-        // 1. Await media uploads first
         let finalBannerUrl = values.imageUrl;
         if (bannerFile) {
             finalBannerUrl = await uploadSingleFile(storage, 'events', bannerFile);
@@ -115,7 +114,6 @@ export function EventForm({ event, onClose }: EventFormProps) {
         
         const finalGalleryImages = [...(values.galleryImages || []), ...newGalleryUrls];
 
-        // 2. Prepare Database Payload
         const eventData = {
             ...values,
             imageUrl: finalBannerUrl,
@@ -124,7 +122,6 @@ export function EventForm({ event, onClose }: EventFormProps) {
             updatedAt: serverTimestamp(),
         };
 
-        // 3. Execute Database Write
         if (event?.id) {
             await updateDoc(doc(firestore, 'events', event.id), eventData);
         } else {
@@ -134,15 +131,21 @@ export function EventForm({ event, onClose }: EventFormProps) {
             });
         }
 
-        // 4. Strict Success Toast
         toast({ title: 'Success: Saved to Database' });
         onClose();
     } catch (error: any) {
         console.error('[EventForm] Submission Error:', error);
+        
+        const isConnectionError = error.message?.includes('ERR_PROXY_CONNECTION_FAILED') || 
+                                 error.message?.includes('Network Error') ||
+                                 error.code === 'storage/retry-limit-exceeded';
+
         toast({ 
             variant: 'destructive', 
-            title: 'Registry Error', 
-            description: 'Failed to save to database. Please check your connection.' 
+            title: isConnectionError ? 'Connection Error' : 'Registry Error', 
+            description: isConnectionError 
+                ? 'Connection Error: Please check your firewall or Firebase CORS settings.' 
+                : 'Failed to save to database. Please check your connection.' 
         });
     } finally {
         setIsSaving(false);

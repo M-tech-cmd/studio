@@ -73,21 +73,18 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
     setIsSaving(true);
 
     try {
-        // 1. Await media uploads
         const newUrls = (galleryFiles.length > 0) 
             ? await uploadMultipleFiles(storage, 'bulletin-gallery', galleryFiles) 
             : [];
         
         const finalGallery = [...(values.galleryImages || []), ...newUrls];
 
-        // 2. Prepare Payload
         const postData = {
             ...values,
             galleryImages: finalGallery,
             updatedAt: serverTimestamp(),
         };
 
-        // 3. Execute Write
         if (post?.id) {
             await updateDoc(doc(firestore, 'bulletins', post.id), postData);
         } else {
@@ -100,12 +97,21 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
             });
         }
 
-        // 4. Strict Success
         toast({ title: 'Success: Saved to Database' });
         onClose();
     } catch (error: any) {
         console.error('[BulletinForm] Error:', error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to publish to the community feed.' });
+        const isConnectionError = error.message?.includes('ERR_PROXY_CONNECTION_FAILED') || 
+                                 error.message?.includes('Network Error') ||
+                                 error.code === 'storage/retry-limit-exceeded';
+
+        toast({ 
+            variant: 'destructive', 
+            title: isConnectionError ? 'Connection Error' : 'Error', 
+            description: isConnectionError 
+                ? 'Connection Error: Please check your firewall or Firebase CORS settings.' 
+                : 'Failed to publish to the community feed.' 
+        });
     } finally {
         setIsSaving(false);
     }

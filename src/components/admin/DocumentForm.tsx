@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { FileText, Trash2, ShieldCheck, Info, X } from 'lucide-react';
+import { FileText, Trash2, ShieldCheck, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { Timestamp, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -69,17 +69,6 @@ export function DocumentForm({ document: existingDoc, onSave, onClose }: Documen
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const form = useForm<z.infer<typeof documentSchema>>({
-    resolver: zodResolver(documentSchema),
-    defaultValues: {
-      title: existingDoc?.title || '',
-      description: existingDoc?.description || '',
-      category: existingDoc?.category || 'Bulletin',
-      date: existingDoc ? formatDateForInput(existingDoc.date) : format(new Date(), 'yyyy-MM-dd'),
-      public: existingDoc ? existingDoc.public : true,
-    },
-  });
-
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -97,7 +86,6 @@ export function DocumentForm({ document: existingDoc, onSave, onClose }: Documen
   const handleCommit = async () => {
     const values = form.getValues();
     
-    // 1. Validation
     if (!values.title?.trim()) {
         form.setError('title', { message: 'Required' });
         scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -109,11 +97,6 @@ export function DocumentForm({ document: existingDoc, onSave, onClose }: Documen
         return;
     }
 
-    // 2. ATOMIC UI RESPONSE: Toast & Close immediately
-    toast({ title: 'Registry Updated', description: 'Changes are being synchronized.' });
-    onClose();
-
-    // 3. SILENT BACKGROUND SYNC
     try {
         let finalUrl = currentFileUrl;
         let finalType = existingDoc?.fileType || 'FILE';
@@ -134,10 +117,34 @@ export function DocumentForm({ document: existingDoc, onSave, onClose }: Documen
         };
 
         onSave(dataToSave as any);
+        toast({ title: 'Registry Updated' });
+        onClose();
     } catch (error: any) {
-        console.error("Background Registry Sync Error:", error.code);
+        console.error("Document Sync Error:", error);
+        const isConnectionError = error.message?.includes('ERR_PROXY_CONNECTION_FAILED') || 
+                                 error.message?.includes('Network Error') ||
+                                 error.code === 'storage/retry-limit-exceeded';
+
+        toast({ 
+            variant: 'destructive', 
+            title: isConnectionError ? 'Connection Error' : 'Upload Error', 
+            description: isConnectionError 
+                ? 'Connection Error: Please check your firewall or Firebase CORS settings.' 
+                : 'Failed to sync document to the registry.' 
+        });
     }
   };
+
+  const form = useForm<z.infer<typeof documentSchema>>({
+    resolver: zodResolver(documentSchema),
+    defaultValues: {
+      title: existingDoc?.title || '',
+      description: existingDoc?.description || '',
+      category: existingDoc?.category || 'Bulletin',
+      date: existingDoc ? formatDateForInput(existingDoc.date) : format(new Date(), 'yyyy-MM-dd'),
+      public: existingDoc ? existingDoc.public : true,
+    },
+  });
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -200,7 +207,6 @@ export function DocumentForm({ document: existingDoc, onSave, onClose }: Documen
 
                   {(localFile || currentFileUrl) && (
                     <div className="relative rounded-2xl border-2 p-5 bg-muted/5 animate-in fade-in zoom-in-95 group overflow-hidden isolate">
-                      {/* Top-Left X Button */}
                       <button type="button" onClick={() => { setLocalFile(null); setCurrentFileUrl(''); if(previewUrl) URL.revokeObjectURL(previewUrl); }} className="absolute top-3 left-3 z-50 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center shadow-2xl hover:bg-black transition-all">
                         <Trash2 className="h-4 w-4" />
                       </button>

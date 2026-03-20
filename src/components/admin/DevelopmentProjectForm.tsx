@@ -92,7 +92,6 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
     setIsSaving(true);
 
     try {
-        // 1. Await media uploads
         let finalBannerUrl = values.imageUrl;
         if (bannerFile) {
             finalBannerUrl = await uploadSingleFile(storage, 'projects', bannerFile);
@@ -104,7 +103,6 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
         
         const finalGallery = [...(values.galleryImages || []), ...newGalleryUrls];
 
-        // 2. Prepare Payload
         const projectData = {
             ...values,
             imageUrl: finalBannerUrl,
@@ -112,7 +110,6 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
             updatedAt: serverTimestamp(),
         };
 
-        // 3. Commit to Firestore
         if (project?.id) {
             await updateDoc(doc(firestore, 'development_projects', project.id), projectData);
         } else {
@@ -122,12 +119,21 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
             });
         }
 
-        // 4. Strict Success Toast
         toast({ title: 'Success: Saved to Database' });
         onClose();
     } catch (error: any) {
         console.error('[ProjectForm] Error:', error);
-        toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not reach the registry database.' });
+        const isConnectionError = error.message?.includes('ERR_PROXY_CONNECTION_FAILED') || 
+                                 error.message?.includes('Network Error') ||
+                                 error.code === 'storage/retry-limit-exceeded';
+
+        toast({ 
+            variant: 'destructive', 
+            title: isConnectionError ? 'Connection Error' : 'Update Failed', 
+            description: isConnectionError 
+                ? 'Connection Error: Please check your firewall or Firebase CORS settings.' 
+                : 'Could not reach the registry database.' 
+        });
     } finally {
         setIsSaving(false);
     }

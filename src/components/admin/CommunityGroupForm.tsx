@@ -97,7 +97,6 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
     setIsSaving(true);
 
     try {
-        // 1. Await media uploads
         let finalBannerUrl = values.imageUrl;
         if (bannerFile) {
             finalBannerUrl = await uploadSingleFile(storage, 'communities', bannerFile);
@@ -109,7 +108,6 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
         
         const finalGallery = [...(values.galleryImages || []), ...newGalleryUrls];
 
-        // 2. Database Payload
         const groupData = {
             ...values,
             imageUrl: finalBannerUrl,
@@ -117,7 +115,6 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
             updatedAt: serverTimestamp(),
         };
 
-        // 3. Firestore Write
         if (group?.id) {
             await updateDoc(doc(firestore, 'community_groups', group.id), groupData);
         } else {
@@ -127,12 +124,21 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
             });
         }
 
-        // 4. Strict Success
         toast({ title: 'Success: Saved to Database' });
         onClose();
     } catch (error: any) {
         console.error('[CommunityForm] Error:', error);
-        toast({ variant: 'destructive', title: 'Sync Error', description: 'Failed to commit changes to the registry.' });
+        const isConnectionError = error.message?.includes('ERR_PROXY_CONNECTION_FAILED') || 
+                                 error.message?.includes('Network Error') ||
+                                 error.code === 'storage/retry-limit-exceeded';
+
+        toast({ 
+            variant: 'destructive', 
+            title: isConnectionError ? 'Connection Error' : 'Sync Error', 
+            description: isConnectionError 
+                ? 'Connection Error: Please check your firewall or Firebase CORS settings.' 
+                : 'Failed to commit changes to the registry.' 
+        });
     } finally {
         setIsSaving(false);
     }
