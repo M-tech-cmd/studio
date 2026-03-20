@@ -14,16 +14,20 @@ interface MultiImageUploadProps {
 
 /**
  * Multi-Image Selection Component.
- * Manages local state for new files and existing cloud URLs.
- * Does not upload to storage directly; returns state to parent for transactional save.
+ * Optimized for "Zero-Ghost" instant previews.
+ * Deferring upload logic to parent forms via upload-utils.ts to prevent deadlocks.
  */
 export function MultiImageUpload({ existingImages, newFiles, onChange, label }: MultiImageUploadProps) {
   const [previews, setPreviews] = useState<{ id: string; url: string }[]>([]);
 
-  // Cleanup previews on unmount
+  // Local object URL cleanup to prevent memory leaks
   useEffect(() => {
     return () => {
-      previews.forEach(p => URL.revokeObjectURL(p.url));
+      previews.forEach(p => {
+        if (p.url.startsWith('blob:')) {
+          URL.revokeObjectURL(p.url);
+        }
+      });
     };
   }, [previews]);
 
@@ -32,14 +36,19 @@ export function MultiImageUpload({ existingImages, newFiles, onChange, label }: 
     if (!files || files.length === 0) return;
 
     const selectedFiles = Array.from(files);
+    
+    // Generate instant local previews for immediate UI feedback
     const newPreviews = selectedFiles.map(file => ({
       id: Math.random().toString(36).substring(7),
       url: URL.createObjectURL(file)
     }));
 
     setPreviews(prev => [...prev, ...newPreviews]);
+    
+    // Bubble the file objects up to the form for the background worker
     onChange(existingImages, [...newFiles, ...selectedFiles]);
 
+    // Reset input so the same file can be re-selected if deleted
     if (e.target) e.target.value = '';
   };
 
@@ -64,18 +73,20 @@ export function MultiImageUpload({ existingImages, newFiles, onChange, label }: 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Label className="font-bold">{label || 'Gallery Media'} ({existingImages.length + newFiles.length})</Label>
+        <Label className="font-bold text-sm uppercase tracking-tight">
+          {label || 'Gallery Media'} ({existingImages.length + newFiles.length})
+        </Label>
         <label className="cursor-pointer">
-          <div className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-full text-xs font-bold hover:opacity-90 transition-all shadow-md">
+          <div className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-full text-xs font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-lg active:scale-95">
             <Upload className="h-4 w-4" />
-            Select Files
+            Add Photos
           </div>
-          <input type="file" multiple className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
+          <input type="file" multiple className="hidden" accept="image/*" onChange={handleFileChange} />
         </label>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {/* Existing Images (from Cloud) */}
+        {/* Existing Cloud Assets */}
         {existingImages.map((url, index) => (
           <MediaItem 
             key={`existing-${index}`} 
@@ -84,22 +95,23 @@ export function MultiImageUpload({ existingImages, newFiles, onChange, label }: 
           />
         ))}
 
-        {/* New Files (Local Previews) */}
+        {/* Local Pending Assets */}
         {previews.map((preview, index) => (
-          <div key={preview.id} className="relative group">
+          <div key={preview.id} className="relative group animate-in fade-in zoom-in-95 duration-300">
             <MediaItem 
               url={preview.url} 
               onRemove={() => removeNew(preview.id, index)} 
             />
-            <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/60 text-[8px] text-white font-bold rounded uppercase">
-              Pending
+            <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded text-[8px] font-black text-white uppercase tracking-tighter pointer-events-none">
+              Pending Sync
             </div>
           </div>
         ))}
 
         {existingImages.length === 0 && newFiles.length === 0 && (
-          <div className="col-span-full py-12 flex flex-col items-center justify-center text-muted-foreground/40 bg-muted/5 border-2 border-dashed rounded-2xl">
-            <p className="text-[10px] font-black uppercase tracking-[0.4em]">No Media Selected</p>
+          <div className="col-span-full py-16 flex flex-col items-center justify-center text-muted-foreground/30 bg-muted/5 border-4 border-dashed rounded-[2rem] transition-colors hover:bg-muted/10">
+            <Upload className="h-10 w-10 mb-4 opacity-20" />
+            <p className="text-[10px] font-black uppercase tracking-[0.4em]">Archive is Empty</p>
           </div>
         )}
       </div>
