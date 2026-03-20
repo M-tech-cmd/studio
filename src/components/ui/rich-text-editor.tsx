@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -6,7 +7,7 @@ import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import TextStyle from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
-import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Link2, Image as ImageIcon, Undo, Redo, Video, Music } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Link2, Image as ImageIcon, Undo, Redo, Video, Music, X } from 'lucide-react';
 import { useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useStorage } from '@/firebase';
@@ -22,7 +23,7 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
   const { toast } = useToast();
 
   const editor = useEditor({
-    immediatelyRender: false, // Fixes SSR hydration mismatch
+    immediatelyRender: false, 
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
@@ -51,6 +52,17 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
       attributes: {
         class: 'prose dark:prose-invert max-w-none focus:outline-none min-h-[350px] border-2 border-input rounded-xl p-6 bg-white shadow-inner transition-all focus:border-primary/50',
       },
+      handleClick: (view, pos, event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest('.media-delete-btn')) {
+            const node = view.state.doc.nodeAt(pos);
+            if (node) {
+                editor?.chain().focus().deleteSelection().run();
+                return true;
+            }
+        }
+        return false;
+      }
     },
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -80,18 +92,18 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     const tempUrl = URL.createObjectURL(file);
     const type = mediaTypeRef.current;
 
-    // Instant local preview injection
+    const deleteBtn = `<button class="media-delete-btn absolute top-2 left-2 z-50 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center border border-white/20 hover:bg-black transition-all"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>`;
+
     if (type === 'image') {
-      editor.chain().focus().insertContent(`<img src="${tempUrl}" class="w-full h-auto rounded-xl opacity-50" />`).run();
+      editor.chain().focus().insertContent(`<div class="relative group isolate"><img src="${tempUrl}" class="w-full h-auto rounded-xl opacity-50" />${deleteBtn}</div>`).run();
     } else if (type === 'video') {
-       editor.chain().focus().insertContent(`<video controls src="${tempUrl}" class="w-full rounded-xl opacity-50"></video>`).run();
+       editor.chain().focus().insertContent(`<div class="relative group isolate"><video controls src="${tempUrl}" class="w-full rounded-xl opacity-50"></video>${deleteBtn}</div>`).run();
     } else if (type === 'audio') {
-      editor.chain().focus().insertContent(`<audio controls src="${tempUrl}" class="w-full opacity-50"></audio>`).run();
+      editor.chain().focus().insertContent(`<div class="relative group isolate"><audio controls src="${tempUrl}" class="w-full opacity-50"></audio>${deleteBtn}</div>`).run();
     }
 
     try {
         const storageRef = ref(storage, `editor-media/${Date.now()}_${file.name}`);
-        // Atomic uploadBytes (single pass, no retry)
         const snapshot = await uploadBytes(storageRef, file);
         const downloadURL = await getDownloadURL(snapshot.ref);
         
@@ -104,7 +116,6 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     } catch (error: any) {
         console.error("Editor Upload Failed:", error.code);
         toast({ variant: 'destructive', title: 'Upload Failed', description: 'Network issue during media sync.' });
-        // Clean up preview on failure
         const content = editor.getHTML();
         editor.commands.setContent(content.split(tempUrl).join(''), false);
     } finally {

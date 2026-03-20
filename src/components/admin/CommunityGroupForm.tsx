@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -66,9 +67,7 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
   const storage = useStorage();
   const { toast } = useToast();
 
-  const [isSaving, setIsSaving] = useState(false);
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
-  
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
 
@@ -89,48 +88,54 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof groupSchema>) => {
-    if (!firestore || !storage) return;
-    
-    setIsSaving(true);
-    console.log('[Community] Saving entity...', { name: values.name, files: galleryFiles.length });
+  const handleSubmit = async () => {
+    // 1. ATOMIC UI RESPONSE
+    toast({ title: 'Community Processed', description: 'Registry changes are now being synchronized.' });
+    onClose();
 
+    // 2. BACKGROUND SYNC WORKER
     try {
-      // 1. Banner
-      let finalBannerUrl = values.imageUrl;
-      if (bannerFile) {
-        finalBannerUrl = await uploadSingleFile(storage, 'communities', bannerFile);
-      }
+        const values = form.getValues();
+        if (!values.name?.trim()) return;
 
-      // 2. Gallery
-      const newUrls = await uploadMultipleFiles(storage, 'community-gallery', galleryFiles);
-      const finalGallery = [...values.galleryImages, ...newUrls];
+        const syncWorker = async () => {
+            try {
+                let finalBannerUrl = values.imageUrl;
+                if (bannerFile && storage) {
+                    finalBannerUrl = await uploadSingleFile(storage, 'communities', bannerFile);
+                }
 
-      // 3. Data Prep
-      const groupData = {
-        ...values,
-        imageUrl: finalBannerUrl,
-        galleryImages: finalGallery,
-        updatedAt: serverTimestamp(),
-      };
+                const newGalleryUrls = (storage && galleryFiles.length > 0) 
+                    ? await uploadMultipleFiles(storage, 'community-gallery', galleryFiles) 
+                    : [];
+                
+                const finalGallery = [...(values.galleryImages || []), ...newGalleryUrls];
 
-      // 4. Firestore
-      if (group?.id) {
-        await updateDoc(doc(firestore, 'community_groups', group.id), groupData);
-      } else {
-        await addDoc(collection(firestore, 'community_groups'), {
-          ...groupData,
-          createdAt: serverTimestamp(),
-        });
-      }
+                const groupData = {
+                    ...values,
+                    imageUrl: finalBannerUrl,
+                    galleryImages: finalGallery,
+                    updatedAt: serverTimestamp(),
+                };
 
-      toast({ title: 'Success', description: 'Community profile saved successfully.' });
-      onClose();
-    } catch (error: any) {
-      console.error('[Community] Save failed:', error);
-      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to save community.' });
-    } finally {
-      setIsSaving(false);
+                if (!firestore) return;
+
+                if (group?.id) {
+                    updateDoc(doc(firestore, 'community_groups', group.id), groupData);
+                } else {
+                    addDoc(collection(firestore, 'community_groups'), {
+                        ...groupData,
+                        createdAt: serverTimestamp(),
+                    });
+                }
+            } catch (err) {
+                console.error('[Sync] Community worker error:', err);
+            }
+        };
+
+        syncWorker();
+    } catch (error) {
+        console.error('[Sync] Failed to initiate community sync');
     }
   };
 
@@ -139,22 +144,22 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
       <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
         <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
           <DialogTitle className="text-2xl font-black uppercase tracking-tighter">
-            {group ? 'Edit Community' : 'Register New Community'}
+            {group ? 'Modify Community' : 'Register Community'}
           </DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="flex-1 flex flex-col overflow-hidden">
             <div className="px-6 border-b">
                 <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="basic">Core Records</TabsTrigger>
-                    <TabsTrigger value="gallery">Media Archive</TabsTrigger>
+                    <TabsTrigger value="basic">Registry</TabsTrigger>
+                    <TabsTrigger value="gallery">Archives</TabsTrigger>
                 </TabsList>
             </div>
 
             <ScrollArea className="flex-1">
                 <TabsContent value="basic" className="p-6 m-0">
                     <Form {...form}>
-                        <form id="group-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                        <form id="group-form" className="space-y-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField control={form.control} name="name" render={({ field }) => (
                                     <FormItem><FormLabel className="font-bold">Group Name *</FormLabel><FormControl><Input {...field} className="h-12 font-bold" /></FormControl></FormItem>
@@ -198,7 +203,7 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
                                         setBannerFile(file);
                                       }}
                                       folder="communities" 
-                                      label="Community Banner Image *" 
+                                      label="Official Banner Image *" 
                                     />
                                     <FormMessage />
                                 </FormItem>
@@ -225,9 +230,8 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
           <LargeTextEditModal isOpen={isDescriptionModalOpen} onClose={() => setIsDescriptionModalOpen(false)} initialValue={form.getValues('description') || ''} onSave={(newValue) => form.setValue('description', newValue)} title="Edit Description" />
         )}
         <DialogFooter className="p-6 border-t bg-muted/5 mt-auto gap-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-full h-12 px-8 font-bold border-2">Cancel</Button>
-            <Button type="submit" form="group-form" disabled={isSaving} className="rounded-full h-12 px-12 font-black shadow-xl">
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8">Cancel</Button>
+            <Button type="button" onClick={handleSubmit} className="rounded-full h-12 px-12 font-black shadow-xl">
                 {group ? 'SAVE PROFILE' : 'REGISTER ENTITY'}
             </Button>
         </DialogFooter>
