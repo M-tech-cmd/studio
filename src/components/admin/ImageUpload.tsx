@@ -3,76 +3,49 @@
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { Upload, Link as LinkIcon, X } from 'lucide-react';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { useStorage } from '@/firebase';
-import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 interface ImageUploadProps {
-  value: string;
-  onChange: (url: string) => void;
-  folder: string;
+  value: string; // Current URL
+  file: File | null; // Current pending file
+  onChange: (url: string, file: File | null) => void;
   label?: string;
   className?: string;
 }
 
 /**
- * Universal Dual-Mode Image Upload Component.
- * Features instant previews via blob URLs and silent atomic cloud sync.
- * Absolute-positioned top-left 'X' button for instant removal.
+ * Individual Image Selection Component.
+ * Supports URL entry or File selection with instant local preview.
  */
-export function ImageUpload({ value, onChange, folder, label, className }: ImageUploadProps) {
+export function ImageUpload({ value, file, onChange, label, className }: ImageUploadProps) {
   const [preview, setPreview] = useState<string>(value || '');
-  const storage = useStorage();
-  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setPreview(value);
-  }, [value]);
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !storage) return;
-
-    // 1. Instant Local Preview
-    const blobUrl = URL.createObjectURL(file);
-    setPreview(blobUrl);
-
-    // 2. Silent Atomic Upload
-    try {
-      const storageRef = ref(storage, `${folder}/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadUrl = await getDownloadURL(snapshot.ref);
-      
-      // 3. Update Parent State
-      onChange(downloadUrl);
-      URL.revokeObjectURL(blobUrl);
-    } catch (error: any) {
-      console.error("Upload failed:", error);
-      toast({ 
-        variant: 'destructive', 
-        title: 'Upload Failed', 
-        description: error.message || 'Check your internet connection.' 
-      });
-      setPreview(value); // Revert to original if failed
+    if (file) {
+      const objectUrl = URL.createObjectURL(file);
+      setPreview(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl);
+    } else {
+      setPreview(value);
     }
+  }, [value, file]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
+    onChange('', selectedFile);
   };
 
   const handleUrlChange = (url: string) => {
-    setPreview(url);
-    onChange(url);
+    onChange(url, null);
   };
 
   const clearImage = () => {
-    if (preview.startsWith('blob:')) {
-        URL.revokeObjectURL(preview);
-    }
-    setPreview('');
-    onChange('');
+    onChange('', null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -80,7 +53,7 @@ export function ImageUpload({ value, onChange, folder, label, className }: Image
     <div className={cn("space-y-4", className)}>
       {label && <Label className="font-bold">{label}</Label>}
       
-      <Tabs defaultValue="upload" className="w-full">
+      <Tabs defaultValue={file ? "upload" : (value ? "url" : "upload")} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="upload" className="gap-2">
             <Upload className="h-4 w-4" /> Upload
@@ -110,7 +83,7 @@ export function ImageUpload({ value, onChange, folder, label, className }: Image
         <TabsContent value="url" className="mt-2">
           <Input 
             placeholder="Paste image link here..." 
-            value={preview.startsWith('blob:') ? '' : preview}
+            value={value}
             autoComplete="off"
             onChange={(e) => handleUrlChange(e.target.value)}
             className="h-12"
@@ -127,7 +100,6 @@ export function ImageUpload({ value, onChange, folder, label, className }: Image
             className="object-contain" 
             unoptimized 
           />
-          {/* Top-Left X Button */}
           <button
             type="button"
             onClick={clearImage}
@@ -135,6 +107,11 @@ export function ImageUpload({ value, onChange, folder, label, className }: Image
           >
             <X className="h-5 w-5" />
           </button>
+          {file && (
+            <div className="absolute bottom-2 right-2 px-2 py-1 bg-primary text-white text-[10px] font-bold rounded uppercase shadow-lg">
+              Pending Upload
+            </div>
+          )}
         </div>
       )}
     </div>

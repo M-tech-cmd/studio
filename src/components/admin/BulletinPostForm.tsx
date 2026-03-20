@@ -1,12 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import dynamic from 'next/dynamic';
+import { Loader2 } from 'lucide-react';
+import { useFirestore, useStorage } from '@/firebase';
+import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { uploadMultipleFiles } from '@/lib/upload-utils';
 
 import type { BulletinPost } from '@/lib/types';
-
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -28,12 +31,8 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RichTextEditor } from '../ui/rich-text-editor';
-
-// Lazy load uploader to prevent ChunkLoadError
-const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
-  ssr: false,
-  loading: () => <div className="h-24 w-full animate-pulse bg-muted rounded-2xl" />
-});
+import { MultiImageUpload } from './MultiImageUpload';
+import { useToast } from '@/hooks/use-toast';
 
 const postSchema = z.object({
   title: z.string().min(3, 'Title is required.'),
@@ -44,11 +43,18 @@ const postSchema = z.object({
 
 type BulletinPostFormProps = {
   post: BulletinPost | null;
-  onSave: (data: Partial<BulletinPost>) => void;
+  author: { uid: string; name: string };
   onClose: () => void;
 };
 
-export function BulletinPostForm({ post, onSave, onClose }: BulletinPostFormProps) {
+export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProps) {
+  const firestore = useFirestore();
+  const storage = useStorage();
+  const { toast } = useToast();
+  
+  const [isSaving, setIsSaving] = useState(false);
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
+
   const form = useForm<z.infer<typeof postSchema>>({
     resolver: zodResolver(postSchema),
     defaultValues: {
@@ -59,24 +65,61 @@ export function BulletinPostForm({ post, onSave, onClose }: BulletinPostFormProp
     },
   });
 
-  const onSubmit = (values: z.infer<typeof postSchema>) => {
-    // INSTANT SAVE: Filter out local blob URLs and proceed immediately
-    const readyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
-    onSave({ id: post?.id, ...values, galleryImages: readyImages });
+  const onSubmit = async (values: z.infer<typeof postSchema>) => {
+    if (!firestore || !storage) return;
+    
+    setIsSaving(true);
+    console.log('[Bulletin] Saving post...', { values, filesCount: galleryFiles.length });
+
+    try {
+      // 1. Upload Gallery Files
+      const newUrls = await uploadMultipleFiles(storage, 'bulletin-gallery', galleryFiles);
+      const finalGallery = [...values.galleryImages, ...newUrls];
+
+      // 2. Prepare Data
+      const postData = {
+        ...values,
+        galleryImages: finalGallery,
+        updatedAt: serverTimestamp(),
+      };
+
+      // 3. Firestore Action
+      if (post?.id) {
+        await updateDoc(doc(firestore, 'bulletins', post.id), postData);
+      } else {
+        await addDoc(collection(firestore, 'bulletins'), {
+          ...postData,
+          authorId: author.uid,
+          authorName: author.name,
+          createdAt: serverTimestamp(),
+          reactions: {},
+        });
+      }
+
+      toast({ title: 'Success', description: 'Bulletin post saved successfully.' });
+      onClose();
+    } catch (error: any) {
+      console.error('[Bulletin] Save error:', error);
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to save post.' });
+    } finally {
+      setIsSaving(false);
+    }
   };
   
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-3xl h-[90vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-0">
-          <DialogTitle>{post ? 'Edit Post' : 'Create New Post'}</DialogTitle>
+      <DialogContent className="sm:max-w-3xl h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
+          <DialogTitle className="text-2xl font-black uppercase tracking-tighter">
+            {post ? 'Edit Post' : 'New Bulletin Entry'}
+          </DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="flex-1 flex flex-col overflow-hidden">
             <div className="px-6 border-b">
                 <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="basic">Bulletin Content</TabsTrigger>
-                    <TabsTrigger value="gallery">Media & Photos</TabsTrigger>
+                    <TabsTrigger value="basic">Content</TabsTrigger>
+                    <TabsTrigger value="gallery">Media Gallery</TabsTrigger>
                 </TabsList>
             </div>
 
@@ -86,24 +129,24 @@ export function BulletinPostForm({ post, onSave, onClose }: BulletinPostFormProp
                         <form onSubmit={form.handleSubmit(onSubmit)} id="bulletin-form" className="space-y-6">
                             <FormField control={form.control} name="title" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Post Title</FormLabel>
-                                <FormControl><Input placeholder="Enter a descriptive title" {...field} /></FormControl>
+                                <FormLabel className="font-bold">Post Title</FormLabel>
+                                <FormControl><Input placeholder="Enter a descriptive title" {...field} className="h-12 text-lg font-bold" /></FormControl>
                                 <FormMessage />
                             </FormItem>
                             )}/>
 
                             <FormField control={form.control} name="category" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Category</FormLabel>
+                                <FormLabel className="font-bold">Category</FormLabel>
                                 <FormControl><Input placeholder="e.g., Fundraising, Youth, Special Event" {...field} /></FormControl>
-                                <FormDescription>Type any category name to group your posts.</FormDescription>
+                                <FormDescription>Enter a category to group this update.</FormDescription>
                                 <FormMessage />
                             </FormItem>
                             )}/>
 
                             <FormField control={form.control} name="content" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Content</FormLabel>
+                                <FormLabel className="font-bold">Body Content</FormLabel>
                                 <FormControl><RichTextEditor value={field.value} onChange={field.onChange} /></FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -114,18 +157,23 @@ export function BulletinPostForm({ post, onSave, onClose }: BulletinPostFormProp
 
                 <TabsContent value="gallery" className="p-6 m-0">
                     <MultiImageUpload 
-                        images={form.watch('galleryImages')} 
-                        onChange={(imgs) => form.setValue('galleryImages', imgs)} 
-                        folder="bulletin-gallery" 
+                        existingImages={form.watch('galleryImages')} 
+                        newFiles={galleryFiles}
+                        onChange={(existing, files) => {
+                          form.setValue('galleryImages', existing);
+                          setGalleryFiles(files);
+                        }}
+                        label="Post Media Assets"
                     />
                 </TabsContent>
             </ScrollArea>
         </Tabs>
 
-        <DialogFooter className="p-6 border-t bg-muted/5 mt-auto">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-full">Cancel</Button>
-            <Button type="submit" form="bulletin-form" className="rounded-full px-8 font-bold">
-                {post ? 'Save Changes' : 'Create Post'}
+        <DialogFooter className="p-6 border-t bg-muted/5 mt-auto gap-4">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-full h-12 px-8 font-bold border-2">Cancel</Button>
+            <Button type="submit" form="bulletin-form" disabled={isSaving} className="rounded-full h-12 px-12 font-black shadow-xl">
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {post ? 'SAVE CHANGES' : 'POST TO BULLETIN'}
             </Button>
         </DialogFooter>
       </DialogContent>

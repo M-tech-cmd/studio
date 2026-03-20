@@ -5,6 +5,9 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Sparkles, Loader2, Expand } from 'lucide-react';
+import { useFirestore, useStorage } from '@/firebase';
+import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { uploadSingleFile } from '@/lib/upload-utils';
 
 import type { Profile } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -48,21 +51,26 @@ const profileSchema = z.object({
   bio: z.string().min(10, 'Biography is required.'),
   email: z.string().email('Please enter a valid email.'),
   phone: z.string().min(1, 'Phone number is required.'),
-  imageUrl: z.string().min(1, 'Profile photo is required.'),
+  imageUrl: z.string().default(''),
   imageHint: z.string().optional(),
   active: z.boolean().default(true),
 });
 
 type ProfileFormProps = {
   profile: Profile | null;
-  onSave: (data: Omit<Profile, 'id'> & { id?: string }) => void;
   onClose: () => void;
 };
 
-export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
+export function ProfileForm({ profile, onClose }: ProfileFormProps) {
+  const firestore = useFirestore();
+  const storage = useStorage();
+  const { toast } = useToast();
+
+  const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingPhoto, setIsGeneratingPhoto] = useState(false);
   const [isBioModalOpen, setIsBioModalOpen] = useState(false);
-  const { toast } = useToast();
+  
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
 
   const form = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -79,8 +87,44 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
     },
   });
 
-  const onSubmit = (values: z.infer<typeof profileSchema>) => {
-    onSave({ ...values, id: profile?.id });
+  const onSubmit = async (values: z.infer<typeof profileSchema>) => {
+    if (!firestore || !storage) return;
+    
+    setIsSaving(true);
+    console.log('[Profile] Saving registry entry...', { name: values.name, hasFile: !!photoFile });
+
+    try {
+      // 1. Photo
+      let finalPhotoUrl = values.imageUrl;
+      if (photoFile) {
+        finalPhotoUrl = await uploadSingleFile(storage, 'staff', photoFile);
+      }
+
+      // 2. Data
+      const profileData = {
+        ...values,
+        imageUrl: finalPhotoUrl,
+        updatedAt: serverTimestamp(),
+      };
+
+      // 3. Firestore
+      if (profile?.id) {
+        await updateDoc(doc(firestore, 'profiles', profile.id), profileData);
+      } else {
+        await addDoc(collection(firestore, 'profiles'), {
+          ...profileData,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      toast({ title: 'Success', description: 'Staff profile updated successfully.' });
+      onClose();
+    } catch (error: any) {
+      console.error('[Profile] Save failed:', error);
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to save profile.' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleGeneratePhotoClick = async () => {
@@ -103,6 +147,7 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
         const result = await handleGenerateProfilePhoto({ name, title });
         if (result.success && result.data?.photoDataUri) {
           form.setValue('imageUrl', result.data.photoDataUri);
+          setPhotoFile(null); // Clear any pending file if AI generated one
           toast({ title: 'AI Rendering Complete' });
         } else {
           toast({ variant: 'destructive', title: 'AI Limit Reached', description: result.error });
@@ -117,7 +162,7 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-3xl h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
-        <DialogHeader className="p-6 bg-primary/5 border-b">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
           <DialogTitle className="text-2xl font-black uppercase tracking-tighter">{profile ? 'Edit Registry' : 'New Staff Profile'}</DialogTitle>
         </DialogHeader>
         <ScrollArea className="flex-1">
@@ -131,7 +176,7 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="font-bold">Full Name *</FormLabel>
-                          <FormControl><Input placeholder="E.g., Deacon James Thompson" {...field} className="h-12 text-lg" /></FormControl>
+                          <FormControl><Input placeholder="E.g., Deacon James Thompson" {...field} className="h-12 text-lg font-bold" /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -216,14 +261,15 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
                     />
                   </div>
 
-                  <FormField
-                    control={form.control}
-                    name="imageUrl"
-                    render={({ field }) => (
+                  <FormField name="imageUrl" render={() => (
                       <FormItem className="space-y-4">
                         <ImageUpload 
-                          value={field.value} 
-                          onChange={field.onChange} 
+                          value={form.watch('imageUrl')} 
+                          file={photoFile}
+                          onChange={(url, file) => {
+                            form.setValue('imageUrl', url);
+                            setPhotoFile(file);
+                          }}
                           folder="staff" 
                           label="Official Profile Photo *" 
                         />
@@ -232,7 +278,7 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
                           variant="outline" 
                           className="w-full h-12 rounded-xl gap-2 border-2 border-primary/20 hover:bg-primary/5 transition-all" 
                           onClick={handleGeneratePhotoClick} 
-                          disabled={isGeneratingPhoto}
+                          disabled={isGeneratingPhoto || isSaving}
                         >
                           {isGeneratingPhoto ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-primary"/>}
                           {isGeneratingPhoto ? 'Generating AI Photo...' : 'Or Generate Professional Photo with AI'}
@@ -270,9 +316,10 @@ export function ProfileForm({ profile, onSave, onClose }: ProfileFormProps) {
                 title="Edit Staff Biography"
             />
         )}
-        <DialogFooter className="p-6 bg-muted/10 border-t mt-auto gap-4">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8">Cancel</Button>
-            <Button type="submit" form="profile-form" className="rounded-full h-12 px-12 font-black shadow-xl">
+        <DialogFooter className="p-6 bg-muted/10 border-t mt-auto gap-4 shrink-0">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-full h-12 px-8">Cancel</Button>
+            <Button type="submit" form="profile-form" disabled={isSaving} className="rounded-full h-12 px-12 font-black shadow-xl">
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {profile ? 'SAVE CHANGES' : 'COMMIT TO REGISTRY'}
             </Button>
         </DialogFooter>

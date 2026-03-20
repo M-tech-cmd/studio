@@ -1,124 +1,104 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { Upload } from 'lucide-react';
-import { ref, getDownloadURL, uploadBytes } from 'firebase/storage';
-import { useStorage } from '@/firebase';
-import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect } from 'react';
+import { Upload, X } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { MediaItem } from '../shared/MediaItem';
 
 interface MultiImageUploadProps {
-  images: string[];
-  onChange: (images: string[]) => void;
-  folder: string;
-}
-
-interface UploadingItem {
-  id: string;
-  preview: string;
-  file: File;
+  existingImages: string[];
+  newFiles: File[];
+  onChange: (existing: string[], newFiles: File[]) => void;
+  label?: string;
 }
 
 /**
- * Standardized Atomic Multi-Image Upload.
- * Uses uploadBytes for single-pass reliability.
- * No blocking state - allows user to save form while uploads run.
+ * Multi-Image Selection Component.
+ * Manages local state for new files and existing cloud URLs.
+ * Does not upload to storage directly; returns state to parent for transactional save.
  */
-export function MultiImageUpload({ images, onChange, folder }: MultiImageUploadProps) {
-  const [activeUploads, setActiveUploads] = useState<UploadingItem[]>([]);
-  const storage = useStorage();
-  const { toast } = useToast();
-  const imagesRef = useRef<string[]>(images || []);
+export function MultiImageUpload({ existingImages, newFiles, onChange, label }: MultiImageUploadProps) {
+  const [previews, setPreviews] = useState<{ id: string; url: string }[]>([]);
 
+  // Cleanup previews on unmount
   useEffect(() => {
-    imagesRef.current = images || [];
-  }, [images]);
+    return () => {
+      previews.forEach(p => URL.revokeObjectURL(p.url));
+    };
+  }, [previews]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0 || !storage) return;
+    if (!files || files.length === 0) return;
 
-    const selectedFiles = Array.from(files).slice(0, 10);
-    
-    for (const file of selectedFiles) {
-      const id = Math.random().toString(36).substring(7);
-      const preview = URL.createObjectURL(file);
-      
-      const newItem: UploadingItem = { id, preview, file };
-      setActiveUploads(prev => [...prev, newItem]);
+    const selectedFiles = Array.from(files);
+    const newPreviews = selectedFiles.map(file => ({
+      id: Math.random().toString(36).substring(7),
+      url: URL.createObjectURL(file)
+    }));
 
-      // Silent Atomic Sync
-      triggerBackgroundUpload(newItem);
-    }
+    setPreviews(prev => [...prev, ...newPreviews]);
+    onChange(existingImages, [...newFiles, ...selectedFiles]);
 
     if (e.target) e.target.value = '';
   };
 
-  const triggerBackgroundUpload = async (item: UploadingItem) => {
-    if (!storage) return;
-
-    try {
-      const storageRef = ref(storage, `${folder}/${Date.now()}_${item.id}_${item.file.name}`);
-      // Single attempt, no retry pattern
-      const snapshot = await uploadBytes(storageRef, item.file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
-      
-      const currentList = [...imagesRef.current, downloadURL];
-      onChange(currentList);
-
-      setActiveUploads(prev => prev.filter(u => u.id !== item.id));
-      URL.revokeObjectURL(item.preview);
-    } catch (error: any) {
-      console.error("Atomic upload failed:", error.code);
-      toast({ variant: 'destructive', title: 'Upload Error', description: 'One or more items could not be synced.' });
-      setActiveUploads(prev => prev.filter(u => u.id !== item.id));
-    }
-  };
-
-  const removeCloudImage = (index: number) => {
-    const next = [...images];
+  const removeExisting = (index: number) => {
+    const next = [...existingImages];
     next.splice(index, 1);
-    onChange(next);
+    onChange(next, newFiles);
   };
 
-  const removePendingUpload = (id: string, preview: string) => {
-    setActiveUploads(prev => prev.filter(u => u.id !== id));
-    URL.revokeObjectURL(preview);
+  const removeNew = (id: string, fileIndex: number) => {
+    const previewToRemove = previews.find(p => p.id === id);
+    if (previewToRemove) {
+      URL.revokeObjectURL(previewToRemove.url);
+      setPreviews(prev => prev.filter(p => p.id !== id));
+    }
+    
+    const nextFiles = [...newFiles];
+    nextFiles.splice(fileIndex, 1);
+    onChange(existingImages, nextFiles);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Label className="font-black text-xs uppercase tracking-widest text-muted-foreground">Gallery Media ({images.length + activeUploads.length})</Label>
+        <Label className="font-bold">{label || 'Gallery Media'} ({existingImages.length + newFiles.length})</Label>
         <label className="cursor-pointer">
-          <div className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-full text-[10px] font-black hover:scale-105 transition-all shadow-lg uppercase tracking-widest active:scale-95">
-            <Upload className="h-3.5 w-3.5" />
-            Add Media
+          <div className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-full text-xs font-bold hover:opacity-90 transition-all shadow-md">
+            <Upload className="h-4 w-4" />
+            Select Files
           </div>
           <input type="file" multiple className="hidden" accept="image/*,video/*" onChange={handleFileChange} />
         </label>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {images.map((url, index) => (
+        {/* Existing Images (from Cloud) */}
+        {existingImages.map((url, index) => (
           <MediaItem 
-            key={`cloud-${index}`} 
+            key={`existing-${index}`} 
             url={url} 
-            onRemove={() => removeCloudImage(index)} 
+            onRemove={() => removeExisting(index)} 
           />
         ))}
 
-        {activeUploads.map((item) => (
-          <MediaItem 
-            key={item.id}
-            url={item.preview} 
-            onRemove={() => removePendingUpload(item.id, item.preview)} 
-          />
+        {/* New Files (Local Previews) */}
+        {previews.map((preview, index) => (
+          <div key={preview.id} className="relative group">
+            <MediaItem 
+              url={preview.url} 
+              onRemove={() => removeNew(preview.id, index)} 
+            />
+            <div className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/60 text-[8px] text-white font-bold rounded uppercase">
+              Pending
+            </div>
+          </div>
         ))}
 
-        {images.length === 0 && activeUploads.length === 0 && (
-          <div className="col-span-full py-12 flex flex-col items-center justify-center text-muted-foreground/40 bg-muted/5 border-2 border-dashed rounded-3xl">
+        {existingImages.length === 0 && newFiles.length === 0 && (
+          <div className="col-span-full py-12 flex flex-col items-center justify-center text-muted-foreground/40 bg-muted/5 border-2 border-dashed rounded-2xl">
             <p className="text-[10px] font-black uppercase tracking-[0.4em]">No Media Selected</p>
           </div>
         )}

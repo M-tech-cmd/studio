@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import dynamic from 'next/dynamic';
-import { Expand, User, Clock, Mail } from 'lucide-react';
+import { Expand, User, Clock, Mail, Loader2 } from 'lucide-react';
+import { useFirestore, useStorage } from '@/firebase';
+import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { uploadSingleFile, uploadMultipleFiles } from '@/lib/upload-utils';
 
 import type { CommunityGroup } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -37,11 +39,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LargeTextEditModal } from './LargeTextEditModal';
 import { ImageUpload } from './ImageUpload';
-
-const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
-  ssr: false,
-  loading: () => <div className="h-24 w-full animate-pulse bg-muted rounded-2xl" />
-});
+import { MultiImageUpload } from './MultiImageUpload';
+import { useToast } from '@/hooks/use-toast';
 
 const groupSchema = z.object({
   name: z.string().min(3, 'Group Name required.'),
@@ -51,7 +50,7 @@ const groupSchema = z.object({
   leader: z.string().min(3, 'Leader name required.'),
   contact: z.string().email('Valid email required.'),
   schedule: z.string().min(3, 'Schedule required.'),
-  imageUrl: z.string().min(1, 'Banner image is required.'),
+  imageUrl: z.string().default(''),
   memberCount: z.coerce.number().min(0).default(0),
   familyCount: z.coerce.number().min(0).default(0),
   galleryImages: z.array(z.string()).default([]),
@@ -59,12 +58,19 @@ const groupSchema = z.object({
 
 type CommunityGroupFormProps = {
   group: CommunityGroup | null;
-  onSave: (data: Omit<CommunityGroup, 'id'> & { id?: string }) => void;
   onClose: () => void;
 };
 
-export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFormProps) {
+export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) {
+  const firestore = useFirestore();
+  const storage = useStorage();
+  const { toast } = useToast();
+
+  const [isSaving, setIsSaving] = useState(false);
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
+  
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
 
   const form = useForm<z.infer<typeof groupSchema>>({
     resolver: zodResolver(groupSchema),
@@ -83,25 +89,65 @@ export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFor
     },
   });
 
-  const onSubmit = (values: z.infer<typeof groupSchema>) => {
-    const readyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
-    onSave({ ...values, id: group?.id, galleryImages: readyImages });
+  const onSubmit = async (values: z.infer<typeof groupSchema>) => {
+    if (!firestore || !storage) return;
+    
+    setIsSaving(true);
+    console.log('[Community] Saving entity...', { name: values.name, files: galleryFiles.length });
+
+    try {
+      // 1. Banner
+      let finalBannerUrl = values.imageUrl;
+      if (bannerFile) {
+        finalBannerUrl = await uploadSingleFile(storage, 'communities', bannerFile);
+      }
+
+      // 2. Gallery
+      const newUrls = await uploadMultipleFiles(storage, 'community-gallery', galleryFiles);
+      const finalGallery = [...values.galleryImages, ...newUrls];
+
+      // 3. Data Prep
+      const groupData = {
+        ...values,
+        imageUrl: finalBannerUrl,
+        galleryImages: finalGallery,
+        updatedAt: serverTimestamp(),
+      };
+
+      // 4. Firestore
+      if (group?.id) {
+        await updateDoc(doc(firestore, 'community_groups', group.id), groupData);
+      } else {
+        await addDoc(collection(firestore, 'community_groups'), {
+          ...groupData,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      toast({ title: 'Success', description: 'Community profile saved successfully.' });
+      onClose();
+    } catch (error: any) {
+      console.error('[Community] Save failed:', error);
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to save community.' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-0">
+      <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
           <DialogTitle className="text-2xl font-black uppercase tracking-tighter">
-            {group ? 'Edit Community' : 'Add Community'}
+            {group ? 'Edit Community' : 'Register New Community'}
           </DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="flex-1 flex flex-col overflow-hidden">
             <div className="px-6 border-b">
                 <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="basic">Core Info</TabsTrigger>
-                    <TabsTrigger value="gallery">Media Gallery</TabsTrigger>
+                    <TabsTrigger value="basic">Core Records</TabsTrigger>
+                    <TabsTrigger value="gallery">Media Archive</TabsTrigger>
                 </TabsList>
             </div>
 
@@ -111,7 +157,7 @@ export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFor
                         <form id="group-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField control={form.control} name="name" render={({ field }) => (
-                                    <FormItem><FormLabel className="font-bold">Group Name *</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                                    <FormItem><FormLabel className="font-bold">Group Name *</FormLabel><FormControl><Input {...field} className="h-12 font-bold" /></FormControl></FormItem>
                                 )}/>
                                 <FormField control={form.control} name="type" render={({ field }) => (
                                     <FormItem><FormLabel className="font-bold">Classification</FormLabel>
@@ -122,7 +168,7 @@ export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFor
                                 )}/>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-dashed">
                                 <FormField control={form.control} name="leader" render={({ field }) => (
                                     <FormItem><FormLabel className="font-bold flex items-center gap-2"><User className="h-4 w-4" /> Leader *</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                                 )}/>
@@ -132,23 +178,27 @@ export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFor
                             </div>
 
                             <FormField control={form.control} name="schedule" render={({ field }) => (
-                                <FormItem><FormLabel className="font-bold flex items-center gap-2"><Clock className="h-4 w-4" /> Meeting Schedule *</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+                                <FormItem><FormLabel className="font-bold flex items-center gap-2"><Clock className="h-4 w-4" /> Active Schedule *</FormLabel><FormControl><Input placeholder="e.g. Every Sunday after 2nd Mass" {...field} /></FormControl></FormItem>
                             )}/>
 
                             <FormField control={form.control} name="description" render={({ field }) => (
                                 <FormItem>
-                                    <div className="flex justify-between items-center"><FormLabel className="font-bold">Public Description *</FormLabel><Button type="button" variant="ghost" size="icon" onClick={() => setIsDescriptionModalOpen(true)}><Expand className="h-4 w-4" /></Button></div>
+                                    <div className="flex justify-between items-center"><FormLabel className="font-bold">Vision & Description *</FormLabel><Button type="button" variant="ghost" size="icon" onClick={() => setIsDescriptionModalOpen(true)}><Expand className="h-4 w-4" /></Button></div>
                                     <FormControl><Textarea rows={4} {...field} /></FormControl>
                                 </FormItem>
                             )}/>
 
-                            <FormField control={form.control} name="imageUrl" render={({ field }) => (
+                            <FormField name="imageUrl" render={() => (
                                 <FormItem>
                                     <ImageUpload 
-                                      value={field.value} 
-                                      onChange={field.onChange} 
+                                      value={form.watch('imageUrl')} 
+                                      file={bannerFile}
+                                      onChange={(url, file) => {
+                                        form.setValue('imageUrl', url);
+                                        setBannerFile(file);
+                                      }}
                                       folder="communities" 
-                                      label="Banner Image *" 
+                                      label="Community Banner Image *" 
                                     />
                                     <FormMessage />
                                 </FormItem>
@@ -159,9 +209,13 @@ export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFor
 
                 <TabsContent value="gallery" className="p-6 m-0">
                     <MultiImageUpload 
-                        images={form.watch('galleryImages')} 
-                        onChange={(imgs) => form.setValue('galleryImages', imgs)} 
-                        folder="community-gallery" 
+                        existingImages={form.watch('galleryImages')} 
+                        newFiles={galleryFiles}
+                        onChange={(existing, files) => {
+                          form.setValue('galleryImages', existing);
+                          setGalleryFiles(files);
+                        }}
+                        label="Community Gallery Assets"
                     />
                 </TabsContent>
             </ScrollArea>
@@ -170,10 +224,11 @@ export function CommunityGroupForm({ group, onSave, onClose }: CommunityGroupFor
         {isDescriptionModalOpen && (
           <LargeTextEditModal isOpen={isDescriptionModalOpen} onClose={() => setIsDescriptionModalOpen(false)} initialValue={form.getValues('description') || ''} onSave={(newValue) => form.setValue('description', newValue)} title="Edit Description" />
         )}
-        <DialogFooter className="p-6 border-t bg-muted/5 mt-auto">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-full">Cancel</Button>
-            <Button type="submit" form="group-form" className="rounded-full px-8 font-bold">
-                {group ? 'Save Changes' : 'Create Entity'}
+        <DialogFooter className="p-6 border-t bg-muted/5 mt-auto gap-4">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-full h-12 px-8 font-bold border-2">Cancel</Button>
+            <Button type="submit" form="group-form" disabled={isSaving} className="rounded-full h-12 px-12 font-black shadow-xl">
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {group ? 'SAVE PROFILE' : 'REGISTER ENTITY'}
             </Button>
         </DialogFooter>
       </DialogContent>

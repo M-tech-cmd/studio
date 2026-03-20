@@ -3,10 +3,11 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import dynamic from 'next/dynamic';
-import { Expand, MapPin, Clock, Calendar as CalendarIcon } from 'lucide-react';
+import { Expand, MapPin, Clock, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { useFirestore, useStorage } from '@/firebase';
+import { uploadSingleFile, uploadMultipleFiles } from '@/lib/upload-utils';
 
 import type { Event } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -40,11 +41,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useState } from 'react';
 import { LargeTextEditModal } from './LargeTextEditModal';
 import { ImageUpload } from './ImageUpload';
-
-const MultiImageUpload = dynamic(() => import('./MultiImageUpload').then(mod => mod.MultiImageUpload), {
-  ssr: false,
-  loading: () => <div className="h-24 w-full animate-pulse bg-muted rounded-2xl" />
-});
+import { MultiImageUpload } from './MultiImageUpload';
+import { useToast } from '@/hooks/use-toast';
 
 const eventSchema = z.object({
   title: z.string().min(3, 'Title is required.'),
@@ -54,14 +52,13 @@ const eventSchema = z.object({
   time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format."),
   endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format.").optional().or(z.literal('')),
   location: z.string().min(3, 'Location is required.'),
-  imageUrl: z.string().min(1, 'Event image is required.'),
+  imageUrl: z.string().default(''),
   featured: z.boolean(),
   galleryImages: z.array(z.string()).default([]),
 });
 
 type EventFormProps = {
   event: Event | null;
-  onSave: (data: Omit<Event, 'id'> & { id?: string }) => void;
   onClose: () => void;
 };
 
@@ -71,8 +68,17 @@ const formatDateForInput = (date: any) => {
     return format(d, 'yyyy-MM-dd');
 };
 
-export function EventForm({ event, onSave, onClose }: EventFormProps) {
+export function EventForm({ event, onClose }: EventFormProps) {
+  const firestore = useFirestore();
+  const storage = useStorage();
+  const { toast } = useToast();
+  
+  const [isSaving, setIsSaving] = useState(false);
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
+  
+  // File state
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
 
   const form = useForm<z.infer<typeof eventSchema>>({
     resolver: zodResolver(eventSchema),
@@ -90,25 +96,63 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
     },
   });
 
-  const onSubmit = (values: z.infer<typeof eventSchema>) => {
-    // Decoupled Save: Proceed immediately with what's in local state
-    const readyImages = values.galleryImages.filter(url => !url.startsWith('blob:'));
+  const onSubmit = async (values: z.infer<typeof eventSchema>) => {
+    if (!firestore || !storage) return;
     
-    const dataToSave = {
-      ...values,
-      id: event?.id,
-      date: new Timestamp(new Date(`${values.date}T00:00:00`).getTime() / 1000, 0),
-      galleryImages: readyImages
-    };
-    onSave(dataToSave as Omit<Event, 'id'> & { id?: string });
+    console.log('[Form] Submit clicked', { values, hasBannerFile: !!bannerFile, galleryFilesCount: galleryFiles.length });
+    setIsSaving(true);
+
+    try {
+      // 1. Upload Banner if new
+      let finalBannerUrl = values.imageUrl;
+      if (bannerFile) {
+        console.log('[Form] Uploading banner...');
+        finalBannerUrl = await uploadSingleFile(storage, 'events', bannerFile);
+      }
+
+      // 2. Upload Gallery Images if new
+      console.log('[Form] Uploading gallery batch...');
+      const newGalleryUrls = await uploadMultipleFiles(storage, 'event-gallery', galleryFiles);
+      const finalGalleryImages = [...values.galleryImages, ...newGalleryUrls];
+
+      // 3. Prepare Firestore Data
+      const eventData = {
+        ...values,
+        imageUrl: finalBannerUrl,
+        galleryImages: finalGalleryImages,
+        date: Timestamp.fromDate(new Date(`${values.date}T00:00:00`)),
+        updatedAt: serverTimestamp(),
+      };
+
+      // 4. Save to Firestore
+      if (event?.id) {
+        console.log('[Form] Updating existing event:', event.id);
+        await updateDoc(doc(firestore, 'events', event.id), eventData);
+      } else {
+        console.log('[Form] Creating new event');
+        await addDoc(collection(firestore, 'events'), {
+          ...eventData,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      console.log('[Form] Firestore write complete');
+      toast({ title: 'Success', description: 'Event saved successfully.' });
+      onClose();
+    } catch (error: any) {
+      console.error('[Form] Save failed:', error);
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to save event.' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-0">
+      <DialogContent className="sm:max-w-2xl h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
           <DialogTitle className="text-2xl font-black uppercase tracking-tighter">
-              Registry Event
+              {event ? 'Edit Event' : 'Schedule New Event'}
           </DialogTitle>
         </DialogHeader>
         
@@ -116,7 +160,7 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
             <div className="px-6 border-b">
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="basic">Details</TabsTrigger>
-                    <TabsTrigger value="gallery">Archives</TabsTrigger>
+                    <TabsTrigger value="gallery">Archives & Photos</TabsTrigger>
                 </TabsList>
             </div>
 
@@ -173,22 +217,26 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
                                 </FormItem>
                             )}/>
                             
-                            <FormField control={form.control} name="imageUrl" render={({ field }) => (
+                            <FormField name="imageUrl" render={() => (
                                 <FormItem>
                                     <ImageUpload 
-                                      value={field.value} 
-                                      onChange={field.onChange} 
+                                      value={form.watch('imageUrl')} 
+                                      file={bannerFile}
+                                      onChange={(url, file) => {
+                                        form.setValue('imageUrl', url);
+                                        setBannerFile(file);
+                                      }} 
                                       folder="events" 
-                                      label="Banner Photo *" 
+                                      label="Main Event Banner Photo *" 
                                     />
                                     <FormMessage />
                                 </FormItem>
                             )}/>
 
                             <FormField control={form.control} name="featured" render={({ field }) => (
-                                <FormItem className="flex flex-row items-center space-x-3 rounded-xl border-2 p-4 bg-muted/5">
+                                <FormItem className="flex flex-row items-center space-x-3 rounded-xl border-2 p-4 bg-white shadow-sm">
                                     <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                                    <div className="space-y-1 leading-none"><FormLabel className="font-bold">High Priority</FormLabel></div>
+                                    <div className="space-y-1 leading-none"><FormLabel className="font-bold">High Priority (Featured)</FormLabel></div>
                                 </FormItem>
                             )}/>
                         </form>
@@ -197,9 +245,13 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
 
                 <TabsContent value="gallery" className="p-6 m-0">
                     <MultiImageUpload 
-                        images={form.watch('galleryImages')} 
-                        onChange={(imgs) => form.setValue('galleryImages', imgs)} 
-                        folder="event-gallery"
+                        existingImages={form.watch('galleryImages')} 
+                        newFiles={galleryFiles}
+                        onChange={(existing, files) => {
+                          form.setValue('galleryImages', existing);
+                          setGalleryFiles(files);
+                        }}
+                        label="Event Archive Gallery"
                     />
                 </TabsContent>
             </ScrollArea>
@@ -211,12 +263,15 @@ export function EventForm({ event, onSave, onClose }: EventFormProps) {
               onClose={() => setIsDescriptionModalOpen(false)}
               initialValue={form.getValues('description') || ''}
               onSave={(newValue) => form.setValue('description', newValue)}
-              title="Edit Content"
+              title="Edit Event Details"
             />
         )}
         <DialogFooter className="p-6 border-t bg-muted/5 mt-auto gap-4">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8 font-bold border-2">Cancel</Button>
-            <Button type="submit" form="event-form" className="rounded-full h-12 px-12 font-black shadow-xl">PUBLISH EVENT</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-full h-12 px-8 font-bold border-2">Cancel</Button>
+            <Button type="submit" form="event-form" disabled={isSaving} className="rounded-full h-12 px-12 font-black shadow-xl">
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {event ? 'SAVE CHANGES' : 'PUBLISH EVENT'}
+            </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

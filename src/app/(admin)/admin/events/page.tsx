@@ -28,7 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { EventForm } from '@/components/admin/EventForm';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { addDoc, collection, deleteDoc, doc, orderBy, query, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, orderBy, query } from 'firebase/firestore';
 
 export default function AdminEventsPage() {
   const firestore = useFirestore();
@@ -52,61 +52,18 @@ export default function AdminEventsPage() {
     setIsFormOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!firestore) return;
     const eventDoc = doc(firestore, 'events', id);
     
-    // INSTANT FEEDBACK
-    toast({ title: 'Deleting Event...', description: 'Registry is being updated.' });
-
-    deleteDoc(eventDoc)
-        .catch((error: any) => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: eventDoc.path,
-                operation: 'delete',
-            }));
-        });
-  };
-
-  const handleFormClose = () => {
-    setIsFormOpen(false);
-    setSelectedEvent(null);
-  };
-
-  const handleFormSave = (eventData: Omit<Event, 'id'> & { id?: string }) => {
-    if (!firestore) return;
-    const isNew = !eventData.id;
-
-    // 1. INSTANT UI FEEDBACK (Non-Blocking)
-    setIsFormOpen(false);
-    toast({
-        title: isNew ? 'Event Scheduled' : 'Event Updated',
-        description: 'Changes have been synchronized with the calendar.',
-    });
-
-    // 2. BACKGROUND SYNC
-    const { id, ...dataToAdd } = eventData;
-    if (isNew) {
-        const eventsCollection = collection(firestore, 'events');
-        addDoc(eventsCollection, dataToAdd)
-            .catch((error: any) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                  path: eventsCollection.path,
-                  operation: 'create',
-                  requestResourceData: dataToAdd,
-                }));
-            });
-    } else {
-        if (!id) return;
-        const eventDoc = doc(firestore, 'events', id!);
-        updateDoc(eventDoc, dataToAdd)
-            .catch((error: any) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                  path: eventDoc.path,
-                  operation: 'update',
-                  requestResourceData: dataToAdd,
-                }));
-            });
+    try {
+      await deleteDoc(eventDoc);
+      toast({ title: 'Deleted', description: 'Event has been removed.' });
+    } catch (error: any) {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: eventDoc.path,
+        operation: 'delete',
+      }));
     }
   };
 
@@ -125,52 +82,51 @@ export default function AdminEventsPage() {
             Create, edit, and manage parish events and announcements.
           </p>
         </div>
-        <Button onClick={handleAddClick}>
+        <Button onClick={handleAddClick} className="rounded-full shadow-lg">
           <PlusCircle className="mr-2 h-4 w-4" />
           Add Event
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All Events ({events?.length || 0})</CardTitle>
+      <Card className="border-none shadow-xl rounded-2xl overflow-hidden">
+        <CardHeader className="bg-muted/30">
+          <CardTitle>All Scheduled Events ({events?.length || 0})</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-muted/10">
               <TableRow>
                 <TableHead>Title</TableHead>
                 <TableHead className="hidden md:table-cell">Date</TableHead>
                 <TableHead className="hidden sm:table-cell">Category</TableHead>
-                <TableHead className="hidden lg:table-cell">
-                  Featured
-                </TableHead>
+                <TableHead className="hidden lg:table-cell">Featured</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                    <TableCell colSpan={5} className="text-center">Loading...</TableCell>
+                    <TableCell colSpan={5} className="text-center py-20 animate-pulse">Syncing calendar...</TableCell>
                 </TableRow>
               ) : (
                 (events || []).map((event) => (
-                    <TableRow key={event.id}>
-                    <TableCell className="font-medium">{event.title}</TableCell>
-                    <TableCell className="hidden md:table-cell">
+                    <TableRow key={event.id} className="hover:bg-primary/5 transition-colors">
+                    <TableCell className="font-bold text-primary">{event.title}</TableCell>
+                    <TableCell className="hidden md:table-cell font-medium">
                         {getDateString(event.date)}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
-                        <Badge variant="outline">{event.category}</Badge>
+                        <Badge variant="outline" className="text-[10px] uppercase font-black">{event.category}</Badge>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
-                        {event.featured ? 'Yes' : 'No'}
+                        {event.featured ? <Badge className="bg-amber-500 text-[9px] uppercase font-black">Yes</Badge> : 'No'}
                     </TableCell>
                     <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                         <Button
                             variant="outline"
                             size="icon"
+                            className="rounded-full h-8 w-8"
                             onClick={() => handleEditClick(event)}
                         >
                             <Edit className="h-4 w-4" />
@@ -181,23 +137,22 @@ export default function AdminEventsPage() {
                             <Button
                                 variant="destructive"
                                 size="icon"
+                                className="rounded-full h-8 w-8"
                             >
                                 <Trash2 className="h-4 w-4" />
                                 <span className="sr-only">Delete</span>
                             </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent>
+                            <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
                             <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogTitle className="text-2xl font-black uppercase tracking-tighter">Remove Event?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the event "{event.title}".
+                                This will permanently delete <strong>"{event.title}"</strong>. This action is final.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(event.id)}>
-                                Continue
-                                </AlertDialogAction>
+                                <AlertDialogCancel className="rounded-full">Abort</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(event.id)} className="bg-destructive text-white rounded-full">Execute Delete</AlertDialogAction>
                             </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
@@ -214,8 +169,7 @@ export default function AdminEventsPage() {
       {isFormOpen && (
         <EventForm
           event={selectedEvent}
-          onSave={handleFormSave}
-          onClose={handleFormClose}
+          onClose={() => setIsFormOpen(false)}
         />
       )}
     </div>
