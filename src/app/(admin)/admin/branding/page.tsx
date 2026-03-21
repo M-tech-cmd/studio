@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { RotateCcw, Palette as PaletteIcon } from 'lucide-react';
+import { RotateCcw, Palette as PaletteIcon, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
@@ -21,6 +21,7 @@ import { collection, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ImageUpload } from '@/components/admin/ImageUpload';
+import { uploadSingleFile } from '@/lib/upload-utils';
 
 const brandingSchema = z.object({
   brandName: z.string().min(1, "Brand name is required"),
@@ -49,7 +50,21 @@ const contentSchema = z.object({
     imageUrl: z.string().optional(),
 });
 
-const SectionControls = ({ form, prefix, label, onReset }: { form: any, prefix: string, label: string, onReset: (p: string) => void }) => {
+const SectionControls = ({ 
+    form, 
+    prefix, 
+    label, 
+    onReset, 
+    file, 
+    onFileChange 
+}: { 
+    form: any, 
+    prefix: string, 
+    label: string, 
+    onReset: (p: string) => void,
+    file: File | null,
+    onFileChange: (file: File | null) => void
+}) => {
     return (
         <Card className="mb-6 border-l-4 border-l-primary shadow-sm">
             <CardHeader className="py-4 flex flex-row items-center justify-between bg-muted/10">
@@ -68,7 +83,11 @@ const SectionControls = ({ form, prefix, label, onReset }: { form: any, prefix: 
                     <FormItem>
                         <ImageUpload 
                           value={field.value || ''} 
-                          onChange={field.onChange} 
+                          file={file}
+                          onChange={(url, newFile) => {
+                              field.onChange(url);
+                              onFileChange(newFile);
+                          }}
                           folder="banners" 
                           label="Section Banner Image" 
                         />
@@ -119,8 +138,13 @@ export default function BrandingPage() {
 
     const siteContentQuery = useMemoFirebase(() => firestore ? collection(firestore, 'site_content') : null, [firestore]);
     const { data: allContent, isLoading: contentLoading } = useCollection<SiteContent>(siteContentQuery);
+    
     const [selectedContentId, setSelectedContentId] = useState<string>('');
     const selectedContent = allContent?.find((c) => c.id === selectedContentId);
+
+    const [brandingFiles, setBrandingFiles] = useState<Record<string, File | null>>({});
+    const [contentFile, setContentFile] = useState<File | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     const form = useForm<z.infer<typeof brandingSchema>>({
         resolver: zodResolver(brandingSchema),
@@ -176,6 +200,7 @@ export default function BrandingPage() {
                 content: selectedContent.content ?? '', 
                 imageUrl: selectedContent.imageUrl ?? '',
             });
+            setContentFile(null);
         }
     }, [selectedContent, contentForm]);
 
@@ -193,60 +218,75 @@ export default function BrandingPage() {
         const d = defaults[prefix] || { title: '', desc: '', img: '' };
         const resetData = { [`${prefix}Title`]: d.title, [`${prefix}Description`]: d.desc, [`${prefix}TitleColor`]: '', [`${prefix}DescriptionColor`]: '', [`${prefix}BoxColor`]: '', [`${prefix}ImageUrl`]: d.img };
         
-        // INSTANT FEEDBACK
         toast({ title: 'Section Reset Initialized' });
         
         updateDoc(settingsRef, resetData).then(() => {
             form.setValue(`${prefix}Title` as any, d.title);
             form.setValue(`${prefix}Description` as any, d.desc);
             form.setValue(`${prefix}ImageUrl` as any, d.img);
+            setBrandingFiles(prev => ({ ...prev, [prefix]: null }));
         });
     };
 
-    const onSubmitBranding = (values: z.infer<typeof brandingSchema>) => {
+    const onSubmitBranding = async (values: z.infer<typeof brandingSchema>) => {
         if (!settingsRef) return;
-        
-        // INSTANT UI FEEDBACK
-        toast({ title: 'Visuals Synchronized', description: 'Changes are live for parishioners.' });
-        router.push('/admin/dashboard');
+        setIsSaving(true);
+        toast({ title: 'Syncing Identity...', description: 'Please wait while we upload assets.' });
 
-        // SILENT BACKGROUND SYNC
-        const sanitizedValues = { ...values };
-        Object.keys(sanitizedValues).forEach(k => {
-            const val = (sanitizedValues as any)[k];
-            if (typeof val === 'string' && val.startsWith('blob:')) {
-                (sanitizedValues as any)[k] = '';
+        const finalValues = { ...values };
+        const prefixes = ['hero', 'mass', 'events', 'clergy', 'community', 'bulletin', 'projects'];
+
+        try {
+            if (brandingFiles.logo) {
+                finalValues.logoUrl = await uploadSingleFile(null, 'branding', brandingFiles.logo);
             }
-        });
-        
-        setDoc(settingsRef, sanitizedValues, { merge: true }).catch(err => {
+
+            for (const p of prefixes) {
+                if (brandingFiles[p]) {
+                    const fieldKey = `${p}ImageUrl`;
+                    (finalValues as any)[fieldKey] = await uploadSingleFile(null, 'banners', brandingFiles[p]);
+                }
+            }
+
+            await setDoc(settingsRef, finalValues, { merge: true });
+            toast({ title: 'Visuals Synchronized', description: 'Changes are now live.' });
+            router.push('/admin/dashboard');
+        } catch (err: any) {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: settingsRef.path,
                 operation: 'update',
-                requestResourceData: sanitizedValues
+                requestResourceData: finalValues
             }));
-        });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
-    const onSubmitContent = (values: any) => {
+    const onSubmitContent = async (values: any) => {
         if (!firestore || !selectedContent) return;
-        
-        // INSTANT FEEDBACK
-        toast({ title: 'Page Content Updated' });
-        router.push('/admin/dashboard');
+        setIsSaving(true);
+        toast({ title: 'Updating Page...', description: 'Uploading cover images.' });
 
-        // BACKGROUND SYNC
-        const sanitizedValues = { ...values };
-        if (sanitizedValues.imageUrl?.startsWith('blob:')) sanitizedValues.imageUrl = '';
+        const finalValues = { ...values };
         const contentRef = doc(firestore, 'site_content', selectedContent.id);
-        
-        updateDoc(contentRef, sanitizedValues).catch(err => {
+
+        try {
+            if (contentFile) {
+                finalValues.imageUrl = await uploadSingleFile(null, 'content', contentFile);
+            }
+
+            await updateDoc(contentRef, finalValues);
+            toast({ title: 'Page Content Updated' });
+            router.push('/admin/dashboard');
+        } catch (err: any) {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: contentRef.path,
                 operation: 'update',
-                requestResourceData: sanitizedValues
+                requestResourceData: finalValues
             }));
-        });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     if (isLoading || contentLoading) return <Skeleton className="h-96 w-full" />;
@@ -280,7 +320,11 @@ export default function BrandingPage() {
                                         <FormItem>
                                             <ImageUpload 
                                               value={field.value || ''} 
-                                              onChange={field.onChange} 
+                                              file={brandingFiles.logo}
+                                              onChange={(url, file) => {
+                                                  field.onChange(url);
+                                                  setBrandingFiles(prev => ({...prev, logo: file}));
+                                              }}
                                               folder="branding" 
                                               label="Official Church Logo" 
                                             />
@@ -289,23 +333,73 @@ export default function BrandingPage() {
                                 </CardContent>
                             </Card>
 
-                            <SectionControls form={form} prefix="hero" label="Main Hero Banner" onReset={handleSectionReset} />
+                            <SectionControls 
+                                form={form} 
+                                prefix="hero" 
+                                label="Main Hero Banner" 
+                                onReset={handleSectionReset} 
+                                file={brandingFiles.hero}
+                                onFileChange={(f) => setBrandingFiles(prev => ({...prev, hero: f}))}
+                            />
                             
                             <div className="space-y-6">
                                 <div className="border-b pb-4"><h3 className="text-2xl font-bold">Section-Specific Styling</h3></div>
-                                <SectionControls form={form} prefix="mass" label="Mass Schedule" onReset={handleSectionReset} />
-                                <SectionControls form={form} prefix="events" label="Upcoming Events" onReset={handleSectionReset} />
-                                <SectionControls form={form} prefix="clergy" label="Meet Our Clergy" onReset={handleSectionReset} />
-                                <SectionControls form={form} prefix="community" label="Parish Communities" onReset={handleSectionReset} />
-                                <SectionControls form={form} prefix="bulletin" label="Latest Updates" onReset={handleSectionReset} />
-                                <SectionControls form={form} prefix="projects" label="Parish Projects" onReset={handleSectionReset} />
+                                <SectionControls 
+                                    form={form} 
+                                    prefix="mass" 
+                                    label="Mass Schedule" 
+                                    onReset={handleSectionReset} 
+                                    file={brandingFiles.mass}
+                                    onFileChange={(f) => setBrandingFiles(prev => ({...prev, mass: f}))}
+                                />
+                                <SectionControls 
+                                    form={form} 
+                                    prefix="events" 
+                                    label="Upcoming Events" 
+                                    onReset={handleSectionReset} 
+                                    file={brandingFiles.events}
+                                    onFileChange={(f) => setBrandingFiles(prev => ({...prev, events: f}))}
+                                />
+                                <SectionControls 
+                                    form={form} 
+                                    prefix="clergy" 
+                                    label="Meet Our Clergy" 
+                                    onReset={handleSectionReset} 
+                                    file={brandingFiles.clergy}
+                                    onFileChange={(f) => setBrandingFiles(prev => ({...prev, clergy: f}))}
+                                />
+                                <SectionControls 
+                                    form={form} 
+                                    prefix="community" 
+                                    label="Parish Communities" 
+                                    onReset={handleSectionReset} 
+                                    file={brandingFiles.community}
+                                    onFileChange={(f) => setBrandingFiles(prev => ({...prev, community: f}))}
+                                />
+                                <SectionControls 
+                                    form={form} 
+                                    prefix="bulletin" 
+                                    label="Latest Updates" 
+                                    onReset={handleSectionReset} 
+                                    file={brandingFiles.bulletin}
+                                    onFileChange={(f) => setBrandingFiles(prev => ({...prev, bulletin: f}))}
+                                />
+                                <SectionControls 
+                                    form={form} 
+                                    prefix="projects" 
+                                    label="Parish Projects" 
+                                    onReset={handleSectionReset} 
+                                    file={brandingFiles.projects}
+                                    onFileChange={(f) => setBrandingFiles(prev => ({...prev, projects: f}))}
+                                />
                             </div>
 
                             <div className="flex justify-end sticky bottom-6 z-50 gap-4">
-                                <Button type="button" variant="outline" size="lg" className="rounded-full px-8 h-16 text-lg font-bold" onClick={() => router.push('/admin/dashboard')}>
+                                <Button type="button" variant="outline" size="lg" className="rounded-full px-8 h-16 text-lg font-bold" onClick={() => router.push('/admin/dashboard')} disabled={isSaving}>
                                     Cancel Changes
                                 </Button>
-                                <Button type="submit" size="lg" className="shadow-2xl rounded-full px-12 h-16 text-lg font-bold">
+                                <Button type="submit" size="lg" className="shadow-2xl rounded-full px-12 h-16 text-lg font-bold" disabled={isSaving}>
+                                    {isSaving ? <Loader2 className="mr-2 animate-spin" /> : null}
                                     Save Visual Identity
                                 </Button>
                             </div>
@@ -339,7 +433,11 @@ export default function BrandingPage() {
                                                 <FormItem>
                                                     <ImageUpload 
                                                       value={field.value || ''} 
-                                                      onChange={field.onChange} 
+                                                      file={contentFile}
+                                                      onChange={(url, file) => {
+                                                          field.onChange(url);
+                                                          setContentFile(file);
+                                                      }}
                                                       folder="content" 
                                                       label="Cover Image" 
                                                     />
@@ -348,8 +446,11 @@ export default function BrandingPage() {
                                         </>
                                     )}
                                     <div className="flex justify-end border-t pt-6 gap-4">
-                                        <Button type="button" variant="outline" size="lg" onClick={() => router.push('/admin/dashboard')}>Cancel</Button>
-                                        <Button type="submit" size="lg">Update Content</Button>
+                                        <Button type="button" variant="outline" size="lg" onClick={() => router.push('/admin/dashboard')} disabled={isSaving}>Cancel</Button>
+                                        <Button type="submit" size="lg" disabled={isSaving}>
+                                            {isSaving ? <Loader2 className="mr-2 animate-spin" /> : null}
+                                            Update Content
+                                        </Button>
                                     </div>
                                 </form>
                             </Form>
