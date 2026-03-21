@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -29,6 +28,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const navLinks = [
@@ -183,7 +183,7 @@ export function Header() {
                   <span className="sr-only">Open menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] p-0">
+              <SheetContent side="left" className="w-[300px] p-0 flex flex-col">
                   <SheetHeader className="p-4 border-b">
                       <SheetTitle className="sr-only">Main Menu</SheetTitle>
                        <div className="flex items-center justify-between">
@@ -193,7 +193,7 @@ export function Header() {
                           </Link>
                       </div>
                   </SheetHeader>
-                <div className="flex flex-col h-full overflow-y-auto">
+                <ScrollArea className="flex-1">
                   <nav className="flex flex-col gap-4 p-4">
                     {navLinks.map((link) => (
                       <Link
@@ -209,7 +209,7 @@ export function Header() {
                       </Link>
                     ))}
                   </nav>
-                   <div className="mt-auto p-4 border-t space-y-4">
+                   <div className="p-4 border-t space-y-4 pb-10">
                     <div className="sm:hidden">
                       {isRealUser ? (
                          <div className="flex flex-col gap-2">
@@ -229,7 +229,7 @@ export function Header() {
                         <Button className="w-full" variant="default" onClick={() => setSheetOpen(false)}>Donate Now</Button>
                     </Link>
                   </div>
-                </div>
+                </ScrollArea>
               </SheetContent>
             </Sheet>
           ) : (

@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -10,24 +9,27 @@ import {
   Briefcase,
   BookOpen,
   UserCheck,
-  CreditCard,
-  Settings,
-  Edit,
-  PlusCircle,
-  ArrowRight,
-  Eye,
-  Palette,
   DollarSign,
   TrendingUp,
   Power,
   AlertTriangle,
   Loader2,
+  ArrowRight,
+  PlusCircle,
+  Edit,
+  Eye,
+  Palette,
+  Settings,
+  Heart,
+  Baby,
+  User as UserIcon,
+  PieChart,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
-import type { Event, RegisteredUser, FinancialEntry, SiteSettings } from '@/lib/types';
+import type { Event, RegisteredUser, FinancialEntry, SiteSettings, DevelopmentProject, MemberProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { GrowthChart } from '@/components/admin/GrowthChart';
@@ -37,6 +39,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { Progress } from '@/components/ui/progress';
 
 
 function DashboardContent() {
@@ -45,38 +48,58 @@ function DashboardContent() {
     const { toast } = useToast();
     const [isSavingStatus, setIsSavingStatus] = useState(false);
     
-    // User profile data fetching
+    // Core data fetching
     const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
     const { data: userData, isLoading: userIsLoading } = useDoc<RegisteredUser>(userDocRef);
 
     const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
     const { data: settings, isLoading: settingsLoading } = useDoc<SiteSettings>(settingsRef);
 
-    // Admin role check from user document
     const isAdmin = userData?.isAdmin;
 
     const eventsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'events') : null, [firestore]);
-    const profilesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'profiles') : null, [firestore]);
-    const documentsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'documents') : null, [firestore]);
     const communityGroupsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'community_groups') : null, [firestore]);
     const devProjectsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'development_projects') : null, [firestore]);
     const usersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
-    const recentEventsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'events'), orderBy('date', 'desc'), limit(5)) : null, [firestore]);
     const financialQuery = useMemoFirebase(() => firestore ? collection(firestore, 'financial_ledger') : null, [firestore]);
+    const membersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'members') : null, [firestore]);
+    const recentEventsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'events'), orderBy('date', 'desc'), limit(3)) : null, [firestore]);
 
     const { data: events, isLoading: eventsLoading } = useCollection(eventsQuery);
-    const { data: profiles, isLoading: profilesLoading } = useCollection(profilesQuery);
-    const { data: documents, isLoading: documentsLoading } = useCollection(documentsQuery);
     const { data: communityGroups, isLoading: communityGroupsLoading } = useCollection(communityGroupsQuery);
-    const { data: devProjects, isLoading: devProjectsLoading } = useCollection(devProjectsQuery);
+    const { data: devProjects, isLoading: devProjectsLoading } = useCollection<DevelopmentProject>(devProjectsQuery);
     const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
-    const { data: recentEvents, isLoading: recentEventsLoading } = useCollection<Event>(recentEventsQuery);
     const { data: financials, isLoading: financialLoading } = useCollection<FinancialEntry>(financialQuery);
+    const { data: members, isLoading: membersLoading } = useCollection<MemberProfile>(membersQuery);
+    const { data: recentEvents, isLoading: recentEventsLoading } = useCollection<Event>(recentEventsQuery);
 
-    const totalRevenue = useMemo(() => {
-        if (!financials) return 0;
-        return financials.reduce((sum, entry) => sum + entry.amount, 0);
+    // Dynamic Financial Calculations
+    const financialsSummary = useMemo(() => {
+        if (!financials) return { total: 0, byProject: {} as Record<string, number> };
+        const summary = { total: 0, byProject: {} as Record<string, number> };
+        
+        financials.forEach(entry => {
+            summary.total += entry.amount;
+            if (entry.category === 'Project' && entry.projectId) {
+                summary.byProject[entry.projectId] = (summary.byProject[entry.projectId] || 0) + entry.amount;
+            }
+        });
+        return summary;
     }, [financials]);
+
+    // Demographic Calculations
+    const demographics = useMemo(() => {
+        if (!members) return { male: 0, female: 0, children: 0, total: 0 };
+        const stats = { male: 0, female: 0, children: 0, total: members.length };
+        
+        members.forEach(m => {
+            if (m.gender === 'Male') stats.male++;
+            if (m.gender === 'Female') stats.female++;
+            stats.children += (m.children?.length || 0);
+        });
+        
+        return stats;
+    }, [members]);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(amount);
@@ -99,74 +122,57 @@ function DashboardContent() {
             .finally(() => setIsSavingStatus(false));
     }
 
-    const handleUpdateMessage = (val: string) => {
-        if (!settingsRef) return;
-        updateDoc(settingsRef, { maintenanceMessage: val });
-    }
-
-    const loading = userIsLoading || eventsLoading || profilesLoading || documentsLoading || communityGroupsLoading || devProjectsLoading || usersLoading || recentEventsLoading || financialLoading || settingsLoading;
+    const loading = userIsLoading || eventsLoading || communityGroupsLoading || devProjectsLoading || usersLoading || financialLoading || settingsLoading || membersLoading;
 
     const stats = [
-        { title: 'Total Revenue', value: formatCurrency(totalRevenue), icon: DollarSign, href: '/admin/financials', color: 'bg-emerald-600' },
-        { title: 'App Users', value: users?.length, icon: UserCheck, href: '/admin/users', color: 'bg-pink-500' },
-        { title: 'Total Events', value: events?.length, icon: Calendar, href: '/admin/events', color: 'bg-blue-500' },
-        { title: 'Community Groups', value: communityGroups?.length, icon: Church, href: '/admin/community', color: 'bg-purple-500' },
-        { title: 'Staff Profiles', value: profiles?.length, icon: Users, href: '/admin/profiles', color: 'bg-teal-500' },
-        { title: 'Documents', value: documents?.length, icon: FileText, href: '/admin/documents', color: 'bg-orange-500' },
-        { title: 'Dev. Projects', value: devProjects?.length, icon: Briefcase, href: '/admin/development', color: 'bg-green-500' },
-        { title: 'Site Branding', value: 'Manage', icon: Palette, href: '/admin/branding', color: 'bg-cyan-500' },
+        { title: 'Total Revenue', value: formatCurrency(financialsSummary.total), icon: DollarSign, href: '/admin/financials', color: 'bg-emerald-600' },
+        { title: 'App Users', value: users?.length || 0, icon: UserCheck, href: '/admin/users', color: 'bg-pink-500' },
+        { title: 'Registered Members', value: members?.length || 0, icon: Users, href: '/admin/members', color: 'bg-blue-500' },
+        { title: 'Community Groups', value: communityGroups?.length || 0, icon: Church, href: '/admin/community', color: 'bg-purple-500' },
     ];
-    
-    const getDateString = (date: any) => {
-        if (!date) return 'No date';
-        const d = date.toDate ? date.toDate() : new Date(date);
-        return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' at ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
 
     return (
-        <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <Card className="md:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Admin Session</CardTitle>
-                        <CardDescription>Logged in as {userData?.email}</CardDescription>
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="md:col-span-2 border-none shadow-lg rounded-2xl overflow-hidden bg-white">
+                    <CardHeader className="bg-primary/5 pb-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="text-2xl font-black uppercase tracking-tighter">Admin Control Center</CardTitle>
+                                <CardDescription className="font-bold">{userData?.email} • Authorized Portal</CardDescription>
+                            </div>
+                            <Button asChild variant="outline" className="rounded-full font-bold border-2">
+                                <Link href="/admin/branding"><Palette className="mr-2 h-4 w-4"/> Theme</Link>
+                            </Button>
+                        </div>
                     </CardHeader>
-                    <CardContent>
-                        {loading ? (
-                            <div className="space-y-2">
-                                <Skeleton className="h-5 w-3/4" />
-                                <Skeleton className="h-4 w-1/4" />
-                            </div>
-                        ) : userData ? (
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="font-bold text-xl">{userData.name}</p>
-                                    <div className="text-sm mt-1">Role: 
-                                        <Badge variant={isAdmin ? "destructive" : "secondary"} className="ml-2 uppercase font-black text-[10px]">
-                                            {isAdmin ? 'Authorized Admin' : 'Standard User'}
-                                        </Badge>
-                                    </div>
+                    <CardContent className="pt-6">
+                        {loading ? <Skeleton className="h-12 w-full" /> : (
+                            <div className="flex items-center gap-4">
+                                <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-primary/20">
+                                    <UserIcon className="h-8 w-8" />
                                 </div>
-                                <Button asChild variant="outline">
-                                    <Link href="/admin/branding"><Palette className="mr-2 h-4 w-4"/> Theme Designer</Link>
-                                </Button>
+                                <div>
+                                    <p className="font-black text-2xl tracking-tighter leading-none">{userData?.name}</p>
+                                    <Badge variant={isAdmin ? "destructive" : "secondary"} className="mt-2 uppercase font-black text-[9px] tracking-widest">
+                                        {isAdmin ? 'System Administrator' : 'Staff User'}
+                                    </Badge>
+                                </div>
                             </div>
-                        ) : (
-                            <p>Could not load user profile.</p>
                         )}
                     </CardContent>
                 </Card>
 
-                <Card className="border-2 border-primary/20">
+                <Card className="border-2 border-primary/20 rounded-2xl shadow-xl bg-card">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-black flex items-center gap-2">
                             <Power className="h-4 w-4 text-primary" />
-                            SITE STATUS
+                            SITE VISIBILITY
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between">
-                            <Label htmlFor="maintenance" className="text-xs font-bold uppercase opacity-70">Maintenance Mode</Label>
+                            <Label htmlFor="maintenance" className="text-xs font-bold uppercase opacity-70">Maintenance Shield</Label>
                             <div className="flex items-center gap-2">
                                 {isSavingStatus && <Loader2 className="h-3 w-3 animate-spin" />}
                                 <Switch 
@@ -177,15 +183,15 @@ function DashboardContent() {
                             </div>
                         </div>
                         {settings?.maintenanceMode && (
-                            <div className="animate-in fade-in slide-in-from-top-2">
+                            <div className="animate-in slide-in-from-top-2">
                                 <div className="flex items-center gap-2 text-[10px] text-destructive font-black mb-2 uppercase">
-                                    <AlertTriangle className="h-3 w-3" /> Public site is currently hidden
+                                    <AlertTriangle className="h-3 w-3" /> Public site is locked
                                 </div>
                                 <Textarea 
-                                    placeholder="Enter reason for downtime..."
-                                    className="text-xs min-h-[60px]"
+                                    placeholder="Maintenance reason..."
+                                    className="text-xs min-h-[60px] rounded-xl"
                                     defaultValue={settings?.maintenanceMessage || ''}
-                                    onBlur={(e) => handleUpdateMessage(e.target.value)}
+                                    onBlur={(e) => updateDoc(settingsRef!, { maintenanceMessage: e.target.value })}
                                 />
                             </div>
                         )}
@@ -195,137 +201,160 @@ function DashboardContent() {
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {stats.map((stat) => (
-                <Card key={stat.title} className={`${stat.color} text-white border-none shadow-lg`}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs font-black uppercase tracking-widest opacity-80">{stat.title}</CardTitle>
-                    <stat.icon className="h-4 w-4 opacity-80" />
-                    </CardHeader>
-                    <CardContent>
-                    <div className="text-2xl font-bold tracking-tight">{loading && typeof stat.value === 'number' ? <Skeleton className="h-8 w-10 bg-white/20" /> : stat.value}</div>
-                    <Button asChild variant="secondary" size="sm" className="mt-4 w-full h-8 bg-white/10 hover:bg-white/20 border-none text-white font-bold">
-                        <Link href={stat.href}>Manage {stat.title.split(" ")[1] || 'Details'}</Link>
-                    </Button>
-                    </CardContent>
-                </Card>
+                    <Card key={stat.title} className={`${stat.color} text-white border-none shadow-lg rounded-2xl`}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-xs font-black uppercase tracking-widest opacity-80">{stat.title}</CardTitle>
+                            <stat.icon className="h-4 w-4 opacity-80" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-black">{loading ? <Skeleton className="h-8 w-20 bg-white/20" /> : stat.value}</div>
+                            <Button asChild variant="secondary" size="sm" className="mt-4 w-full h-8 bg-white/10 hover:bg-white/20 border-none text-white font-bold rounded-lg">
+                                <Link href={stat.href}>Manage Records</Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
                 ))}
-                
-                <OfficeHoursCard />
-
-                <Card className="bg-slate-800 text-white border-none shadow-lg">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-xs font-black uppercase tracking-widest opacity-80">Static Pages</CardTitle>
-                        <Settings className="h-4 w-4 opacity-80" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">Content Editor</div>
-                        <Button asChild variant="secondary" size="sm" className="mt-4 w-full h-8 bg-white/10 hover:bg-white/20 border-none text-white font-bold">
-                            <Link href="/admin/branding">Edit Pages</Link>
-                        </Button>
-                    </CardContent>
-                </Card>
             </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
-                <Card className="lg:col-span-3 border-none shadow-md">
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" /> Growth Analytics</CardTitle>
-                                <CardDescription>Tracking app registrations and community profiles.</CardDescription>
-                            </div>
-                        </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-2 border-none shadow-xl rounded-2xl overflow-hidden bg-white">
+                    <CardHeader className="bg-primary/5">
+                        <CardTitle className="flex items-center gap-2">
+                            <TrendingUp className="h-5 w-5 text-primary" />
+                            Growth & Activity
+                        </CardTitle>
                     </CardHeader>
-                    <CardContent className="pl-2">
+                    <CardContent className="pt-6">
                         <GrowthChart />
                     </CardContent>
                 </Card>
-                <Card className="lg:col-span-2 border-none shadow-md">
-                    <CardHeader>
-                        <CardTitle className="flex items-center"><ArrowRight className="mr-2 h-5 w-5 text-primary" /> Quick Actions</CardTitle>
+
+                <Card className="border-none shadow-xl rounded-2xl bg-slate-900 text-white overflow-hidden">
+                    <CardHeader className="bg-white/5">
+                        <CardTitle className="flex items-center gap-2 text-sm uppercase font-black tracking-widest">
+                            <PieChart className="h-4 w-4 text-primary" />
+                            Parish Demographics
+                        </CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 gap-2">
-                            {quickActions.map((action) => (
-                                <Link
-                                key={action.href}
-                                href={action.href}
-                                className="flex items-center justify-between p-3 rounded-md hover:bg-muted text-sm font-bold transition-colors group"
-                                >
-                                <span>{action.title}</span>
-                                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                                </Link>
-                            ))}
+                    <CardContent className="pt-6 space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                                <p className="text-[10px] font-black uppercase opacity-60 mb-1">Total Men</p>
+                                <div className="flex items-end gap-2">
+                                    <span className="text-3xl font-black text-primary">{demographics.male}</span>
+                                    <UserIcon className="h-4 w-4 mb-1 opacity-20" />
+                                </div>
+                            </div>
+                            <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                                <p className="text-[10px] font-black uppercase opacity-60 mb-1">Total Women</p>
+                                <div className="flex items-end gap-2">
+                                    <span className="text-3xl font-black text-pink-400">{demographics.female}</span>
+                                    <Heart className="h-4 w-4 mb-1 opacity-20" />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 bg-primary text-slate-900 rounded-2xl flex items-center justify-between shadow-2xl">
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Total Children Registered</p>
+                                <p className="text-4xl font-black">{demographics.children}</p>
+                            </div>
+                            <Baby className="h-12 w-12 opacity-30" />
+                        </div>
+                        <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                            <span className="text-xs font-bold uppercase opacity-50 tracking-widest">Global Registry</span>
+                            <span className="text-xs font-black">{demographics.total} Active Households</span>
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
-            <Card className="mt-6 border-none shadow-md">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5 text-primary" /> Recent Events & Activities</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {loading ? Array.from({ length: 3 }).map((_, index) => (
-                        <div key={index} className="flex items-center justify-between text-sm p-2 rounded-md">
-                            <div>
-                                <Skeleton className="h-4 w-32 mb-2" />
-                                <Skeleton className="h-3 w-24" />
-                            </div>
-                            <Skeleton className="h-8 w-8" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="border-none shadow-xl rounded-2xl bg-white overflow-hidden">
+                    <CardHeader className="border-b bg-muted/30">
+                        <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-emerald-600" />
+                            Project Momentum
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="divide-y">
+                            {loading ? <Skeleton className="h-48 w-full" /> : (devProjects || []).slice(0, 4).map(project => {
+                                const raised = financialsSummary.byProject[project.id] || 0;
+                                const progress = Math.min(Math.round(((project.currentAmount + raised) / project.goalAmount) * 100), 100);
+                                return (
+                                    <div key={project.id} className="p-4 hover:bg-muted/10 transition-colors">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <p className="font-bold text-sm">{project.title}</p>
+                                                <p className="text-[10px] text-muted-foreground uppercase font-bold">{project.status}</p>
+                                            </div>
+                                            <span className="text-sm font-black text-emerald-600">{progress}%</span>
+                                        </div>
+                                        <Progress value={progress} className="h-1.5 rounded-full" />
+                                        <div className="flex justify-between mt-2 text-[9px] font-black uppercase opacity-60">
+                                            <span>{formatCurrency(project.currentAmount + raised)}</span>
+                                            <span>Goal: {formatCurrency(project.goalAmount)}</span>
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
-                    )) : (recentEvents || []).slice(0,3).map((event) => (
-                    <div key={event.id} className="flex items-center justify-between text-sm p-3 rounded-lg border hover:bg-muted transition-colors">
-                        <div>
-                        <p className="font-bold">{event.title}</p>
-                        <p className="text-xs text-muted-foreground">{getDateString(event.date)}</p>
-                        </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                            <Link href={`/admin/events`}>
-                                <Edit className="h-4 w-4" />
-                            </Link>
+                        <Button asChild variant="ghost" className="w-full h-12 rounded-none font-bold text-xs uppercase tracking-widest text-primary border-t">
+                            <Link href="/admin/development">Full Project Portfolio <ArrowRight className="ml-2 h-3 w-3"/></Link>
                         </Button>
-                    </div>
-                    ))}
-                    <Button variant="outline" className="w-full mt-4 font-bold h-12" asChild>
-                        <Link href="/admin/events">
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Schedule New Parish Event
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
 
-        </>
+                <Card className="border-none shadow-xl rounded-2xl bg-white overflow-hidden">
+                    <CardHeader className="border-b bg-muted/30">
+                        <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-blue-600" />
+                            Registry Calendar
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="divide-y">
+                            {loading ? <Skeleton className="h-48 w-full" /> : (recentEvents || []).map(event => (
+                                <div key={event.id} className="p-4 flex items-center justify-between hover:bg-muted/10">
+                                    <div>
+                                        <p className="font-bold text-sm leading-tight">{event.title}</p>
+                                        <p className="text-[10px] text-muted-foreground font-medium">{format(new Date(event.date as any), 'MMMM do, yyyy')}</p>
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="rounded-full" asChild><Link href="/admin/events"><Edit className="h-4 w-4"/></Link></Button>
+                                </div>
+                            ))}
+                        </div>
+                        <Button asChild variant="ghost" className="w-full h-12 rounded-none font-bold text-xs uppercase tracking-widest text-primary border-t">
+                            <Link href="/admin/events"><PlusCircle className="mr-2 h-3 w-3" /> Schedule Event</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
     )
 }
 
-const quickActions = [
-    { title: 'Log Tithe or Offertory', href: '/admin/financials' },
-    { title: 'Update Mass Schedule', href: '/admin/masses' },
-    { title: 'Post to Community Bulletin', href: '/admin/bulletin' },
-    { title: 'Manage Registered Members', href: '/admin/members' },
-    { title: 'Upload Church Documents', href: '/admin/documents' },
-    { title: 'Manage Site Visuals & Banners', href: '/admin/branding' },
-];
+function format(date: Date, pattern: string) {
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+}
 
 export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-            <h1 className="text-3xl font-black tracking-tighter">ADMIN DASHBOARD</h1>
-            <p className="text-muted-foreground font-medium">Control center for St. Martin De Porres Parish</p>
+            <h1 className="text-3xl font-black tracking-tighter uppercase">Registry Dashboard</h1>
+            <p className="text-muted-foreground font-medium">St. Martin De Porres Digital Infrastructure</p>
         </div>
-        <Button asChild variant="outline" className="font-bold border-2">
+        <Button asChild variant="outline" className="font-bold border-2 rounded-full h-12 px-6 hidden sm:flex">
             <Link href="/" target="_blank">
                 <Eye className="mr-2 h-4 w-4" />
-                View Public Website
+                Live Website
             </Link>
         </Button>
       </div>
 
       <DashboardContent />
-      
     </div>
   );
 }

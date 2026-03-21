@@ -10,14 +10,15 @@ import {
     User,
     ArrowUpRight,
     ArrowDownRight,
-    Loader2
+    Loader2,
+    Users
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
 
-import type { FinancialEntry } from '@/lib/types';
+import type { FinancialEntry, DevelopmentProject } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -52,13 +53,20 @@ import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePe
 import { collection, deleteDoc, doc, orderBy, query, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 const entrySchema = z.object({
-  memberName: z.string().min(2, "Member name is required"),
+  entryType: z.enum(['Individual', 'General']),
+  memberName: z.string().optional(),
   amount: z.coerce.number().min(1, "Amount must be greater than 0"),
-  category: z.enum(['Tithe', 'Offertory', 'Donation', 'Other']),
+  category: z.enum(['Tithe', 'Offertory', 'Donation', 'Project', 'Other']),
+  projectId: z.string().optional(),
   date: z.string().min(1, "Date is required"),
   notes: z.string().optional(),
+}).refine(data => data.entryType === 'General' || (data.entryType === 'Individual' && data.memberName), {
+    message: "Member name is required for individual entries",
+    path: ["memberName"]
 });
 
 export default function AdminFinancialsPage() {
@@ -74,16 +82,28 @@ export default function AdminFinancialsPage() {
   
   const { data: financials, isLoading } = useCollection<FinancialEntry>(financialQuery);
 
+  const projectsQuery = useMemoFirebase(() => {
+      if (!firestore) return null;
+      return collection(firestore, 'development_projects');
+  }, [firestore]);
+  
+  const { data: projects } = useCollection<DevelopmentProject>(projectsQuery);
+
   const form = useForm<z.infer<typeof entrySchema>>({
     resolver: zodResolver(entrySchema),
     defaultValues: {
+      entryType: 'Individual',
       memberName: '',
       amount: 0,
       category: 'Tithe',
+      projectId: 'none',
       date: format(new Date(), 'yyyy-MM-dd'),
       notes: '',
     },
   });
+
+  const entryType = form.watch('entryType');
+  const category = form.watch('category');
 
   const totals = useMemo(() => {
     if (!financials) return { tithe: 0, offertory: 0, other: 0, total: 0 };
@@ -100,20 +120,13 @@ export default function AdminFinancialsPage() {
     if (!firestore) return;
     setIsSaving(true);
 
-    // SAFE SERIALIZATION
-    let dataToAdd = {};
-    try {
-        dataToAdd = {
-            ...values,
-            date: Timestamp.fromDate(new Date(values.date)),
-            createdAt: serverTimestamp(),
-        };
-    } catch (e) {
-        console.error("Data prep failed", e);
-        toast({ variant: 'destructive', title: "Data Error", description: "Malformed entry data." });
-        setIsSaving(false);
-        return;
-    }
+    const dataToAdd = {
+        ...values,
+        memberName: values.entryType === 'General' ? 'General Collection' : values.memberName,
+        projectId: values.category === 'Project' && values.projectId !== 'none' ? values.projectId : null,
+        date: Timestamp.fromDate(new Date(values.date)),
+        createdAt: serverTimestamp(),
+    };
 
     try {
         await addDoc(collection(firestore, 'financial_ledger'), dataToAdd);
@@ -150,49 +163,87 @@ export default function AdminFinancialsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-black tracking-tighter">FINANCIAL LEDGER</h1>
-          <p className="text-muted-foreground font-medium">Record tithes, offertory, and general donations.</p>
+          <h1 className="text-3xl font-black tracking-tighter uppercase">Parish Treasury</h1>
+          <p className="text-muted-foreground font-medium">Record tithes, offertory, and project contributions.</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-                <Button className="font-bold">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Entry
+                <Button className="font-bold h-12 px-6 rounded-full shadow-lg">
+                    <PlusCircle className="mr-2 h-5 w-5" />
+                    Record Contribution
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[500px] rounded-3xl">
                 <DialogHeader>
-                    <DialogTitle>Log Financial Contribution</DialogTitle>
-                    <DialogDescription>Manually record a payment received from a parishioner.</DialogDescription>
+                    <DialogTitle className="text-2xl font-black tracking-tighter">Contribution Entry</DialogTitle>
+                    <DialogDescription>Manually record funds received by the parish office.</DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-                        <FormField control={form.control} name="memberName" render={({ field }) => (
-                            <FormItem><FormLabel>Member Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
+                        <FormField control={form.control} name="entryType" render={({ field }) => (
+                            <FormItem className="space-y-3">
+                                <FormLabel className="text-xs font-black uppercase opacity-60">Source Type</FormLabel>
+                                <FormControl>
+                                    <RadioGroup
+                                        onValueChange={field.onChange}
+                                        defaultValue={field.value}
+                                        className="flex gap-4"
+                                    >
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="Individual" id="r1" />
+                                            <Label htmlFor="r1">Member</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="General" id="r2" />
+                                            <Label htmlFor="r2">General Collection</Label>
+                                        </div>
+                                    </RadioGroup>
+                                </FormControl>
+                            </FormItem>
                         )}/>
+
+                        {entryType === 'Individual' && (
+                            <FormField control={form.control} name="memberName" render={({ field }) => (
+                                <FormItem><FormLabel className="text-xs font-black uppercase">Member Name *</FormLabel><FormControl><Input placeholder="Search or type name..." {...field} className="h-12" /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                        )}
+
                         <div className="grid grid-cols-2 gap-4">
                             <FormField control={form.control} name="amount" render={({ field }) => (
-                                <FormItem><FormLabel>Amount (KES)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel className="text-xs font-black uppercase">Amount (KES) *</FormLabel><FormControl><Input type="number" {...field} className="h-12 font-bold" /></FormControl><FormMessage /></FormItem>
                             )}/>
                             <FormField control={form.control} name="category" render={({ field }) => (
-                                <FormItem><FormLabel>Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>
+                                <FormItem><FormLabel className="text-xs font-black uppercase">Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue /></SelectTrigger></FormControl><SelectContent>
                                     <SelectItem value="Tithe">Tithe</SelectItem>
                                     <SelectItem value="Offertory">Offertory</SelectItem>
-                                    <SelectItem value="Donation">Donation</SelectItem>
+                                    <SelectItem value="Project">Project Fund</SelectItem>
+                                    <SelectItem value="Donation">General Donation</SelectItem>
                                     <SelectItem value="Other">Other</SelectItem>
                                 </SelectContent></Select></FormItem>
                             )}/>
                         </div>
+
+                        {category === 'Project' && (
+                            <FormField control={form.control} name="projectId" render={({ field }) => (
+                                <FormItem><FormLabel className="text-xs font-black uppercase">Link to Specific Project</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue /></SelectTrigger></FormControl><SelectContent>
+                                    <SelectItem value="none">General Development Fund</SelectItem>
+                                    {projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>)}
+                                </Select></FormItem>
+                            )}/>
+                        )}
+
                         <FormField control={form.control} name="date" render={({ field }) => (
-                            <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel className="text-xs font-black uppercase">Date Received</FormLabel><FormControl><Input type="date" {...field} className="h-12" /></FormControl><FormMessage /></FormItem>
                         )}/>
+                        
                         <FormField control={form.control} name="notes" render={({ field }) => (
-                            <FormItem><FormLabel>Notes (Optional)</FormLabel><FormControl><Input placeholder="e.g. M-Pesa Ref ID" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel className="text-xs font-black uppercase">Notes / Reference</FormLabel><FormControl><Input placeholder="e.g. M-Pesa ID, Cheque No." {...field} className="h-12" /></FormControl><FormMessage /></FormItem>
                         )}/>
+
                         <DialogFooter>
-                            <Button type="submit" disabled={isSaving} className="w-full">
-                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DollarSign className="mr-2 h-4 w-4" />}
-                                Save Ledger Entry
+                            <Button type="submit" disabled={isSaving} className="w-full h-14 rounded-full font-black uppercase tracking-widest shadow-xl">
+                                {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <DollarSign className="mr-2 h-5 w-5" />}
+                                Commit to Ledger
                             </Button>
                         </DialogFooter>
                     </form>
@@ -205,11 +256,11 @@ export default function AdminFinancialsPage() {
         <Card className="border-none shadow-md bg-emerald-50">
             <CardHeader className="pb-2">
                 <CardTitle className="text-xs font-black uppercase tracking-widest text-emerald-800 flex items-center justify-between">
-                    Total Revenue <ArrowUpRight className="h-4 w-4" />
+                    Gross Revenue <ArrowUpRight className="h-4 w-4" />
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold text-emerald-950">{formatCurrency(totals.total)}</div>
+                <div className="text-3xl font-black text-emerald-950">{formatCurrency(totals.total)}</div>
             </CardContent>
         </Card>
         <Card className="border-none shadow-md bg-blue-50">
@@ -230,7 +281,7 @@ export default function AdminFinancialsPage() {
         </Card>
         <Card className="border-none shadow-md bg-slate-50">
             <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-800">Other Collections</CardTitle>
+                <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-800">Other Funds</CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="text-2xl font-bold text-slate-950">{formatCurrency(totals.other)}</div>
@@ -238,56 +289,64 @@ export default function AdminFinancialsPage() {
         </Card>
       </div>
 
-      <Card className="border-none shadow-md">
-        <CardHeader>
-          <CardTitle>Transaction History</CardTitle>
-          <CardDescription>Comprehensive list of all manually recorded contributions.</CardDescription>
+      <Card className="border-none shadow-xl rounded-2xl overflow-hidden">
+        <CardHeader className="bg-muted/30 border-b">
+          <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Registry Transaction History
+          </CardTitle>
+          <CardDescription>Comprehensive list of all office-recorded contributions.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-muted/10">
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Member</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="font-bold">Date</TableHead>
+                <TableHead className="font-bold">Contributor</TableHead>
+                <TableHead className="font-bold">Category</TableHead>
+                <TableHead className="font-bold">Amount</TableHead>
+                <TableHead className="text-right font-bold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-20 animate-pulse">Syncing Treasury...</TableCell></TableRow>
               ) : financials?.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No financial records found.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic">No financial records found in registry.</TableCell></TableRow>
               ) : (
                 (financials || []).map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="font-medium flex items-center gap-2">
-                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                        {entry.date ? format((entry.date as any).toDate ? (entry.date as any).toDate() : new Date(entry.date as any), 'MMM dd, yyyy') : 'N/A'}
+                  <TableRow key={entry.id} className="hover:bg-muted/30">
+                    <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            {entry.date ? format((entry.date as any).toDate ? (entry.date as any).toDate() : new Date(entry.date as any), 'MMM dd, yyyy') : 'N/A'}
+                        </div>
                     </TableCell>
                     <TableCell>
-                        <div className="flex items-center gap-2 font-bold">
-                            <User className="h-3 w-3 text-primary" />
-                            {entry.memberName}
+                        <div className="flex items-center gap-2">
+                            {entry.entryType === 'General' ? <Users className="h-4 w-4 text-muted-foreground" /> : <User className="h-4 w-4 text-primary" />}
+                            <div className="flex flex-col">
+                                <span className={cn("font-bold", entry.entryType === 'General' && "text-muted-foreground uppercase text-[10px]")}>{entry.memberName}</span>
+                                {entry.notes && <span className="text-[10px] text-muted-foreground italic truncate max-w-[200px]">{entry.notes}</span>}
+                            </div>
                         </div>
-                        {entry.notes && <p className="text-[10px] text-muted-foreground italic">{entry.notes}</p>}
                     </TableCell>
                     <TableCell>
                         <Badge variant="outline" className={cn(
-                            "font-bold text-[10px] uppercase",
+                            "font-black text-[10px] uppercase tracking-widest",
                             entry.category === 'Tithe' ? "border-blue-200 text-blue-700 bg-blue-50" :
                             entry.category === 'Offertory' ? "border-purple-200 text-purple-700 bg-purple-50" :
+                            entry.category === 'Project' ? "border-emerald-200 text-emerald-700 bg-emerald-50" :
                             "border-slate-200 text-slate-700 bg-slate-50"
                         )}>
                             {entry.category}
                         </Badge>
                     </TableCell>
-                    <TableCell className="font-black text-emerald-700">
+                    <TableCell className="font-black text-lg">
                         {formatCurrency(entry.amount)}
                     </TableCell>
                     <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleDelete(entry.id)}>
+                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 rounded-full" onClick={() => handleDelete(entry.id)}>
                             <Trash2 className="h-4 w-4" />
                         </Button>
                     </TableCell>

@@ -157,8 +157,10 @@ export type FinancialEntry = {
   id: string;
   date: Timestamp | Date;
   amount: number;
-  category: 'Tithe' | 'Offertory' | 'Donation' | 'Other';
+  category: 'Tithe' | 'Offertory' | 'Donation' | 'Project' | 'Other';
+  entryType: 'Individual' | 'General';
   memberName: string;
+  projectId?: string;
   notes?: string;
   createdAt: Timestamp;
 };
@@ -271,6 +273,7 @@ export type ParentInfo = {
 export type Child = {
     name?: string;
     age?: number;
+    gender?: 'Male' | 'Female';
     baptism?: boolean;
     confirmation?: boolean;
     eucharist?: boolean;
@@ -287,6 +290,7 @@ export type MemberProfile = {
     userId: string;
     fullName: string;
     age: number;
+    gender: 'Male' | 'Female';
     maritalStatus: 'Single' | 'Married' | 'Widowed' | 'Other';
     location: string;
     profession: string;

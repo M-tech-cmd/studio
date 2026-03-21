@@ -33,6 +33,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 const parentInfoSchema = z.object({
   name: z.string().optional(),
@@ -42,6 +44,7 @@ const parentInfoSchema = z.object({
 const childSchema = z.object({
     name: z.string().optional(),
     age: z.coerce.number().optional(),
+    gender: z.enum(['Male', 'Female']).default('Male'),
     baptism: z.boolean().default(false),
     confirmation: z.boolean().default(false),
     eucharist: z.boolean().default(false),
@@ -57,6 +60,7 @@ const profileSchema = z.object({
   fullName: z.string().min(3, "Full name is required."),
   email: z.string().email("A valid email is required."),
   age: z.coerce.number().min(1, "Age is required."),
+  gender: z.enum(['Male', 'Female']),
   maritalStatus: z.enum(['Single', 'Married', 'Widowed', 'Other']),
   location: z.string().min(2, "Location is required."),
   phone: z.string().min(1, "Phone number is required."),
@@ -130,7 +134,7 @@ export function MemberProfileForm() {
   const form = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-        fullName: '', email: user?.email || '', age: 0, maritalStatus: 'Single', location: '', phone: '', profession: '', employmentStatus: 'Employed', groupType: 'Families', sundayMassPreference: '1st Mass',
+        fullName: '', email: user?.email || '', age: 0, gender: 'Male', maritalStatus: 'Single', location: '', phone: '', profession: '', employmentStatus: 'Employed', groupType: 'Families', sundayMassPreference: '1st Mass',
         sccId: '', customSccName: '', parishGroupId: '', customParishGroupName: '', baptism: false, confirmation: false, eucharist: false, penance: false, anointing: false, matrimony: false, holyOrders: false,
         fatherInfo: { name: '', phone: '' }, motherInfo: { name: '', phone: '' }, children: [],
     }
@@ -143,10 +147,12 @@ export function MemberProfileForm() {
         form.reset({
             ...memberProfile,
             email: memberProfile.email || user?.email || '',
+            gender: memberProfile.gender || 'Male',
             sccId: memberProfile.sccId || '',
             parishGroupId: memberProfile.parishGroupId || '',
             children: (memberProfile.children || []).map(c => ({
                 ...c,
+                gender: c.gender || 'Male',
                 baptism: c.baptism || false,
                 confirmation: c.confirmation || false,
                 eucharist: c.eucharist || false,
@@ -162,11 +168,11 @@ export function MemberProfileForm() {
   async function onSubmit(values: z.infer<typeof profileSchema>) {
     if (!user || !firestore) return;
     try {
-      // SAFE CHECK: Defend against undefined fields before writing to Firestore
       const sanitizedValues = {
         fullName: values.fullName || "",
         email: values.email || "",
         age: values.age || 0,
+        gender: values.gender || 'Male',
         maritalStatus: values.maritalStatus || "Single",
         location: values.location || "",
         phone: values.phone || "",
@@ -196,6 +202,7 @@ export function MemberProfileForm() {
         children: (values.children || []).map(c => ({
           name: c.name || "",
           age: c.age || 0,
+          gender: c.gender || 'Male',
           baptism: c.baptism ?? false,
           confirmation: c.confirmation ?? false,
           eucharist: c.eucharist ?? false,
@@ -253,15 +260,38 @@ export function MemberProfileForm() {
                                     <FormField control={form.control} name="age" render={({ field }) => (
                                         <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest">Age</FormLabel><FormControl><Input type="number" {...field} className="h-12" /></FormControl></FormItem>
                                     )}/>
+                                    <FormField control={form.control} name="gender" render={({ field }) => (
+                                        <FormItem className="space-y-3">
+                                            <FormLabel className="text-[10px] font-black uppercase tracking-widest">Gender</FormLabel>
+                                            <FormControl>
+                                                <RadioGroup
+                                                    onValueChange={field.onChange}
+                                                    defaultValue={field.value}
+                                                    className="flex space-x-4"
+                                                >
+                                                    <div className="flex items-center space-x-2">
+                                                        <RadioGroupItem value="Male" id="m" />
+                                                        <Label htmlFor="m">Male</Label>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <RadioGroupItem value="Female" id="f" />
+                                                        <Label htmlFor="f">Female</Label>
+                                                    </div>
+                                                </RadioGroup>
+                                            </FormControl>
+                                        </FormItem>
+                                    )}/>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
                                     <FormField control={form.control} name="maritalStatus" render={({ field }) => (
                                         <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest">Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue/></SelectTrigger></FormControl><SelectContent>
                                             {['Single', 'Married', 'Widowed', 'Other'].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                                         </SelectContent></Select></FormItem>
                                     )}/>
+                                    <FormField control={form.control} name="location" render={({ field }) => (
+                                        <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest">Residence (Area)</FormLabel><FormControl><Input {...field} className="h-12" /></FormControl></FormItem>
+                                    )}/>
                                 </div>
-                                <FormField control={form.control} name="location" render={({ field }) => (
-                                    <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest">Residence (Area)</FormLabel><FormControl><Input {...field} className="h-12" /></FormControl></FormItem>
-                                )}/>
                                  <FormField control={form.control} name="phone" render={({ field }) => (
                                     <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest">Phone Number</FormLabel><FormControl><PhoneInput defaultCountry="KE" {...field} className="h-12" /></FormControl></FormItem>
                                 )}/>
@@ -368,7 +398,7 @@ export function MemberProfileForm() {
                             <div className="space-y-6 pt-6 border-t border-dashed">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                     <h4 className="font-bold text-sm uppercase">Children Registry ({fields.length})</h4>
-                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ name: '', age: 0, baptism: false, confirmation: false, eucharist: false, penance: false, anointing: false, matrimony: false, holyOrders: false })} className="rounded-full gap-2">
+                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ name: '', age: 0, gender: 'Male', baptism: false, confirmation: false, eucharist: false, penance: false, anointing: false, matrimony: false, holyOrders: false })} className="rounded-full gap-2">
                                         <PlusCircle className="h-4 w-4" /> Add Child
                                     </Button>
                                 </div>
@@ -380,9 +410,23 @@ export function MemberProfileForm() {
                                             <FormField control={form.control} name={`children.${index}.name`} render={({ field }) => (
                                                 <FormItem><FormLabel className="text-[10px] uppercase font-bold">Child Name</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                                             )}/>
-                                            <FormField control={form.control} name={`children.${index}.age`} render={({ field }) => (
-                                                <FormItem><FormLabel className="text-[10px] uppercase font-bold">Age</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                                            )}/>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <FormField control={form.control} name={`children.${index}.age`} render={({ field }) => (
+                                                    <FormItem><FormLabel className="text-[10px] uppercase font-bold">Age</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                                                )}/>
+                                                <FormField control={form.control} name={`children.${index}.gender`} render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel className="text-[10px] uppercase font-bold">Gender</FormLabel>
+                                                        <Select onValueChange={field.onChange} value={field.value}>
+                                                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                                            <SelectContent>
+                                                                <SelectItem value="Male">Male</SelectItem>
+                                                                <SelectItem value="Female">Female</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </FormItem>
+                                                )}/>
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <FormField control={form.control} name={`children.${index}.parishGroupId`} render={({ field }) => (
@@ -391,7 +435,7 @@ export function MemberProfileForm() {
                                                     <SelectItem value="none">None</SelectItem>
                                                     {otherGroups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
                                                     <SelectItem value="other_child_group">Other / Custom</SelectItem>
-                                                </SelectContent></Select></FormItem>
+                                                </Select></FormItem>
                                             )}/>
                                             {form.watch(`children.${index}.parishGroupId`) === 'other_child_group' && (
                                                 <FormField control={form.control} name={`children.${index}.customGroupName`} render={({ field }) => (
