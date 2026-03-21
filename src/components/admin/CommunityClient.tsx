@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { PlusCircle, Edit, Trash2, Users } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Users, Phone } from 'lucide-react';
 import type { CommunityGroup } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -100,13 +100,14 @@ export function CommunityClient() {
                 <TableHead>Group Name</TableHead>
                 <TableHead className="hidden md:table-cell">Type</TableHead>
                 <TableHead className="hidden sm:table-cell">Leader</TableHead>
+                <TableHead className="hidden lg:table-cell">Contact Phone</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center py-20 animate-pulse opacity-50">Loading registry...</TableCell>
+                    <TableCell colSpan={5} className="text-center py-20 animate-pulse opacity-50">Loading registry...</TableCell>
                 </TableRow>
               ) : (
                 (groups || []).map((group) => (
@@ -122,6 +123,12 @@ export function CommunityClient() {
                         <Badge variant="outline" className="text-[10px] font-black uppercase">{group.type}</Badge>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-sm font-medium">{group.leader}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm font-medium">
+                        <a href={`tel:${group.contactPhone}`} className="flex items-center gap-2 hover:text-primary transition-colors">
+                            <Phone className="h-3 w-3" />
+                            {group.contactPhone}
+                        </a>
+                    </TableCell>
                     <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                         <Button

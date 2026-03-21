@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Expand, User, Clock, Mail, Loader2 } from 'lucide-react';
+import { Expand, User, Clock, Phone, Loader2 } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadSingleFile, uploadMultipleFiles } from '@/lib/upload-utils';
@@ -41,6 +41,7 @@ import { LargeTextEditModal } from './LargeTextEditModal';
 import { ImageUpload } from './ImageUpload';
 import { MultiImageUpload } from './MultiImageUpload';
 import { useToast } from '@/hooks/use-toast';
+import { PhoneInput } from '../ui/phone-input';
 
 const groupSchema = z.object({
   name: z.string().min(3, 'Group Name required.'),
@@ -48,7 +49,7 @@ const groupSchema = z.object({
   description: z.string().min(10, 'Description required.'),
   goals: z.string().optional(),
   leader: z.string().min(3, 'Leader name required.'),
-  contact: z.string().email('Valid email required.'),
+  contactPhone: z.string().min(1, 'Phone number required.'),
   schedule: z.string().min(3, 'Schedule required.'),
   imageUrl: z.string().default(''),
   memberCount: z.coerce.number().min(0).default(0),
@@ -78,7 +79,7 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
       description: group?.description || '',
       goals: group?.goals || '',
       leader: group?.leader || '',
-      contact: group?.contact || '',
+      contactPhone: group?.contactPhone || '',
       schedule: group?.schedule || '',
       imageUrl: group?.imageUrl || '',
       memberCount: group?.memberCount || 0,
@@ -115,7 +116,7 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
             description: values.description,
             goals: values.goals || '',
             leader: values.leader,
-            contact: values.contact,
+            contactPhone: values.contactPhone,
             schedule: values.schedule,
             memberCount: values.memberCount,
             familyCount: values.familyCount,
@@ -185,8 +186,8 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
                                 <FormField control={form.control} name="leader" render={({ field }) => (
                                     <FormItem><FormLabel className="font-bold flex items-center gap-2"><User className="h-4 w-4" /> Leader *</FormLabel><FormControl><Input {...field} disabled={isSaving} /></FormControl></FormItem>
                                 )}/>
-                                <FormField control={form.control} name="contact" render={({ field }) => (
-                                    <FormItem><FormLabel className="font-bold flex items-center gap-2"><Mail className="h-4 w-4" /> Contact Email *</FormLabel><FormControl><Input type="email" {...field} disabled={isSaving} /></FormControl></FormItem>
+                                <FormField control={form.control} name="contactPhone" render={({ field }) => (
+                                    <FormItem><FormLabel className="font-bold flex items-center gap-2"><Phone className="h-4 w-4" /> Contact Phone Number *</FormLabel><FormControl><PhoneInput defaultCountry="KE" {...field} disabled={isSaving} /></FormControl></FormItem>
                                 )}/>
                             </div>
 

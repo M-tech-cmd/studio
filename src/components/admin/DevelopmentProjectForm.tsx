@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Expand, Target, TrendingUp, Loader2 } from 'lucide-react';
+import { Expand, Target, TrendingUp, Phone, Loader2 } from 'lucide-react';
 import { useFirestore } from '@/firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadSingleFile, uploadMultipleFiles } from '@/lib/upload-utils';
@@ -42,6 +42,7 @@ import { LargeTextEditModal } from './LargeTextEditModal';
 import { ImageUpload } from './ImageUpload';
 import { MultiImageUpload } from './MultiImageUpload';
 import { useToast } from '@/hooks/use-toast';
+import { PhoneInput } from '../ui/phone-input';
 
 const projectSchema = z.object({
   title: z.string().min(3, 'Title required.'),
@@ -52,6 +53,7 @@ const projectSchema = z.object({
   imageUrl: z.string().default(''),
   public: z.boolean().default(true),
   galleryImages: z.array(z.string()).default([]),
+  contactPhone: z.string().optional(),
 });
 
 type DevelopmentProjectFormProps = {
@@ -79,6 +81,7 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
       imageUrl: project?.imageUrl || '',
       public: project?.public ?? true,
       galleryImages: project?.galleryImages || [],
+      contactPhone: project?.contactPhone || '',
     },
   });
 
@@ -113,6 +116,7 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
             imageUrl: finalBannerUrl,
             galleryImages: finalGallery,
             public: values.public,
+            contactPhone: values.contactPhone || '',
             updatedAt: serverTimestamp(),
         };
 
@@ -179,6 +183,10 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
                                     <FormItem><FormLabel className="text-xs font-black uppercase tracking-widest opacity-60"><Target className="h-3 w-3 inline mr-1" /> Total Goal (KES)</FormLabel><FormControl><Input type="number" {...field} disabled={isSaving} className="h-12 font-bold" /></FormControl></FormItem>
                                 )}/>
                             </div>
+
+                            <FormField control={form.control} name="contactPhone" render={({ field }) => (
+                                <FormItem><FormLabel className="font-bold flex items-center gap-2"><Phone className="h-4 w-4" /> Inquiry Phone Number</FormLabel><FormControl><PhoneInput defaultCountry="KE" {...field} disabled={isSaving} /></FormControl></FormItem>
+                            )}/>
 
                             <FormField control={form.control} name="status" render={({ field }) => (
                                 <FormItem><FormLabel className="font-bold">Project Lifecycle</FormLabel>

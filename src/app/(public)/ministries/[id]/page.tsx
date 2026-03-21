@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, User, Clock, Mail, Info, ShieldCheck, Heart, Target } from 'lucide-react';
+import { ArrowLeft, User, Clock, Phone, Info, ShieldCheck, Heart, Target } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,6 +50,8 @@ export default function MinistryDetailPage() {
         </div>
     );
   }
+
+  const sanitizedPhone = ministry.contactPhone ? ministry.contactPhone.replace(/\D/g, '') : '';
 
   return (
     <div className="bg-transparent animate-in fade-in duration-700">
@@ -129,11 +130,11 @@ export default function MinistryDetailPage() {
                     </div>
                     <div className="flex items-start gap-4">
                         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
-                            <Mail className="h-5 w-5" />
+                            <Phone className="h-5 w-5" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Contact Office</p>
-                            <a href={`mailto:${ministry.contact}`} className="font-bold text-lg hover:text-primary transition-colors">{ministry.contact}</a>
+                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Contact Phone</p>
+                            <a href={`tel:${sanitizedPhone}`} className="font-bold text-lg hover:text-primary transition-colors">{ministry.contactPhone}</a>
                         </div>
                     </div>
               </div>
@@ -142,7 +143,7 @@ export default function MinistryDetailPage() {
                 <h4 className="text-xl font-black mb-2 uppercase tracking-tighter">Ready to Serve?</h4>
                 <p className="text-muted-foreground mb-6">"As each has received a gift, use it to serve one another, as good stewards of God's varied grace." (1 Peter 4:10)</p>
                 <Button asChild className="rounded-full px-8 h-12 font-bold shadow-lg">
-                    <a href={`mailto:${ministry.contact}?subject=Joining ${ministry.name}`}>Get Involved Today</a>
+                    <a href={`tel:${sanitizedPhone}`}>Call to Volunteer</a>
                 </Button>
               </div>
             </CardContent>

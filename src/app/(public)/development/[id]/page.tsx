@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import { ArrowLeft, Target, TrendingUp, Info, DollarSign } from 'lucide-react';
+import { ArrowLeft, Target, TrendingUp, Info, DollarSign, Phone } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -64,6 +63,7 @@ export default function DevelopmentProjectDetailPage() {
   };
 
   const progressPercentage = Math.min(Math.round((project.currentAmount / project.goalAmount) * 100), 100);
+  const sanitizedPhone = project.contactPhone ? project.contactPhone.replace(/\D/g, '') : '';
 
   return (
     <div className="bg-transparent animate-in fade-in duration-700">
@@ -123,6 +123,18 @@ export default function DevelopmentProjectDetailPage() {
                         </div>
                     </div>
                 </div>
+
+                {project.contactPhone && (
+                    <div className="flex items-center gap-4 p-6 bg-primary/5 rounded-2xl border border-primary/10">
+                        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                            <Phone className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Project Inquiry</p>
+                            <a href={`tel:${sanitizedPhone}`} className="text-xl font-bold hover:text-primary transition-colors">{project.contactPhone}</a>
+                        </div>
+                    </div>
+                )}
             </CardContent>
             {project.status !== 'Completed' && (
                 <CardFooter className="p-8 md:p-12 bg-muted/10 border-t flex flex-col items-center">

@@ -55,7 +55,7 @@ export type CommunityGroup = {
   description: string;
   type: 'Small Christian Community' | 'Group' | 'Choir' | 'Ministry';
   leader: string;
-  contact: string;
+  contactPhone: string;
   schedule: string;
   imageUrl: string;
   imageHint: string;
@@ -76,6 +76,7 @@ export type DevelopmentProject = {
   imageHint: string;
   public: boolean;
   galleryImages?: string[];
+  contactPhone?: string;
 };
 
 export type Document = {

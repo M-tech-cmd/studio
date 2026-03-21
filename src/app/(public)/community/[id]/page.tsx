@@ -1,11 +1,10 @@
-
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { ArrowLeft, User, Clock, Mail, Users, Info, ShieldCheck, Target } from 'lucide-react';
+import { ArrowLeft, User, Clock, Phone, Users, Info, ShieldCheck, Target } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,6 +56,8 @@ export default function CommunityGroupDetailPage() {
         </div>
     );
   }
+
+  const sanitizedPhone = group.contactPhone ? group.contactPhone.replace(/\D/g, '') : '';
 
   return (
     <div className="bg-transparent animate-in fade-in duration-700">
@@ -135,11 +136,11 @@ export default function CommunityGroupDetailPage() {
                     </div>
                     <div className="flex items-start gap-4">
                         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
-                            <Mail className="h-5 w-5" />
+                            <Phone className="h-5 w-5" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Contact</p>
-                            <a href={`mailto:${group.contact}`} className="font-bold text-lg hover:text-primary transition-colors">{group.contact}</a>
+                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Contact Leader</p>
+                            <a href={`tel:${sanitizedPhone}`} className="font-bold text-lg hover:text-primary transition-colors">{group.contactPhone}</a>
                         </div>
                     </div>
               </div>
