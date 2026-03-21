@@ -2,7 +2,7 @@
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection } from "firebase/firestore";
-import type { MemberProfile, RegisteredUser } from "@/lib/types";
+import type { MemberProfile, RegisteredUser, CommunityGroup } from "@/lib/types";
 import { useMemo } from "react";
 import { Area, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Line, ComposedChart, Bar } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,16 +12,27 @@ export function GrowthChart() {
     
     const membersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'members') : null, [firestore]);
     const usersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
+    const groupsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'community_groups') : null, [firestore]);
     
     const { data: members, isLoading: membersLoading } = useCollection<MemberProfile>(membersQuery);
     const { data: users, isLoading: usersLoading } = useCollection<RegisteredUser>(usersQuery);
+    const { data: groups, isLoading: groupsLoading } = useCollection<CommunityGroup>(groupsQuery);
     
     const chartData = useMemo(() => {
-        if (!members || !users) return [];
+        if (!members || !users || !groups) return [];
 
         const now = new Date();
         const months: { date: Date; key: string }[] = [];
         
+        // Helper to extract IDs based on name keywords
+        const getGroupIds = (names: string[]) => 
+            groups.filter(g => names.includes(g.name)).map(g => g.id);
+
+        const menGroupIds = getGroupIds(['CMA', 'Sacred Heart (Men)']);
+        const womenGroupIds = getGroupIds(['CWA', 'Sacred Heart (Women)']);
+        const youthGroupIds = getGroupIds(['MYM', 'YCA', 'YSC']);
+        const childrenGroupIds = getGroupIds(['PMC']);
+
         // Generate last 12 months in ascending order
         for (let i = 11; i >= 0; i--) {
             const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -33,8 +44,10 @@ export function GrowthChart() {
         
         return months.map(({ date, key }) => {
             let totalAppUsers = 0;
-            let totalCommunityMembers = 0;
+            let totalMen = 0;
+            let totalWomen = 0;
             let totalYouth = 0;
+            let totalChildren = 0;
             let monthlyProfileGrowth = 0;
 
             const nextMonthStart = new Date(date.getFullYear(), date.getMonth() + 1, 1);
@@ -49,14 +62,18 @@ export function GrowthChart() {
                 }
             });
 
-            // Member Profiles
+            // Member Profiles & Demographics
             members.forEach(member => {
                 if (!member.createdAt) return;
                 const createdAt = (member.createdAt as any).toDate ? (member.createdAt as any).toDate() : new Date(member.createdAt as any);
                 
                 if (createdAt < nextMonthStart) {
-                    totalCommunityMembers++;
-                    if (member.groupType === 'YCS' || member.groupType === 'YCA') totalYouth++;
+                    const gid = member.parishGroupId || '';
+                    
+                    if (menGroupIds.includes(gid)) totalMen++;
+                    else if (womenGroupIds.includes(gid)) totalWomen++;
+                    else if (youthGroupIds.includes(gid)) totalYouth++;
+                    else if (childrenGroupIds.includes(gid)) totalChildren++;
                     
                     if (createdAt >= monthStart) {
                         monthlyProfileGrowth++;
@@ -66,15 +83,17 @@ export function GrowthChart() {
 
             return {
                 name: date.toLocaleString('default', { month: 'short' }),
-                "App Users": totalAppUsers,
-                "Community Members": totalCommunityMembers,
-                "Youth/Children": totalYouth,
                 "New Profiles": monthlyProfileGrowth,
+                "App Users": totalAppUsers,
+                "Men": totalMen,
+                "Women": totalWomen,
+                "Youth": totalYouth,
+                "Children": totalChildren,
             };
         });
-    }, [members, users]);
+    }, [members, users, groups]);
     
-    if (membersLoading || usersLoading) {
+    if (membersLoading || usersLoading || groupsLoading) {
         return <Skeleton className="h-[350px] w-full" />;
     }
 
@@ -104,36 +123,60 @@ export function GrowthChart() {
                         allowDecimals={false}
                     />
                     <Tooltip 
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                        contentStyle={{ 
+                            borderRadius: '12px', 
+                            border: 'none', 
+                            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                            padding: '12px'
+                        }}
                     />
-                    <Legend verticalAlign="top" align="right" height={36}/>
+                    <Legend verticalAlign="top" align="right" height={36} iconType="circle" />
                     
-                    {/* New Profile Growth as Bars */}
+                    {/* Monthly Growth as Bar */}
                     <Bar dataKey="New Profiles" barSize={20} fill="#d4a574" radius={[4, 4, 0, 0]} opacity={0.6} />
                     
-                    {/* Cumulative Data as Lines/Areas */}
+                    {/* Cumulative App Data as Area */}
                     <Area 
                         type="monotone" 
                         dataKey="App Users" 
                         stroke="#1e3a5f" 
-                        fillOpacity={0.1} 
+                        fillOpacity={0.05} 
                         fill="#1e3a5f" 
                         strokeWidth={3}
                     />
+
+                    {/* Demographic Series as Lines */}
                     <Line 
                         type="monotone" 
-                        dataKey="Community Members" 
-                        stroke="#10b981" 
+                        dataKey="Men" 
+                        stroke="#3b82f6" 
                         strokeWidth={2} 
-                        dot={{ r: 4 }} 
-                        activeDot={{ r: 6 }} 
+                        dot={{ r: 3 }} 
+                        activeDot={{ r: 5 }} 
                     />
                     <Line 
                         type="monotone" 
-                        dataKey="Youth/Children" 
-                        stroke="#8b5cf6" 
+                        dataKey="Women" 
+                        stroke="#ec4899" 
                         strokeWidth={2} 
-                        dot={{ r: 4 }} 
+                        dot={{ r: 3 }} 
+                        activeDot={{ r: 5 }} 
+                    />
+                    <Line 
+                        type="monotone" 
+                        dataKey="Youth" 
+                        stroke="#10b981" 
+                        strokeWidth={2} 
+                        dot={{ r: 3 }} 
+                        activeDot={{ r: 5 }} 
+                    />
+                    <Line 
+                        type="monotone" 
+                        dataKey="Children" 
+                        stroke="#f97316" 
+                        strokeWidth={2} 
+                        dot={{ r: 3 }} 
+                        activeDot={{ r: 5 }} 
                     />
                 </ComposedChart>
             </ResponsiveContainer>
