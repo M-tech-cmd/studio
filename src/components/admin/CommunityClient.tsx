@@ -148,7 +148,6 @@ export function CommunityClient() {
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                                <AccordionTrigger className="sr-only" />
                                 <AlertDialogCancel className="rounded-full">Abort</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => handleDelete(group.id)} className="bg-destructive text-white rounded-full">Confirm Delete</AlertDialogAction>
                             </AlertDialogFooter>
