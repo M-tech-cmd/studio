@@ -33,10 +33,12 @@ import { addDoc, collection, deleteDoc, doc, query, updateDoc, orderBy } from 'f
 
 /**
  * Isolated Profiles Client Component.
- * Extracted to allow for high-priority dynamic chunk loading.
+ * Extracted to allow for high-priority dynamic chunk loading and resolve Webpack import errors.
  */
 export function ProfilesClient() {
   const firestore = useFirestore();
+  const { toast } = useToast();
+
   const profilesQuery = useMemoFirebase(() => {
       if (!firestore) return null;
       return query(collection(firestore, 'profiles'), orderBy('name'));
@@ -45,7 +47,6 @@ export function ProfilesClient() {
   const { data: profiles, isLoading } = useCollection<Profile>(profilesQuery);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
-  const { toast } = useToast();
 
   const handleAddClick = () => {
     setSelectedProfile(null);
@@ -61,7 +62,7 @@ export function ProfilesClient() {
     if (!firestore) return;
     const profileDoc = doc(firestore, 'profiles', id);
     
-    // INSTANT FEEDBACK
+    // INSTANT UI FEEDBACK
     toast({ title: 'Removing Profile...', description: 'Registry update initiated.' });
 
     deleteDoc(profileDoc)
@@ -91,8 +92,7 @@ export function ProfilesClient() {
 
     // 2. BACKGROUND DATA SYNC
     if (isNew) {
-        const dataToAdd = { ...profileData };
-        delete dataToAdd.id;
+        const { id, ...dataToAdd } = profileData;
         const profilesCollection = collection(firestore, 'profiles');
         addDoc(profilesCollection, dataToAdd)
             .catch(() => {
@@ -133,7 +133,7 @@ export function ProfilesClient() {
       </div>
 
       <Card className="border-none shadow-xl rounded-2xl overflow-hidden">
-        <CardHeader className="bg-muted/30">
+        <CardHeader className="bg-muted/30 border-b">
           <CardTitle>Staff Registry ({profiles?.length || 0})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -158,11 +158,11 @@ export function ProfilesClient() {
                     <TableCell>
                         <Avatar className="border-2 border-white shadow-sm">
                             <AvatarImage src={profile.imageUrl} alt={profile.name} />
-                            <AvatarFallback><User /></AvatarFallback>
+                            <AvatarFallback className="bg-primary/5 text-primary"><User className="h-4 w-4" /></AvatarFallback>
                         </Avatar>
                     </TableCell>
                     <TableCell className="font-bold text-primary">{profile.name}</TableCell>
-                    <TableCell className="hidden md:table-cell">{profile.role}</TableCell>
+                    <TableCell className="hidden md:table-cell font-medium">{profile.role}</TableCell>
                     <TableCell className="hidden sm:table-cell">
                         <Badge variant={profile.active === false ? 'destructive' : 'default'} className={profile.active === false ? '' : 'bg-green-600'}>
                         {profile.active === false ? 'Inactive' : 'Active'}
@@ -173,7 +173,7 @@ export function ProfilesClient() {
                         <Button
                             variant="outline"
                             size="icon"
-                            className="rounded-full"
+                            className="rounded-full h-8 w-8"
                             onClick={() => handleEditClick(profile)}
                         >
                             <Edit className="h-4 w-4" />
@@ -181,7 +181,7 @@ export function ProfilesClient() {
                         </Button>
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon" className="rounded-full">
+                            <Button variant="destructive" size="icon" className="rounded-full h-8 w-8">
                                 <Trash2 className="h-4 w-4" />
                                 <span className="sr-only">Delete</span>
                             </Button>
