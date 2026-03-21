@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Expand, User, Clock, Mail, Loader2 } from 'lucide-react';
-import { useFirestore, useStorage } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadSingleFile, uploadMultipleFiles } from '@/lib/upload-utils';
 
@@ -63,7 +63,6 @@ type CommunityGroupFormProps = {
 
 export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) {
   const firestore = useFirestore();
-  const storage = useStorage();
   const { toast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -89,7 +88,7 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
   });
 
   const handleSubmit = async () => {
-    if (!firestore || !storage) return;
+    if (!firestore) return;
     
     const values = form.getValues();
     if (!values.name?.trim()) return;
@@ -97,19 +96,29 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
     setIsSaving(true);
 
     try {
+        console.log('[Community] Syncing entity:', values.name);
+        
         let finalBannerUrl = values.imageUrl;
         if (bannerFile) {
-            finalBannerUrl = await uploadSingleFile(storage, 'communities', bannerFile);
+            finalBannerUrl = await uploadSingleFile(null, 'communities', bannerFile);
         }
 
-        const newGalleryUrls = (galleryFiles.length > 0) 
-            ? await uploadMultipleFiles(storage, 'communities', galleryFiles) 
+        const newGalleryUrls = (galleryFiles && galleryFiles.length > 0) 
+            ? await uploadMultipleFiles(null, 'communities', galleryFiles) 
             : [];
         
         const finalGallery = [...(values.galleryImages || []), ...newGalleryUrls];
 
         const groupData = {
-            ...values,
+            name: values.name,
+            type: values.type,
+            description: values.description,
+            goals: values.goals || '',
+            leader: values.leader,
+            contact: values.contact,
+            schedule: values.schedule,
+            memberCount: values.memberCount,
+            familyCount: values.familyCount,
             imageUrl: finalBannerUrl,
             galleryImages: finalGallery,
             updatedAt: serverTimestamp(),
@@ -195,10 +204,10 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
                             <FormField name="imageUrl" render={() => (
                                 <FormItem>
                                     <ImageUpload 
-                                      value={form.watch('imageUrl')} 
+                                      value={form.watch('imageUrl') || ''} 
                                       file={bannerFile}
                                       onChange={(url, file) => {
-                                        form.setValue('imageUrl', url);
+                                        form.setValue('imageUrl', url || '');
                                         setBannerFile(file);
                                       }}
                                       folder="communities" 
@@ -213,11 +222,11 @@ export function CommunityGroupForm({ group, onClose }: CommunityGroupFormProps) 
 
                 <TabsContent value="gallery" className="p-6 m-0">
                     <MultiImageUpload 
-                        existingImages={form.watch('galleryImages')} 
-                        newFiles={galleryFiles}
+                        existingImages={form.watch('galleryImages') || []} 
+                        newFiles={galleryFiles || []}
                         onChange={(existing, files) => {
-                          form.setValue('galleryImages', existing);
-                          setGalleryFiles(files);
+                          form.setValue('galleryImages', existing || []);
+                          setGalleryFiles(files || []);
                         }}
                         label="Community Gallery Assets"
                     />

@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Loader2 } from 'lucide-react';
-import { useFirestore, useStorage } from '@/firebase';
+import { useFirestore, useUser } from '@/firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadMultipleFiles } from '@/lib/upload-utils';
 
@@ -42,13 +42,12 @@ const postSchema = z.object({
 
 type BulletinPostFormProps = {
   post: BulletinPost | null;
-  author: { uid: string; name: string };
   onClose: () => void;
 };
 
-export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProps) {
+export function BulletinPostForm({ post, onClose }: BulletinPostFormProps) {
   const firestore = useFirestore();
-  const storage = useStorage();
+  const { user } = useUser();
   const { toast } = useToast();
   
   const [isSaving, setIsSaving] = useState(false);
@@ -65,7 +64,7 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
   });
 
   const handleSubmit = async () => {
-    if (!firestore || !storage) return;
+    if (!firestore || !user) return;
     
     const values = form.getValues();
     if (!values.title?.trim()) return;
@@ -73,14 +72,18 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
     setIsSaving(true);
 
     try {
-        const newUrls = (galleryFiles.length > 0) 
-            ? await uploadMultipleFiles(storage, 'bulletins', galleryFiles) 
+        console.log('[Bulletin] Initiating sync for:', values.title);
+        
+        const newUrls = (galleryFiles && galleryFiles.length > 0) 
+            ? await uploadMultipleFiles(null, 'bulletins', galleryFiles) 
             : [];
         
         const finalGallery = [...(values.galleryImages || []), ...newUrls];
 
         const postData = {
-            ...values,
+            title: values.title,
+            content: values.content,
+            category: values.category,
             galleryImages: finalGallery,
             updatedAt: serverTimestamp(),
         };
@@ -90,8 +93,8 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
         } else {
             await addDoc(collection(firestore, 'bulletins'), {
                 ...postData,
-                authorId: author.uid,
-                authorName: author.name,
+                authorId: user.uid,
+                authorName: user.displayName || user.email?.split('@')[0] || 'Admin',
                 createdAt: serverTimestamp(),
                 reactions: {},
             });
@@ -161,11 +164,11 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
 
                 <TabsContent value="gallery" className="p-6 m-0">
                     <MultiImageUpload 
-                        existingImages={form.watch('galleryImages')} 
-                        newFiles={galleryFiles}
+                        existingImages={form.watch('galleryImages') || []} 
+                        newFiles={galleryFiles || []}
                         onChange={(existing, files) => {
-                          form.setValue('galleryImages', existing);
-                          setGalleryFiles(files);
+                          form.setValue('galleryImages', existing || []);
+                          setGalleryFiles(files || []);
                         }}
                         label="Post Media Assets"
                     />

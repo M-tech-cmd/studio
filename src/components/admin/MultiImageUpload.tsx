@@ -16,16 +16,18 @@ interface MultiImageUploadProps {
  * Multi-Media Selection Component (Cloudinary Engine).
  * Supports Images, Video, and Audio concurrently.
  */
-export function MultiImageUpload({ existingImages, newFiles, onChange, label }: MultiImageUploadProps) {
+export function MultiImageUpload({ existingImages = [], newFiles = [], onChange, label }: MultiImageUploadProps) {
   const [previews, setPreviews] = useState<{ id: string; url: string }[]>([]);
 
   useEffect(() => {
     return () => {
-      previews.forEach(p => {
-        if (p.url.startsWith('blob:')) {
-          URL.revokeObjectURL(p.url);
-        }
-      });
+      if (previews && previews.length > 0) {
+          previews.forEach(p => {
+            if (p.url && p.url.startsWith('blob:')) {
+              URL.revokeObjectURL(p.url);
+            }
+          });
+      }
     };
   }, [previews]);
 
@@ -40,35 +42,35 @@ export function MultiImageUpload({ existingImages, newFiles, onChange, label }: 
       url: URL.createObjectURL(file)
     }));
 
-    setPreviews(prev => [...prev, ...newPreviews]);
-    onChange(existingImages, [...newFiles, ...selectedFiles]);
+    setPreviews(prev => [...(prev || []), ...newPreviews]);
+    onChange(existingImages || [], [...(newFiles || []), ...selectedFiles]);
 
     if (e.target) e.target.value = '';
   };
 
   const removeExisting = (index: number) => {
-    const next = [...existingImages];
+    const next = [...(existingImages || [])];
     next.splice(index, 1);
-    onChange(next, newFiles);
+    onChange(next, newFiles || []);
   };
 
   const removeNew = (id: string, fileIndex: number) => {
-    const previewToRemove = previews.find(p => p.id === id);
+    const previewToRemove = (previews || []).find(p => p.id === id);
     if (previewToRemove) {
-      URL.revokeObjectURL(previewToRemove.url);
-      setPreviews(prev => prev.filter(p => p.id !== id));
+      if (previewToRemove.url.startsWith('blob:')) URL.revokeObjectURL(previewToRemove.url);
+      setPreviews(prev => (prev || []).filter(p => p.id !== id));
     }
     
-    const nextFiles = [...newFiles];
+    const nextFiles = [...(newFiles || [])];
     nextFiles.splice(fileIndex, 1);
-    onChange(existingImages, nextFiles);
+    onChange(existingImages || [], nextFiles);
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Label className="font-bold text-sm uppercase tracking-tight">
-          {label || 'Gallery Media'} ({existingImages.length + newFiles.length})
+          {label || 'Gallery Media'} ({(existingImages?.length || 0) + (newFiles?.length || 0)})
         </Label>
         <label className="cursor-pointer">
           <div className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-full text-xs font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-lg active:scale-95">
@@ -80,7 +82,7 @@ export function MultiImageUpload({ existingImages, newFiles, onChange, label }: 
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {existingImages.map((url, index) => (
+        {(existingImages || []).map((url, index) => (
           <MediaItem 
             key={`existing-${index}`} 
             url={url} 
@@ -88,7 +90,7 @@ export function MultiImageUpload({ existingImages, newFiles, onChange, label }: 
           />
         ))}
 
-        {previews.map((preview, index) => (
+        {(previews || []).map((preview, index) => (
           <div key={preview.id} className="relative group animate-in fade-in zoom-in-95 duration-300">
             <MediaItem 
               url={preview.url} 
@@ -97,7 +99,7 @@ export function MultiImageUpload({ existingImages, newFiles, onChange, label }: 
           </div>
         ))}
 
-        {existingImages.length === 0 && newFiles.length === 0 && (
+        {(!existingImages || existingImages.length === 0) && (!newFiles || newFiles.length === 0) && (
           <div className="col-span-full py-16 flex flex-col items-center justify-center text-muted-foreground/30 bg-muted/5 border-4 border-dashed rounded-[2rem] transition-colors hover:bg-muted/10">
             <Upload className="h-10 w-10 mb-4 opacity-20" />
             <p className="text-[10px] font-black uppercase tracking-[0.4em]">Archive is Empty</p>

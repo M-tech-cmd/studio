@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { Upload, Link as LinkIcon, X, Film, Music } from 'lucide-react';
+import { Upload, Link as LinkIcon, X, Film, Music, Mic } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,9 +31,11 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
       const objectUrl = URL.createObjectURL(file);
       setPreview(objectUrl);
       setFileType(file.type);
-      return () => URL.revokeObjectURL(objectUrl);
+      return () => {
+          if (objectUrl.startsWith('blob:')) URL.revokeObjectURL(objectUrl);
+      };
     } else {
-      setPreview(value);
+      setPreview(value || '');
       setFileType('');
     }
   }, [value, file]);
@@ -53,8 +55,8 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const isVideo = fileType.startsWith('video/') || preview.toLowerCase().match(/\.(mp4|mov|webm)/);
-  const isAudio = fileType.startsWith('audio/') || preview.toLowerCase().match(/\.(mp3|wav|ogg)/);
+  const isVideo = (fileType && fileType.startsWith('video/')) || (preview && preview.toLowerCase().match(/\.(mp4|mov|webm)/));
+  const isAudio = (fileType && fileType.startsWith('audio/')) || (preview && preview.toLowerCase().match(/\.(mp3|wav|ogg)/));
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -91,7 +93,7 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
         <TabsContent value="url" className="mt-2">
           <Input 
             placeholder="Paste media link here..." 
-            value={value}
+            value={value || ''}
             autoComplete="off"
             onChange={(e) => handleUrlChange(e.target.value)}
             className="h-12"
@@ -105,17 +107,19 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
             <video src={preview} className="w-full h-full object-contain" controls />
           ) : isAudio ? (
             <div className="flex flex-col items-center justify-center h-full gap-4">
-                <Music className="h-12 w-12 text-primary opacity-40" />
+                <Mic className="h-12 w-12 text-primary opacity-40" />
                 <audio src={preview} controls className="w-[80%]" />
             </div>
           ) : (
-            <Image 
-              src={preview} 
-              alt="Upload Preview" 
-              fill 
-              className="object-contain" 
-              unoptimized 
-            />
+            <div className="relative w-full h-full">
+                <Image 
+                  src={preview} 
+                  alt="Upload Preview" 
+                  fill 
+                  className="object-contain" 
+                  unoptimized 
+                />
+            </div>
           )}
           <button
             type="button"

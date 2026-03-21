@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Expand, Target, TrendingUp, Loader2 } from 'lucide-react';
-import { useFirestore, useStorage } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadSingleFile, uploadMultipleFiles } from '@/lib/upload-utils';
 
@@ -61,7 +61,6 @@ type DevelopmentProjectFormProps = {
 
 export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectFormProps) {
   const firestore = useFirestore();
-  const storage = useStorage();
   const { toast } = useToast();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -84,7 +83,7 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
   });
 
   const handleSubmit = async () => {
-    if (!firestore || !storage) return;
+    if (!firestore) return;
     
     const values = form.getValues();
     if (!values.title?.trim()) return;
@@ -92,21 +91,28 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
     setIsSaving(true);
 
     try {
+        console.log('[Development] Committing project:', values.title);
+        
         let finalBannerUrl = values.imageUrl;
         if (bannerFile) {
-            finalBannerUrl = await uploadSingleFile(storage, 'projects', bannerFile);
+            finalBannerUrl = await uploadSingleFile(null, 'projects', bannerFile);
         }
 
-        const newGalleryUrls = (galleryFiles.length > 0) 
-            ? await uploadMultipleFiles(storage, 'projects', galleryFiles) 
+        const newGalleryUrls = (galleryFiles && galleryFiles.length > 0) 
+            ? await uploadMultipleFiles(null, 'projects', galleryFiles) 
             : [];
         
         const finalGallery = [...(values.galleryImages || []), ...newGalleryUrls];
 
         const projectData = {
-            ...values,
+            title: values.title,
+            description: values.description,
+            goalAmount: values.goalAmount,
+            currentAmount: values.currentAmount,
+            status: values.status,
             imageUrl: finalBannerUrl,
             galleryImages: finalGallery,
+            public: values.public,
             updatedAt: serverTimestamp(),
         };
 
@@ -185,10 +191,10 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
                             <FormField name="imageUrl" render={() => (
                                 <FormItem>
                                     <ImageUpload 
-                                      value={form.watch('imageUrl')} 
+                                      value={form.watch('imageUrl') || ''} 
                                       file={bannerFile}
                                       onChange={(url, file) => {
-                                        form.setValue('imageUrl', url);
+                                        form.setValue('imageUrl', url || '');
                                         setBannerFile(file);
                                       }}
                                       folder="projects" 
@@ -210,11 +216,11 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
 
                 <TabsContent value="gallery" className="p-6 m-0">
                     <MultiImageUpload 
-                        existingImages={form.watch('galleryImages')} 
-                        newFiles={galleryFiles}
+                        existingImages={form.watch('galleryImages') || []} 
+                        newFiles={galleryFiles || []}
                         onChange={(existing, files) => {
-                          form.setValue('galleryImages', existing);
-                          setGalleryFiles(files);
+                          form.setValue('galleryImages', existing || []);
+                          setGalleryFiles(files || []);
                         }}
                         label="Project Milestones & Photos"
                     />
