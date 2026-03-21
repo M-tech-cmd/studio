@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -24,12 +25,13 @@ import {
   Baby,
   User as UserIcon,
   PieChart,
+  Zap,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
-import type { Event, RegisteredUser, FinancialEntry, SiteSettings, DevelopmentProject, MemberProfile } from '@/lib/types';
+import type { Event, RegisteredUser, FinancialEntry, SiteSettings, DevelopmentProject, MemberProfile, CommunityGroup } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { GrowthChart } from '@/components/admin/GrowthChart';
@@ -66,7 +68,7 @@ function DashboardContent() {
     const recentEventsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'events'), orderBy('date', 'desc'), limit(3)) : null, [firestore]);
 
     const { data: events, isLoading: eventsLoading } = useCollection(eventsQuery);
-    const { data: communityGroups, isLoading: communityGroupsLoading } = useCollection(communityGroupsQuery);
+    const { data: communityGroups, isLoading: communityGroupsLoading } = useCollection<CommunityGroup>(communityGroupsQuery);
     const { data: devProjects, isLoading: devProjectsLoading } = useCollection<DevelopmentProject>(devProjectsQuery);
     const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
     const { data: financials, isLoading: financialLoading } = useCollection<FinancialEntry>(financialQuery);
@@ -87,19 +89,34 @@ function DashboardContent() {
         return summary;
     }, [financials]);
 
-    // Demographic Calculations
+    // Demographic Calculations (Updated for Group Affiliation Mapping)
     const demographics = useMemo(() => {
-        if (!members) return { male: 0, female: 0, children: 0, total: 0 };
-        const stats = { male: 0, female: 0, children: 0, total: members.length };
+        if (!members || !communityGroups) return { men: 0, women: 0, youth: 0, children: 0, total: 0 };
+        
+        const groups = communityGroups as CommunityGroup[];
+        
+        // Helper to extract IDs based on name keywords provided in registry rules
+        const getIds = (names: string[]) => 
+            groups.filter(g => names.includes(g.name)).map(g => g.id);
+
+        const menGroupIds = getIds(['CMA', 'Sacred Heart (Men)']);
+        const womenGroupIds = getIds(['CWA', 'Sacred Heart (Women)']);
+        const youthGroupIds = getIds(['MYM', 'YCA', 'YSC']);
+        const childrenGroupIds = getIds(['PMC']);
+
+        const stats = { men: 0, women: 0, youth: 0, children: 0, total: members.length };
         
         members.forEach(m => {
-            if (m.gender === 'Male') stats.male++;
-            if (m.gender === 'Female') stats.female++;
-            stats.children += (m.children?.length || 0);
+            const gid = m.parishGroupId || '';
+            // unique counting per member profile document
+            if (menGroupIds.includes(gid)) stats.men++;
+            else if (womenGroupIds.includes(gid)) stats.women++;
+            else if (youthGroupIds.includes(gid)) stats.youth++;
+            else if (childrenGroupIds.includes(gid)) stats.children++;
         });
         
         return stats;
-    }, [members]);
+    }, [members, communityGroups]);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(amount);
@@ -238,31 +255,41 @@ function DashboardContent() {
                     </CardHeader>
                     <CardContent className="pt-6 space-y-6">
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                            <div className="p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
                                 <p className="text-[10px] font-black uppercase opacity-60 mb-1">Total Men</p>
                                 <div className="flex items-end gap-2">
-                                    <span className="text-3xl font-black text-primary">{demographics.male}</span>
+                                    <span className="text-3xl font-black text-primary">{demographics.men}</span>
                                     <UserIcon className="h-4 w-4 mb-1 opacity-20" />
                                 </div>
                             </div>
-                            <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                            <div className="p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
                                 <p className="text-[10px] font-black uppercase opacity-60 mb-1">Total Women</p>
                                 <div className="flex items-end gap-2">
-                                    <span className="text-3xl font-black text-pink-400">{demographics.female}</span>
+                                    <span className="text-3xl font-black text-pink-400">{demographics.women}</span>
                                     <Heart className="h-4 w-4 mb-1 opacity-20" />
                                 </div>
                             </div>
-                        </div>
-                        <div className="p-6 bg-primary text-slate-900 rounded-2xl flex items-center justify-between shadow-2xl">
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Total Children Registered</p>
-                                <p className="text-4xl font-black">{demographics.children}</p>
+                            <div className="p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
+                                <p className="text-[10px] font-black uppercase opacity-60 mb-1">Total Youth</p>
+                                <div className="flex items-end gap-2">
+                                    <span className="text-3xl font-black text-blue-400">{demographics.youth}</span>
+                                    <Zap className="h-4 w-4 mb-1 opacity-20" />
+                                </div>
                             </div>
-                            <Baby className="h-12 w-12 opacity-30" />
+                            <div className="p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-colors">
+                                <p className="text-[10px] font-black uppercase opacity-60 mb-1">Total Children</p>
+                                <div className="flex items-end gap-2">
+                                    <span className="text-3xl font-black text-orange-400">{demographics.children}</span>
+                                    <Baby className="h-4 w-4 mb-1 opacity-20" />
+                                </div>
+                            </div>
                         </div>
                         <div className="flex items-center justify-between pt-4 border-t border-white/10">
-                            <span className="text-xs font-bold uppercase opacity-50 tracking-widest">Global Registry</span>
-                            <span className="text-xs font-black">{demographics.total} Active Households</span>
+                            <div>
+                                <span className="text-[10px] font-black uppercase opacity-50 tracking-widest block">Global Registry</span>
+                                <span className="text-sm font-black">{demographics.total} Unique Profiles</span>
+                            </div>
+                            <Users className="h-8 w-8 opacity-10" />
                         </div>
                     </CardContent>
                 </Card>
