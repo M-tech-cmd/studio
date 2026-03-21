@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
     PlusCircle, 
     Trash2, 
@@ -9,9 +9,9 @@ import {
     Calendar as CalendarIcon,
     User,
     ArrowUpRight,
-    ArrowDownRight,
     Loader2,
-    Users
+    Users,
+    Pencil
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -50,7 +50,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, deleteDoc, doc, orderBy, query, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, deleteDoc, doc, orderBy, query, addDoc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -74,6 +74,7 @@ export default function AdminFinancialsPage() {
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<FinancialEntry | null>(null);
 
   const financialQuery = useMemoFirebase(() => {
       if (!firestore) return null;
@@ -105,6 +106,32 @@ export default function AdminFinancialsPage() {
   const entryType = form.watch('entryType');
   const category = form.watch('category');
 
+  // Handle Edit Pre-population
+  useEffect(() => {
+    if (selectedEntry) {
+        const entryDate = (selectedEntry.date as any).toDate ? (selectedEntry.date as any).toDate() : new Date(selectedEntry.date as any);
+        form.reset({
+            entryType: selectedEntry.entryType || 'Individual',
+            memberName: selectedEntry.memberName === 'General Collection' ? '' : selectedEntry.memberName,
+            amount: selectedEntry.amount,
+            category: selectedEntry.category,
+            projectId: selectedEntry.projectId || 'none',
+            date: format(entryDate, 'yyyy-MM-dd'),
+            notes: selectedEntry.notes || '',
+        });
+    } else {
+        form.reset({
+            entryType: 'Individual',
+            memberName: '',
+            amount: 0,
+            category: 'Tithe',
+            projectId: 'none',
+            date: format(new Date(), 'yyyy-MM-dd'),
+            notes: '',
+        });
+    }
+  }, [selectedEntry, form]);
+
   const totals = useMemo(() => {
     if (!financials) return { tithe: 0, offertory: 0, other: 0, total: 0 };
     return financials.reduce((acc, entry) => {
@@ -120,25 +147,34 @@ export default function AdminFinancialsPage() {
     if (!firestore) return;
     setIsSaving(true);
 
-    const dataToAdd = {
+    const dataToSave = {
         ...values,
         memberName: values.entryType === 'General' ? 'General Collection' : values.memberName,
         projectId: values.category === 'Project' && values.projectId !== 'none' ? values.projectId : null,
         date: Timestamp.fromDate(new Date(values.date)),
-        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
     };
 
     try {
-        await addDoc(collection(firestore, 'financial_ledger'), dataToAdd);
-        toast({ title: "Entry Recorded", description: "The financial entry has been logged successfully." });
+        if (selectedEntry) {
+            await updateDoc(doc(firestore, 'financial_ledger', selectedEntry.id), dataToSave);
+            toast({ title: "Entry Updated", description: "The transaction has been adjusted successfully." });
+        } else {
+            await addDoc(collection(firestore, 'financial_ledger'), {
+                ...dataToSave,
+                createdAt: serverTimestamp(),
+            });
+            toast({ title: "Entry Recorded", description: "The financial entry has been logged successfully." });
+        }
         setIsDialogOpen(false);
+        setSelectedEntry(null);
         form.reset();
     } catch (error: any) {
         toast({ variant: 'destructive', title: "Error", description: error.message });
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: 'financial_ledger',
-            operation: 'create',
-            requestResourceData: dataToAdd
+            operation: selectedEntry ? 'update' : 'create',
+            requestResourceData: dataToSave
         }));
     } finally {
         setIsSaving(false);
@@ -155,6 +191,16 @@ export default function AdminFinancialsPage() {
     }
   };
 
+  const handleEditClick = (entry: FinancialEntry) => {
+    setSelectedEntry(entry);
+    setIsDialogOpen(true);
+  };
+
+  const handleAddNewClick = () => {
+    setSelectedEntry(null);
+    setIsDialogOpen(true);
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(amount);
   };
@@ -166,17 +212,24 @@ export default function AdminFinancialsPage() {
           <h1 className="text-3xl font-black tracking-tighter uppercase">Parish Treasury</h1>
           <p className="text-muted-foreground font-medium">Record tithes, offertory, and project contributions.</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) setSelectedEntry(null);
+        }}>
             <DialogTrigger asChild>
-                <Button className="font-bold h-12 px-6 rounded-full shadow-lg">
+                <Button onClick={handleAddNewClick} className="font-bold h-12 px-6 rounded-full shadow-lg">
                     <PlusCircle className="mr-2 h-5 w-5" />
                     Record Contribution
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] rounded-3xl">
                 <DialogHeader>
-                    <DialogTitle className="text-2xl font-black tracking-tighter">Contribution Entry</DialogTitle>
-                    <DialogDescription>Manually record funds received by the parish office.</DialogDescription>
+                    <DialogTitle className="text-2xl font-black tracking-tighter">
+                        {selectedEntry ? 'Adjust Transaction' : 'Contribution Entry'}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {selectedEntry ? 'Modify the details of this recorded entry.' : 'Manually record funds received by the parish office.'}
+                    </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
@@ -213,7 +266,7 @@ export default function AdminFinancialsPage() {
                                 <FormItem><FormLabel className="text-xs font-black uppercase">Amount (KES) *</FormLabel><FormControl><Input type="number" {...field} className="h-12 font-bold" /></FormControl><FormMessage /></FormItem>
                             )}/>
                             <FormField control={form.control} name="category" render={({ field }) => (
-                                <FormItem><FormLabel className="text-xs font-black uppercase">Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue /></SelectTrigger></FormControl><SelectContent>
+                                <FormItem><FormLabel className="text-xs font-black uppercase">Category</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue /></SelectTrigger></FormControl><SelectContent>
                                     <SelectItem value="Tithe">Tithe</SelectItem>
                                     <SelectItem value="Offertory">Offertory</SelectItem>
                                     <SelectItem value="Project">Project Fund</SelectItem>
@@ -225,7 +278,7 @@ export default function AdminFinancialsPage() {
 
                         {category === 'Project' && (
                             <FormField control={form.control} name="projectId" render={({ field }) => (
-                                <FormItem><FormLabel className="text-xs font-black uppercase">Link to Specific Project</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue /></SelectTrigger></FormControl><SelectContent>
+                                <FormItem><FormLabel className="text-xs font-black uppercase">Link to Specific Project</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue /></SelectTrigger></FormControl><SelectContent>
                                     <SelectItem value="none">General Development Fund</SelectItem>
                                     {projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>)}
                                 </SelectContent></Select></FormItem>
@@ -243,7 +296,7 @@ export default function AdminFinancialsPage() {
                         <DialogFooter>
                             <Button type="submit" disabled={isSaving} className="w-full h-14 rounded-full font-black uppercase tracking-widest shadow-xl">
                                 {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <DollarSign className="mr-2 h-5 w-5" />}
-                                Commit to Ledger
+                                {selectedEntry ? 'Save Adjustments' : 'Commit to Ledger'}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -346,9 +399,14 @@ export default function AdminFinancialsPage() {
                         {formatCurrency(entry.amount)}
                     </TableCell>
                     <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 rounded-full" onClick={() => handleDelete(entry.id)}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" className="text-primary hover:bg-primary/10 rounded-full" onClick={() => handleEditClick(entry)}>
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 rounded-full" onClick={() => handleDelete(entry.id)}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </div>
                     </TableCell>
                   </TableRow>
                 ))
