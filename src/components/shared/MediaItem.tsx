@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { X, Play, Video, Music } from 'lucide-react';
+import { X, Play, Video, Music, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MediaItemProps {
@@ -12,8 +12,8 @@ interface MediaItemProps {
 }
 
 /**
- * Zero-Ghost Media Item.
- * Stripped of all loading spinners and overlays for instant rendering.
+ * Universal Media Item (Cloudinary Optimized).
+ * Renders Image, Video, or Audio based on URL detection.
  */
 export function MediaItem({ 
   url, 
@@ -34,8 +34,12 @@ export function MediaItem({
     )}>
       
       {isAudio ? (
-        <div className="h-full w-full flex items-center justify-center bg-slate-100">
-          <Music className="h-10 w-10 text-primary/40" />
+        <div className="h-full w-full flex flex-col items-center justify-center bg-slate-100 gap-2">
+          <Mic className="h-10 w-10 text-primary/40" />
+          <span className="text-[8px] font-black uppercase tracking-widest text-primary/60">Voice/Audio</span>
+          {showIconOverlay && (
+              <audio src={url} controls className="absolute bottom-2 scale-75 w-full opacity-0 group-hover:opacity-100 transition-opacity" />
+          )}
         </div>
       ) : isVideo ? (
         <div className="h-full w-full bg-slate-900 flex items-center justify-center">

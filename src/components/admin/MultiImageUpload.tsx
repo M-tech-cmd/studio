@@ -13,14 +13,12 @@ interface MultiImageUploadProps {
 }
 
 /**
- * Multi-Image Selection Component.
- * Optimized for "Zero-Ghost" instant previews.
- * Deferring upload logic to parent forms via upload-utils.ts using atomic uploadBytes.
+ * Multi-Media Selection Component (Cloudinary Engine).
+ * Supports Images, Video, and Audio concurrently.
  */
 export function MultiImageUpload({ existingImages, newFiles, onChange, label }: MultiImageUploadProps) {
   const [previews, setPreviews] = useState<{ id: string; url: string }[]>([]);
 
-  // Local object URL cleanup
   useEffect(() => {
     return () => {
       previews.forEach(p => {
@@ -37,18 +35,14 @@ export function MultiImageUpload({ existingImages, newFiles, onChange, label }: 
 
     const selectedFiles = Array.from(files);
     
-    // Generate instant local previews for immediate UI feedback
     const newPreviews = selectedFiles.map(file => ({
       id: Math.random().toString(36).substring(7),
       url: URL.createObjectURL(file)
     }));
 
     setPreviews(prev => [...prev, ...newPreviews]);
-    
-    // Bubble the file objects up to the form for the silent background sync
     onChange(existingImages, [...newFiles, ...selectedFiles]);
 
-    // Reset input so the same file can be re-selected if deleted
     if (e.target) e.target.value = '';
   };
 
@@ -79,14 +73,13 @@ export function MultiImageUpload({ existingImages, newFiles, onChange, label }: 
         <label className="cursor-pointer">
           <div className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-full text-xs font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-lg active:scale-95">
             <Upload className="h-4 w-4" />
-            Add Photos
+            Add Media
           </div>
-          <input type="file" multiple className="hidden" accept="image/*" onChange={handleFileChange} />
+          <input type="file" multiple className="hidden" accept="image/*,video/*,audio/*" onChange={handleFileChange} />
         </label>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {/* Existing Cloud Assets */}
         {existingImages.map((url, index) => (
           <MediaItem 
             key={`existing-${index}`} 
@@ -95,7 +88,6 @@ export function MultiImageUpload({ existingImages, newFiles, onChange, label }: 
           />
         ))}
 
-        {/* Local Pending Assets */}
         {previews.map((preview, index) => (
           <div key={preview.id} className="relative group animate-in fade-in zoom-in-95 duration-300">
             <MediaItem 

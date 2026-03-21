@@ -1,11 +1,9 @@
-
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore, doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged, User as FirebaseUser, setPersistence, browserLocalPersistence, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
-import { FirebaseStorage } from 'firebase/storage';
 import { Database } from 'firebase/database';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 import { useRouter } from 'next/navigation';
@@ -16,8 +14,8 @@ interface FirebaseProviderProps {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;
-  storage: FirebaseStorage;
   database: Database;
+  storage?: any; // Storage is now externalized to Cloudinary
 }
 
 interface UserAuthState {
@@ -31,7 +29,6 @@ export interface FirebaseContextState {
   firebaseApp: FirebaseApp | null;
   firestore: Firestore | null;
   auth: Auth | null;
-  storage: FirebaseStorage | null;
   database: Database | null;
   user: User | null;
   isUserLoading: boolean;
@@ -44,7 +41,6 @@ export interface FirebaseServicesAndUser extends FirebaseContextState {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;
-  storage: FirebaseStorage;
   database: Database;
 }
 
@@ -87,7 +83,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   firebaseApp,
   firestore,
   auth,
-  storage,
   database,
 }) => {
   const [userAuthState, setUserAuthState] = useState<UserAuthState>({
@@ -101,15 +96,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
   useEffect(() => {
     if (auth) {
-      // Explicitly set persistence to LOCAL to survive cross-domain redirects
       setPersistence(auth, browserLocalPersistence).catch((err) => {
         console.error("Auth: setPersistence error:", err);
       });
 
-      // Catch the result from signInWithRedirect (fixes redirect loop)
       getRedirectResult(auth).then((result) => {
         if (result?.user) {
-          console.log("Auth: Successfully caught redirect login for", result.user.email);
           toast({ title: "Welcome back!", description: "You have signed in successfully." });
         }
       }).catch((error) => {
@@ -125,14 +117,11 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     }
 
     if (!isAuthListenerInitialized.current) {
-        console.log("Auth Listener: Attaching onAuthStateChanged.");
         isAuthListenerInitialized.current = true;
 
         const unsubscribe = onAuthStateChanged(
           auth,
           async (firebaseUser) => {
-            console.log("Auth Listener: State changed. User:", firebaseUser ? firebaseUser.uid : "null");
-            
             if (firebaseUser) {
               await upsertUserProfile(firestore, firebaseUser);
             }
@@ -161,7 +150,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     const provider = new GoogleAuthProvider();
     
     try {
-        // Using Redirect for better cross-origin reliability on Cloud Workstations
         await signInWithRedirect(auth, provider);
     } catch (error: any) {
         console.error("Auth: Sign-in error:", error.code, error.message);
@@ -171,13 +159,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   };
 
   const contextValue = useMemo((): FirebaseContextState => {
-    const servicesAvailable = !!(firebaseApp && firestore && auth && storage && database);
+    const servicesAvailable = !!(firebaseApp && firestore && auth && database);
     return {
       areServicesAvailable: servicesAvailable,
       firebaseApp: servicesAvailable ? firebaseApp : null,
       firestore: servicesAvailable ? firestore : null,
       auth: servicesAvailable ? auth : null,
-      storage: servicesAvailable ? storage : null,
       database: servicesAvailable ? database : null,
       user: userAuthState.user,
       isUserLoading: userAuthState.isUserLoading,
@@ -185,7 +172,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       isSigningIn,
       startGoogleSignIn
     };
-  }, [firebaseApp, firestore, auth, storage, database, userAuthState, isSigningIn]);
+  }, [firebaseApp, firestore, auth, database, userAuthState, isSigningIn]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>
@@ -200,15 +187,14 @@ export const useFirebase = (): FirebaseServicesAndUser => {
   if (context === undefined) {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
   }
-  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth || !context.storage || !context.database) {
-    throw new Error('Firebase core services not available. Check FirebaseProvider props.');
+  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth || !context.database) {
+    throw new Error('Firebase core services not available.');
   }
   return {
     ...context,
     firebaseApp: context.firebaseApp!,
     firestore: context.firestore!,
     auth: context.auth!,
-    storage: context.storage!,
     database: context.database!,
   };
 };
@@ -223,9 +209,8 @@ export const useFirestore = (): Firestore => {
   return firestore;
 };
 
-export const useStorage = (): FirebaseStorage => {
-  const { storage } = useFirebase();
-  return storage;
+export const useStorage = (): any => {
+  return null; // Firebase Storage is no longer used. Cloudinary is direct via upload-utils.
 };
 
 export const useDatabase = (): Database => {

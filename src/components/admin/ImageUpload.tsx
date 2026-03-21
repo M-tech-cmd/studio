@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { Upload, Link as LinkIcon, X } from 'lucide-react';
+import { Upload, Link as LinkIcon, X, Film, Music } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,23 +14,27 @@ interface ImageUploadProps {
   onChange: (url: string, file: File | null) => void;
   label?: string;
   className?: string;
+  folder?: string;
 }
 
 /**
- * Individual Image Selection Component.
- * Supports URL entry or File selection with instant local preview.
+ * Individual Media Selection Component (Cloudinary Ready).
+ * Supports URL entry or File selection (Image, Video, Audio) with instant local preview.
  */
 export function ImageUpload({ value, file, onChange, label, className }: ImageUploadProps) {
   const [preview, setPreview] = useState<string>(value || '');
+  const [fileType, setFileType] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (file) {
       const objectUrl = URL.createObjectURL(file);
       setPreview(objectUrl);
+      setFileType(file.type);
       return () => URL.revokeObjectURL(objectUrl);
     } else {
       setPreview(value);
+      setFileType('');
     }
   }, [value, file]);
 
@@ -48,6 +52,9 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
     onChange('', null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
+  const isVideo = fileType.startsWith('video/') || preview.toLowerCase().match(/\.(mp4|mov|webm)/);
+  const isAudio = fileType.startsWith('audio/') || preview.toLowerCase().match(/\.(mp3|wav|ogg)/);
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -69,12 +76,13 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
             className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer hover:bg-muted/50 transition-colors bg-muted/10 group"
           >
             <Upload className="h-8 w-8 text-muted-foreground mb-2 group-hover:text-primary transition-colors" />
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Select Image File</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Select Media File</span>
+            <span className="text-[9px] text-muted-foreground opacity-60">Photos, Videos, Audio</span>
             <input 
               type="file" 
               ref={fileInputRef} 
               className="hidden" 
-              accept="image/*" 
+              accept="image/*,video/*,audio/*" 
               onChange={handleFileSelect} 
             />
           </div>
@@ -82,7 +90,7 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
 
         <TabsContent value="url" className="mt-2">
           <Input 
-            placeholder="Paste image link here..." 
+            placeholder="Paste media link here..." 
             value={value}
             autoComplete="off"
             onChange={(e) => handleUrlChange(e.target.value)}
@@ -93,13 +101,22 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
 
       {preview && (
         <div className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-primary/10 shadow-lg bg-muted/5 group animate-in fade-in zoom-in-95 isolate">
-          <Image 
-            src={preview} 
-            alt="Upload Preview" 
-            fill 
-            className="object-contain" 
-            unoptimized 
-          />
+          {isVideo ? (
+            <video src={preview} className="w-full h-full object-contain" controls />
+          ) : isAudio ? (
+            <div className="flex flex-col items-center justify-center h-full gap-4">
+                <Music className="h-12 w-12 text-primary opacity-40" />
+                <audio src={preview} controls className="w-[80%]" />
+            </div>
+          ) : (
+            <Image 
+              src={preview} 
+              alt="Upload Preview" 
+              fill 
+              className="object-contain" 
+              unoptimized 
+            />
+          )}
           <button
             type="button"
             onClick={clearImage}
@@ -109,7 +126,7 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
           </button>
           {file && (
             <div className="absolute bottom-2 right-2 px-2 py-1 bg-primary text-white text-[10px] font-bold rounded uppercase shadow-lg">
-              Pending Upload
+              Pending Sync
             </div>
           )}
         </div>

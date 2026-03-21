@@ -1,49 +1,49 @@
-import { ref, uploadBytesResumable, getDownloadURL, FirebaseStorage } from 'firebase/storage';
-
 /**
- * Uploads a single file to Firebase Storage using direct resumable sync.
- * This is more resilient to environment-specific disconnects.
+ * Unified Cloudinary Upload Worker.
+ * Replaces Firebase Storage logic to bypass billing errors and support multi-modal media.
+ * Uses the 'auto' resource type to handle Image, Video, and Audio concurrently.
  */
-export async function uploadSingleFile(storage: FirebaseStorage, folder: string, file: File): Promise<string> {
-  if (!file) return '';
-  
-  // Enforce rigid path: uploads/{category}/{filename}
-  const category = folder.replace(/^uploads\//, '').replace(/-/g, '_');
-  const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-  const storagePath = `uploads/${category}/${fileName}`;
-  const storageRef = ref(storage, storagePath);
-  
-  console.log(`[Upload] Resumable sync started: ${storagePath}`);
-  
-  return new Promise((resolve, reject) => {
-    const uploadTask = uploadBytesResumable(storageRef, file);
 
-    uploadTask.on('state_changed', 
-      null, // Silent progress per instructions
-      (error) => {
-        console.error(`[Upload] Resumable sync failed for: ${file.name}`, error);
-        reject(error);
-      }, 
-      async () => {
-        try {
-          const url = await getDownloadURL(uploadTask.snapshot.ref);
-          console.log(`[Upload] Sync complete: ${url}`);
-          resolve(url);
-        } catch (err) {
-          reject(err);
-        }
-      }
-    );
-  });
+const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dojrqgd3l/auto/upload';
+const CLOUDINARY_PRESET = 'st_martin_preset';
+
+export async function uploadSingleFile(storage: any, folder: string, file: File): Promise<string> {
+  if (!file) return '';
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_PRESET);
+  formData.append('folder', `st_martin/${folder}`);
+
+  console.log(`[Cloudinary] Starting upload for: ${file.name} to ${folder}`);
+
+  try {
+    const response = await fetch(CLOUDINARY_UPLOAD_URL, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Cloudinary upload failed');
+    }
+
+    const data = await response.json();
+    console.log(`[Cloudinary] Upload success: ${data.secure_url}`);
+    return data.secure_url;
+  } catch (error: any) {
+    console.error(`[Cloudinary] Sync error for ${file.name}:`, error);
+    throw error;
+  }
 }
 
 /**
- * Uploads multiple files concurrently using Promise.all.
+ * Uploads multiple files concurrently using Cloudinary's API.
  */
-export async function uploadMultipleFiles(storage: FirebaseStorage, folder: string, files: File[]): Promise<string[]> {
+export async function uploadMultipleFiles(storage: any, folder: string, files: File[]): Promise<string[]> {
   if (!files || files.length === 0) return [];
-  console.log(`[Upload] Batch sync initiated for ${files.length} assets`);
+  console.log(`[Cloudinary] Batch sync initiated for ${files.length} assets`);
   
-  const uploadPromises = files.map(file => uploadSingleFile(storage, folder, file));
+  const uploadPromises = files.map(file => uploadSingleFile(null, folder, file));
   return Promise.all(uploadPromises);
 }

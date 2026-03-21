@@ -3,10 +3,10 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Expand, MapPin, Clock, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { Expand, MapPin, Clock, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { Timestamp, collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { useFirestore, useStorage } from '@/firebase';
+import { useFirestore } from '@/firebase';
 import { uploadSingleFile, uploadMultipleFiles } from '@/lib/upload-utils';
 
 import type { Event } from '@/lib/types';
@@ -70,10 +70,8 @@ const formatDateForInput = (date: any) => {
 
 export function EventForm({ event, onClose }: EventFormProps) {
   const firestore = useFirestore();
-  const storage = useStorage();
   const { toast } = useToast();
   
-  const [isSaving, setIsSaving] = useState(false);
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
@@ -95,21 +93,24 @@ export function EventForm({ event, onClose }: EventFormProps) {
   });
 
   const handleSubmit = async () => {
-    if (!firestore || !storage) return;
+    if (!firestore) return;
     
     const values = form.getValues();
     if (!values.title?.trim()) return;
 
-    setIsSaving(true);
+    // IMMEDIATE FEEDBACK: Modal closes and toast shows instantly
+    toast({ title: 'Success: Registry Update Scheduled' });
+    onClose();
 
+    // BACKGROUND WORKER: Synchronous-feeling Cloudinary & Firestore operations
     try {
         let finalBannerUrl = values.imageUrl;
         if (bannerFile) {
-            finalBannerUrl = await uploadSingleFile(storage, 'events', bannerFile);
+            finalBannerUrl = await uploadSingleFile(null, 'events', bannerFile);
         }
 
         const newGalleryUrls = (galleryFiles.length > 0) 
-            ? await uploadMultipleFiles(storage, 'events', galleryFiles) 
+            ? await uploadMultipleFiles(null, 'events', galleryFiles) 
             : [];
         
         const finalGalleryImages = [...(values.galleryImages || []), ...newGalleryUrls];
@@ -130,18 +131,9 @@ export function EventForm({ event, onClose }: EventFormProps) {
                 createdAt: serverTimestamp(),
             });
         }
-
-        toast({ title: 'Success: Saved to Database' });
-        onClose();
     } catch (error: any) {
         console.error('[EventForm] Sync Error:', error);
-        toast({ 
-            variant: 'destructive', 
-            title: 'Upload Failed', 
-            description: 'Upload blocked by Browser/CORS. Check Console.' 
-        });
-    } finally {
-        setIsSaving(false);
+        toast({ variant: 'destructive', title: 'Upload blocked by Browser/CORS. Check Console.' });
     }
   };
 
@@ -170,14 +162,14 @@ export function EventForm({ event, onClose }: EventFormProps) {
                                 <FormField control={form.control} name="title" render={({ field }) => (
                                     <FormItem className="sm:col-span-2">
                                         <FormLabel className="font-bold">Event Name *</FormLabel>
-                                        <FormControl><Input placeholder="E.g., Parish Picnic" {...field} disabled={isSaving} /></FormControl>
+                                        <FormControl><Input placeholder="E.g., Parish Picnic" {...field} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}/>
                                 <FormField control={form.control} name="category" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="font-bold">Type</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSaving}>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                                             <FormControl><SelectTrigger className="h-12"><SelectValue/></SelectTrigger></FormControl>
                                             <SelectContent>
                                                 {['Mass', 'Ministry', 'Community', 'Special', 'Youth', 'Other'].map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
@@ -190,17 +182,17 @@ export function EventForm({ event, onClose }: EventFormProps) {
                             <div className="bg-muted/30 p-6 rounded-2xl border-2 border-muted space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <FormField control={form.control} name="date" render={({ field }) => (
-                                        <FormItem><FormLabel className="text-xs font-bold uppercase"><CalendarIcon className="h-3.5 w-3.5 inline mr-1" /> Date *</FormLabel><FormControl><Input type="date" {...field} disabled={isSaving} /></FormControl></FormItem>
+                                        <FormItem><FormLabel className="text-xs font-bold uppercase"><CalendarIcon className="h-3.5 w-3.5 inline mr-1" /> Date *</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                                     )}/>
                                     <FormField control={form.control} name="time" render={({ field }) => (
-                                        <FormItem><FormLabel className="text-xs font-bold uppercase"><Clock className="h-3.5 w-3.5 inline mr-1" /> Start *</FormLabel><FormControl><Input type="time" {...field} disabled={isSaving} /></FormControl></FormItem>
+                                        <FormItem><FormLabel className="text-xs font-bold uppercase"><Clock className="h-3.5 w-3.5 inline mr-1" /> Start *</FormLabel><FormControl><Input type="time" {...field} /></FormControl></FormItem>
                                     )}/>
                                     <FormField control={form.control} name="endTime" render={({ field }) => (
-                                        <FormItem><FormLabel className="text-xs font-bold uppercase">End Time</FormLabel><FormControl><Input type="time" {...field} disabled={isSaving} /></FormControl></FormItem>
+                                        <FormItem><FormLabel className="text-xs font-bold uppercase">End Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl></FormItem>
                                     )}/>
                                 </div>
                                 <FormField control={form.control} name="location" render={({ field }) => (
-                                    <FormItem><FormLabel className="text-xs font-bold uppercase"><MapPin className="h-3.5 w-3.5 inline mr-1" /> Location *</FormLabel><FormControl><Input placeholder="Parish Hall" {...field} disabled={isSaving} /></FormControl></FormItem>
+                                    <FormItem><FormLabel className="text-xs font-bold uppercase"><MapPin className="h-3.5 w-3.5 inline mr-1" /> Location *</FormLabel><FormControl><Input placeholder="Parish Hall" {...field} /></FormControl></FormItem>
                                 )}/>
                             </div>
 
@@ -208,9 +200,9 @@ export function EventForm({ event, onClose }: EventFormProps) {
                                 <FormItem>
                                     <div className="flex justify-between items-center">
                                         <FormLabel className="font-bold">Description *</FormLabel>
-                                        <Button type="button" variant="ghost" size="icon" onClick={() => setIsDescriptionModalOpen(true)} disabled={isSaving}><Expand className="h-4 w-4" /></Button>
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => setIsDescriptionModalOpen(true)}><Expand className="h-4 w-4" /></Button>
                                     </div>
-                                    <FormControl><Textarea rows={5} {...field} disabled={isSaving} /></FormControl>
+                                    <FormControl><Textarea rows={5} {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}/>
@@ -233,7 +225,7 @@ export function EventForm({ event, onClose }: EventFormProps) {
 
                             <FormField control={form.control} name="featured" render={({ field }) => (
                                 <FormItem className="flex flex-row items-center space-x-3 rounded-xl border-2 p-4 bg-white shadow-sm">
-                                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isSaving} /></FormControl>
+                                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                                     <div className="space-y-1 leading-none"><FormLabel className="font-bold">High Priority (Featured)</FormLabel></div>
                                 </FormItem>
                             )}/>
@@ -265,14 +257,12 @@ export function EventForm({ event, onClose }: EventFormProps) {
             />
         )}
         <DialogFooter className="p-6 border-t bg-muted/5 mt-auto gap-4">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8 font-bold border-2" disabled={isSaving}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-12 px-8 font-bold border-2">Cancel</Button>
             <Button 
                 type="button" 
                 onClick={handleSubmit} 
                 className="rounded-full h-12 px-12 font-black shadow-xl"
-                disabled={isSaving}
             >
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {event ? 'SAVE CHANGES' : 'PUBLISH EVENT'}
             </Button>
         </DialogFooter>
