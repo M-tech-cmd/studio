@@ -33,22 +33,24 @@ export function getSdks(firebaseApp: FirebaseApp) {
   let firestore: Firestore;
   
   try {
-    // Modern persistent cache implementation (fixes deprecation warnings)
+    // Modern persistent cache implementation
     firestore = initializeFirestore(firebaseApp, {
       localCache: persistentLocalCache({
         tabManager: persistentIndexedDbWebProvider()
       })
     });
   } catch (e) {
-    // If already initialized (e.g. during HMR), get existing instance
     firestore = getFirestore(firebaseApp);
   }
+
+  const storage = getStorage(firebaseApp, "studio-8930156154-19ec3.firebasestorage.app");
+  console.log("[Firebase] Storage verified with bucket:", storage.app.options.storageBucket);
 
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
     firestore,
-    storage: getStorage(firebaseApp),
+    storage,
     database: getDatabase(firebaseApp),
   };
 }

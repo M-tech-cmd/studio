@@ -7,10 +7,10 @@ import * as z from 'zod';
 import { FileText, Trash2, ShieldCheck, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { Timestamp, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 import type { Document } from '@/lib/types';
 import { useStorage } from '@/firebase';
+import { uploadSingleFile } from '@/lib/upload-utils';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -102,9 +102,7 @@ export function DocumentForm({ document: existingDoc, onSave, onClose }: Documen
         let finalType = existingDoc?.fileType || 'FILE';
 
         if (localFile && storage) {
-            const storageRef = ref(storage, `documents/${Date.now()}_${localFile.name}`);
-            const snapshot = await uploadBytes(storageRef, localFile);
-            finalUrl = await getDownloadURL(snapshot.ref);
+            finalUrl = await uploadSingleFile(storage, 'documents', localFile);
             finalType = localFile.name.split('.').pop()?.toUpperCase() || 'FILE';
         }
 
@@ -117,20 +115,14 @@ export function DocumentForm({ document: existingDoc, onSave, onClose }: Documen
         };
 
         onSave(dataToSave as any);
-        toast({ title: 'Registry Updated' });
+        toast({ title: 'Success: Saved to Database' });
         onClose();
     } catch (error: any) {
         console.error("Document Sync Error:", error);
-        const isConnectionError = error.message?.includes('ERR_PROXY_CONNECTION_FAILED') || 
-                                 error.message?.includes('Network Error') ||
-                                 error.code === 'storage/retry-limit-exceeded';
-
         toast({ 
             variant: 'destructive', 
-            title: isConnectionError ? 'Connection Error' : 'Upload Error', 
-            description: isConnectionError 
-                ? 'Connection Error: Please check your firewall or Firebase CORS settings.' 
-                : 'Failed to sync document to the registry.' 
+            title: 'Registry Error', 
+            description: 'Upload blocked by Browser/CORS. Check Console.' 
         });
     }
   };

@@ -109,7 +109,7 @@ export function EventForm({ event, onClose }: EventFormProps) {
         }
 
         const newGalleryUrls = (galleryFiles.length > 0) 
-            ? await uploadMultipleFiles(storage, 'event-gallery', galleryFiles) 
+            ? await uploadMultipleFiles(storage, 'events', galleryFiles) 
             : [];
         
         const finalGalleryImages = [...(values.galleryImages || []), ...newGalleryUrls];
@@ -134,18 +134,11 @@ export function EventForm({ event, onClose }: EventFormProps) {
         toast({ title: 'Success: Saved to Database' });
         onClose();
     } catch (error: any) {
-        console.error('[EventForm] Submission Error:', error);
-        
-        const isConnectionError = error.message?.includes('ERR_PROXY_CONNECTION_FAILED') || 
-                                 error.message?.includes('Network Error') ||
-                                 error.code === 'storage/retry-limit-exceeded';
-
+        console.error('[EventForm] Sync Error:', error);
         toast({ 
             variant: 'destructive', 
-            title: isConnectionError ? 'Connection Error' : 'Registry Error', 
-            description: isConnectionError 
-                ? 'Connection Error: Please check your firewall or Firebase CORS settings.' 
-                : 'Failed to save to database. Please check your connection.' 
+            title: 'Upload Failed', 
+            description: 'Upload blocked by Browser/CORS. Check Console.' 
         });
     } finally {
         setIsSaving(false);

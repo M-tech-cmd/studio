@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Expand, Target, TrendingUp, Loader2 } from 'lucide-react';
 import { useFirestore, useStorage } from '@/firebase';
-import { collection, addDoc, doc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadSingleFile, uploadMultipleFiles } from '@/lib/upload-utils';
 
 import type { DevelopmentProject } from '@/lib/types';
@@ -98,7 +98,7 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
         }
 
         const newGalleryUrls = (galleryFiles.length > 0) 
-            ? await uploadMultipleFiles(storage, 'project-gallery', galleryFiles) 
+            ? await uploadMultipleFiles(storage, 'projects', galleryFiles) 
             : [];
         
         const finalGallery = [...(values.galleryImages || []), ...newGalleryUrls];
@@ -122,17 +122,11 @@ export function DevelopmentProjectForm({ project, onClose }: DevelopmentProjectF
         toast({ title: 'Success: Saved to Database' });
         onClose();
     } catch (error: any) {
-        console.error('[ProjectForm] Error:', error);
-        const isConnectionError = error.message?.includes('ERR_PROXY_CONNECTION_FAILED') || 
-                                 error.message?.includes('Network Error') ||
-                                 error.code === 'storage/retry-limit-exceeded';
-
+        console.error('[ProjectForm] Sync Error:', error);
         toast({ 
             variant: 'destructive', 
-            title: isConnectionError ? 'Connection Error' : 'Update Failed', 
-            description: isConnectionError 
-                ? 'Connection Error: Please check your firewall or Firebase CORS settings.' 
-                : 'Could not reach the registry database.' 
+            title: 'Upload Failed', 
+            description: 'Upload blocked by Browser/CORS. Check Console.' 
         });
     } finally {
         setIsSaving(false);

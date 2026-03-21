@@ -74,7 +74,7 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
 
     try {
         const newUrls = (galleryFiles.length > 0) 
-            ? await uploadMultipleFiles(storage, 'bulletin-gallery', galleryFiles) 
+            ? await uploadMultipleFiles(storage, 'bulletins', galleryFiles) 
             : [];
         
         const finalGallery = [...(values.galleryImages || []), ...newUrls];
@@ -100,17 +100,11 @@ export function BulletinPostForm({ post, author, onClose }: BulletinPostFormProp
         toast({ title: 'Success: Saved to Database' });
         onClose();
     } catch (error: any) {
-        console.error('[BulletinForm] Error:', error);
-        const isConnectionError = error.message?.includes('ERR_PROXY_CONNECTION_FAILED') || 
-                                 error.message?.includes('Network Error') ||
-                                 error.code === 'storage/retry-limit-exceeded';
-
+        console.error('[BulletinForm] Sync Error:', error);
         toast({ 
             variant: 'destructive', 
-            title: isConnectionError ? 'Connection Error' : 'Error', 
-            description: isConnectionError 
-                ? 'Connection Error: Please check your firewall or Firebase CORS settings.' 
-                : 'Failed to publish to the community feed.' 
+            title: 'Sync Failed', 
+            description: 'Upload blocked by Browser/CORS. Check Console.' 
         });
     } finally {
         setIsSaving(false);
