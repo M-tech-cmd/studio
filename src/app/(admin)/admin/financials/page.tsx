@@ -228,7 +228,7 @@ export default function AdminFinancialsPage() {
                                 <FormItem><FormLabel className="text-xs font-black uppercase">Link to Specific Project</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue /></SelectTrigger></FormControl><SelectContent>
                                     <SelectItem value="none">General Development Fund</SelectItem>
                                     {projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>)}
-                                </Select></FormItem>
+                                </SelectContent></Select></FormItem>
                             )}/>
                         )}
 

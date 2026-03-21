@@ -313,30 +313,34 @@ export function MemberProfileForm() {
                         <AccordionTrigger className="text-lg sm:text-xl font-bold uppercase tracking-tight hover:no-underline">Ecclesial Participation</AccordionTrigger>
                         <AccordionContent className="pt-6 pb-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <FormField control={form.control} name="sccId" render={({ field }) => (
-                                    <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest text-primary">Your Jumuia (SCC) *</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-14 text-lg border-primary/20"><SelectValue placeholder="-- Select Jumuia --"/></SelectTrigger></FormControl><SelectContent>
-                                        {sccGroups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-                                        <SelectItem value="other_scc">Other / New SCC</SelectItem>
-                                    </Select></FormItem>
-                                )}/>
-                                {form.watch('sccId') === 'other_scc' && (
-                                    <FormField control={form.control} name="customSccName" render={({ field }) => (
-                                        <FormItem><FormLabel className="text-[10px] font-bold">New Jumuia Name</FormLabel><FormControl><Input {...field} placeholder="Enter name..." /></FormControl></FormItem>
+                                <>
+                                    <FormField control={form.control} name="sccId" render={({ field }) => (
+                                        <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest text-primary">Your Jumuia (SCC) *</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-14 text-lg border-primary/20"><SelectValue placeholder="-- Select Jumuia --"/></SelectTrigger></FormControl><SelectContent>
+                                            {sccGroups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                                            <SelectItem value="other_scc">Other / New SCC</SelectItem>
+                                        </SelectContent></Select></FormItem>
                                     )}/>
-                                )}
-                                <FormField control={form.control} name="parishGroupId" render={({ field }) => (
-                                    <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest">Parish Group (Dropdown)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-14 text-lg"><SelectValue placeholder="-- Select Group --"/></SelectTrigger></FormControl><SelectContent>
-                                        <SelectItem value="none">None</SelectItem>
-                                        {otherGroups.map(g => <SelectItem key={g.id} value={g.id}>{g.name} ({g.type})</SelectItem>)}
-                                        <SelectItem value="other_group">Other / Add New Group</SelectItem>
-                                    </Select></FormItem>
-                                )}/>
-                                {form.watch('parishGroupId') === 'other_group' && (
-                                    <FormField control={form.control} name="customParishGroupName" render={({ field }) => (
-                                        <FormItem><FormLabel className="text-[10px] font-bold">New Group Name</FormLabel><FormControl><Input {...field} placeholder="Enter name..." /></FormControl></FormItem>
+                                    {form.watch('sccId') === 'other_scc' && (
+                                        <FormField control={form.control} name="customSccName" render={({ field }) => (
+                                            <FormItem><FormLabel className="text-[10px] font-bold">New Jumuia Name</FormLabel><FormControl><Input {...field} placeholder="Enter name..." /></FormControl></FormItem>
+                                        )}/>
+                                    )}
+                                </>
+                                <>
+                                    <FormField control={form.control} name="parishGroupId" render={({ field }) => (
+                                        <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest">Parish Group (Dropdown)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-14 text-lg"><SelectValue placeholder="-- Select Group --"/></SelectTrigger></FormControl><SelectContent>
+                                            <SelectItem value="none">None</SelectItem>
+                                            {otherGroups.map(g => <SelectItem key={g.id} value={g.id}>{g.name} ({g.type})</SelectItem>)}
+                                            <SelectItem value="other_group">Other / Add New Group</SelectItem>
+                                        </SelectContent></Select></FormItem>
                                     )}/>
-                                )}
+                                    {form.watch('parishGroupId') === 'other_group' && (
+                                        <FormField control={form.control} name="customParishGroupName" render={({ field }) => (
+                                            <FormItem><FormLabel className="text-[10px] font-bold">New Group Name</FormLabel><FormControl><Input {...field} placeholder="Enter name..." /></FormControl></FormItem>
+                                        )}/>
+                                    )}
+                                </>
                                 <FormField control={form.control} name="groupType" render={({ field }) => (
                                     <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest">Role (Profile Type)</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue/></SelectTrigger></FormControl><SelectContent>
                                         {['YCS', 'YCA', 'Families', 'Other'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -346,7 +350,7 @@ export function MemberProfileForm() {
                                     <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-widest">Mass Preference</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue/></SelectTrigger></FormControl><SelectContent>
                                         <SelectItem value="1st Mass">1st Mass</SelectItem>
                                         <SelectItem value="2nd Mass">2nd Mass</SelectItem>
-                                    </Select></FormItem>
+                                    </SelectContent></Select></FormItem>
                                 )}/>
                             </div>
                         </AccordionContent>
@@ -432,11 +436,12 @@ export function MemberProfileForm() {
                                             <>
                                                 <FormField control={form.control} name={`children.${index}.parishGroupId`} render={({ field }) => (
                                                     <FormItem><FormLabel className="text-[10px] uppercase font-bold">Group / Category</FormLabel>
-                                                    <Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-10"><SelectValue placeholder="-- Select Group --"/></SelectTrigger></FormControl><SelectContent>
+                                                    <Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-10"><SelectValue placeholder="-- Select Group --"/></SelectTrigger></FormControl>
+                                                    <SelectContent>
                                                         <SelectItem value="none">None</SelectItem>
                                                         {otherGroups.map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
                                                         <SelectItem value="other_child_group">Other / Custom</SelectItem>
-                                                    </Select></FormItem>
+                                                    </SelectContent></Select></FormItem>
                                                 )}/>
                                                 {form.watch(`children.${index}.parishGroupId`) === 'other_child_group' && (
                                                     <FormField control={form.control} name={`children.${index}.customGroupName`} render={({ field }) => (
