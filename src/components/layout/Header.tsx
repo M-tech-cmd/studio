@@ -51,7 +51,7 @@ export function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useUser();
-  const auth = useAuth();
+  const { auth } = useAuth(); // Correctly destructure auth instance
   const firestore = useFirestore();
 
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
@@ -63,8 +63,9 @@ export function Header() {
 
 
   const handleLogout = async () => {
+    if (!auth) return;
     try {
-      await signOut(auth);
+      await signOut(auth); // Pass the Auth instance, not the hook result object
       router.push('/');
     } catch (error) {
       console.error("Error signing out: ", error);
