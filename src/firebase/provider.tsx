@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
@@ -96,16 +97,21 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
   useEffect(() => {
     if (auth) {
+      // 1. Force persistence for mobile reliability
       setPersistence(auth, browserLocalPersistence).catch((err) => {
-        console.error("Auth: setPersistence error:", err);
+        console.error("Auth: Persistence error:", err);
       });
 
+      // 2. Handle Redirect Results (Critical for Mobile)
       getRedirectResult(auth).then((result) => {
         if (result?.user) {
-          toast({ title: "Welcome back!", description: "You have signed in successfully." });
+          toast({ title: "Authorized", description: "Identity verified via Google." });
         }
       }).catch((error) => {
-        console.error("Auth: Redirect result error:", error);
+        if (error.code !== 'auth/no-auth-event') {
+            console.error("Auth: Redirect sync error:", error);
+            toast({ variant: 'destructive', title: 'Auth Error', description: 'Could not complete redirect. Try again.' });
+        }
       });
     }
   }, [auth, toast]);
@@ -148,8 +154,11 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
     setIsSigningIn(true);
     const provider = new GoogleAuthProvider();
+    // Prompt selection to prevent automatic login with wrong account
+    provider.setCustomParameters({ prompt: 'select_account' });
     
     try {
+        // Redirect is superior for mobile PWA/Web-app compatibility
         await signInWithRedirect(auth, provider);
     } catch (error: any) {
         console.error("Auth: Sign-in error:", error.code, error.message);
