@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
@@ -7,7 +6,6 @@ import { Firestore, doc, setDoc, getDoc, serverTimestamp } from 'firebase/firest
 import { Auth, User, onAuthStateChanged, User as FirebaseUser, setPersistence, browserLocalPersistence, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { Database } from 'firebase/database';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
-import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 
 interface FirebaseProviderProps {
@@ -16,7 +14,7 @@ interface FirebaseProviderProps {
   firestore: Firestore;
   auth: Auth;
   database: Database;
-  storage?: any; // Storage is now externalized to Cloudinary
+  storage?: any;
 }
 
 interface UserAuthState {
@@ -33,6 +31,7 @@ export interface FirebaseContextState {
   database: Database | null;
   user: User | null;
   isUserLoading: boolean;
+  isRedirecting: boolean;
   userError: Error | null;
   isSigningIn: boolean;
   startGoogleSignIn: () => Promise<void>;
@@ -91,23 +90,24 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     isUserLoading: true,
     userError: null,
   });
+  const [isRedirecting, setIsRedirecting] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const isAuthListenerInitialized = useRef(false);
   const { toast } = useToast();
 
   useEffect(() => {
     if (auth) {
-      // 1. Force persistence for mobile reliability
       setPersistence(auth, browserLocalPersistence).catch((err) => {
         console.error("Auth: Persistence error:", err);
       });
 
-      // 2. Handle Redirect Results (Critical for Mobile)
       getRedirectResult(auth).then((result) => {
         if (result?.user) {
           toast({ title: "Authorized", description: "Identity verified via Google." });
         }
+        setIsRedirecting(false);
       }).catch((error) => {
+        setIsRedirecting(false);
         if (error.code !== 'auth/no-auth-event') {
             console.error("Auth: Redirect sync error:", error);
             toast({ variant: 'destructive', title: 'Auth Error', description: 'Could not complete redirect. Try again.' });
@@ -154,11 +154,9 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
     setIsSigningIn(true);
     const provider = new GoogleAuthProvider();
-    // Prompt selection to prevent automatic login with wrong account
     provider.setCustomParameters({ prompt: 'select_account' });
     
     try {
-        // Redirect is superior for mobile PWA/Web-app compatibility
         await signInWithRedirect(auth, provider);
     } catch (error: any) {
         console.error("Auth: Sign-in error:", error.code, error.message);
@@ -177,11 +175,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       database: servicesAvailable ? database : null,
       user: userAuthState.user,
       isUserLoading: userAuthState.isUserLoading,
+      isRedirecting,
       userError: userAuthState.userError,
       isSigningIn,
       startGoogleSignIn
     };
-  }, [firebaseApp, firestore, auth, database, userAuthState, isSigningIn]);
+  }, [firebaseApp, firestore, auth, database, userAuthState, isSigningIn, isRedirecting]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>
@@ -209,8 +208,8 @@ export const useFirebase = (): FirebaseServicesAndUser => {
 };
 
 export const useAuth = () => {
-  const { auth, user, isUserLoading, userError, isSigningIn, startGoogleSignIn } = useFirebase();
-  return { auth, user, isUserLoading, userError, isSigningIn, startGoogleSignIn };
+  const { auth, user, isUserLoading, isRedirecting, userError, isSigningIn, startGoogleSignIn } = useFirebase();
+  return { auth, user, isUserLoading, isRedirecting, userError, isSigningIn, startGoogleSignIn };
 };
 
 export const useFirestore = (): Firestore => {
@@ -219,7 +218,7 @@ export const useFirestore = (): Firestore => {
 };
 
 export const useStorage = (): any => {
-  return null; // Firebase Storage is no longer used. Cloudinary is direct via upload-utils.
+  return null;
 };
 
 export const useDatabase = (): Database => {

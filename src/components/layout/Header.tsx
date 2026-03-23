@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Menu, User, Shield, LogOut, MessageCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { signOut, User as FirebaseUser } from 'firebase/auth';
+import { signOut as firebaseSignOut, User as FirebaseUser } from 'firebase/auth';
 import { useAuth, useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import type { SiteSettings } from '@/lib/types';
@@ -51,7 +51,7 @@ export function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useUser();
-  const { auth } = useAuth(); // Correctly destructure auth instance
+  const { auth } = useAuth();
   const firestore = useFirestore();
 
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
@@ -65,7 +65,7 @@ export function Header() {
   const handleLogout = async () => {
     if (!auth) return;
     try {
-      await signOut(auth); // Pass the Auth instance, not the hook result object
+      await firebaseSignOut(auth);
       router.push('/');
     } catch (error) {
       console.error("Error signing out: ", error);

@@ -3,7 +3,7 @@
 import { AdminSidebar } from "@/components/layout/AdminSidebar";
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from "react";
-import { useUser, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
+import { useUser, useFirestore, useMemoFirebase, useDoc, useAuth } from "@/firebase";
 import type { RegisteredUser, SiteSettings } from "@/lib/types";
 import { PasskeyModal } from "@/components/admin/PasskeyModal";
 import { PresenceManager } from "@/components/shared/PresenceManager";
@@ -14,13 +14,14 @@ import Link from 'next/link';
 /**
  * Admin Layout Client Wrapper
  * Handles auth redirection, presence, and navigation state.
+ * Prevents session bounce by monitoring isRedirecting state.
  */
 export function AdminLayoutClient({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isUserLoading } = useUser();
+  const { user, isUserLoading, isRedirecting } = useAuth();
   const firestore = useFirestore();
   const router = useRouter();
   const pathname = usePathname();
@@ -38,7 +39,7 @@ export function AdminLayoutClient({
   const isSuperAdmin = user?.email === 'kimaniemma20@gmail.com' || user?.uid === 'BKSmmIdohYQHlao5V9eZ9JQyaEV2';
   const isAdmin = userProfile?.isAdmin === true || isSuperAdmin;
   
-  const isVerifying = isUserLoading || (user && isProfileLoading);
+  const isVerifying = isUserLoading || isRedirecting || (user && isProfileLoading);
   
   useEffect(() => {
     if (!isVerifying && !user) {
