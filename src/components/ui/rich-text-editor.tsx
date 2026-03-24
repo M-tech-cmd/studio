@@ -1,18 +1,139 @@
 'use client';
 
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Image from '@tiptap/extension-image';
+import ImageExtension from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
 import TextStyle from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
-import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Link2, Image as ImageIcon, Undo, Redo, Video, Music, X } from 'lucide-react';
+import { Node, mergeAttributes } from '@tiptap/core';
+import { Bold, Italic, List, ListOrdered, Heading1, Heading2, Link2, Image as ImageIcon, Undo, Redo, Video as VideoIcon, Music, X } from 'lucide-react';
 import { useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useStorage } from '@/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
+
+/**
+ * Universal Media Component for Node Views.
+ * Provides a hoverable 'X' button to delete media nodes easily.
+ */
+const MediaNodeView = ({ node, deleteNode, extension }: any) => {
+  const { src } = node.attrs;
+  const isImage = extension.name === 'image';
+  const isVideo = extension.name === 'video';
+  const isAudio = extension.name === 'audio';
+
+  return (
+    <NodeViewWrapper className="relative group my-6 isolate">
+      <div className="relative inline-block w-full rounded-2xl overflow-hidden border-2 border-transparent group-hover:border-primary/30 transition-all">
+        {isImage && (
+          <img 
+            src={src} 
+            className="w-full h-auto object-contain block shadow-lg" 
+            alt="Content"
+          />
+        )}
+        {isVideo && (
+          <video 
+            src={src} 
+            controls 
+            className="w-full bg-black block shadow-lg" 
+          />
+        )}
+        {isAudio && (
+          <div className="bg-muted/30 p-4 rounded-xl">
+            <audio src={src} controls className="w-full" />
+          </div>
+        )}
+        
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            deleteNode();
+          }}
+          className="absolute top-3 right-3 h-10 w-10 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-50 hover:bg-destructive hover:scale-110 shadow-2xl backdrop-blur-md"
+          title="Remove Media"
+        >
+          <X className="h-5 w-5 stroke-[3px]" />
+        </button>
+      </div>
+    </NodeViewWrapper>
+  );
+};
+
+// --- Custom Media Extensions ---
+
+const Video = Node.create({
+  name: 'video',
+  group: 'block',
+  atom: true,
+  addAttributes() {
+    return {
+      src: { default: null },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'video' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['video', mergeAttributes(HTMLAttributes, { controls: true, class: 'w-full rounded-xl' })];
+  },
+  addCommands(): any {
+    return {
+      setVideo: (options: { src: string }) => ({ commands }: any) => {
+        return commands.insertContent({
+          type: this.name,
+          attrs: options,
+        });
+      },
+    };
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(MediaNodeView);
+  },
+});
+
+const Audio = Node.create({
+  name: 'audio',
+  group: 'block',
+  atom: true,
+  addAttributes() {
+    return {
+      src: { default: null },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'audio' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['audio', mergeAttributes(HTMLAttributes, { controls: true, class: 'w-full' })];
+  },
+  addCommands(): any {
+    return {
+      setAudio: (options: { src: string }) => ({ commands }: any) => {
+        return commands.insertContent({
+          type: this.name,
+          attrs: options,
+        });
+      },
+    };
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(MediaNodeView);
+  },
+});
+
+const CustomImage = ImageExtension.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(MediaNodeView);
+  },
+});
+
+// --- Main Editor Component ---
 
 const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,12 +150,11 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
         bulletList: { HTMLAttributes: { class: 'list-disc pl-5' } },
         orderedList: { HTMLAttributes: { class: 'list-decimal pl-5' } }
       }),
-      Image.configure({
+      CustomImage.configure({
         allowBase64: true,
-        HTMLAttributes: {
-          class: 'w-full h-auto object-contain rounded-xl shadow-lg my-4 border-2 border-primary/10',
-        },
       }),
+      Video,
+      Audio,
       Link.configure({ 
         openOnClick: false,
         HTMLAttributes: {
@@ -49,18 +169,7 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     content: value,
     editorProps: {
       attributes: {
-        class: 'prose dark:prose-invert max-w-none focus:outline-none min-h-[350px] border-2 border-input rounded-xl p-6 bg-white shadow-inner transition-all focus:border-primary/50',
-      },
-      handleClick: (view, pos, event) => {
-        const target = event.target as HTMLElement;
-        if (target.closest('.media-delete-btn')) {
-            const node = view.state.doc.nodeAt(pos);
-            if (node) {
-                editor?.chain().focus().deleteSelection().run();
-                return true;
-            }
-        }
-        return false;
+        class: 'prose dark:prose-invert max-w-none focus:outline-none min-h-[400px] border-2 border-input rounded-xl p-8 bg-white shadow-inner transition-all focus:border-primary/50',
       }
     },
     onUpdate: ({ editor }) => {
@@ -91,13 +200,13 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
     const tempUrl = URL.createObjectURL(file);
     const type = mediaTypeRef.current;
 
-    // 1. Immediate UI Feedback: Insert temporary node
+    // 1. Immediate UI Feedback: Insert node using native commands
     if (type === 'image') {
       editor.chain().focus().setImage({ src: tempUrl }).run();
     } else if (type === 'video') {
-       editor.chain().focus().insertContent(`<video controls src="${tempUrl}" class="w-full rounded-xl"></video>`).run();
+      (editor.chain().focus() as any).setVideo({ src: tempUrl }).run();
     } else if (type === 'audio') {
-      editor.chain().focus().insertContent(`<audio controls src="${tempUrl}" class="w-full"></audio>`).run();
+      (editor.chain().focus() as any).setAudio({ src: tempUrl }).run();
     }
 
     // 2. Background Sync (If storage is available)
@@ -114,8 +223,8 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
                 URL.revokeObjectURL(tempUrl);
             }
         } catch (error: any) {
-            console.error("Editor Upload Sync Error:", error);
-            toast({ variant: 'destructive', title: 'Media Sync Delayed', description: 'Using local temporary visual.' });
+            console.error("Editor Media Sync Error:", error);
+            toast({ variant: 'destructive', title: 'Cloud Sync Delayed', description: 'Using local visual for now.' });
         }
     }
 
@@ -137,11 +246,11 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
   if (!editor) return null;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
       
-      <div className="flex flex-col border-2 border-input rounded-xl bg-muted/30 backdrop-blur-sm sticky top-0 z-10 overflow-hidden">
-        <div className="flex flex-wrap items-center gap-1.5 p-2">
+      <div className="flex flex-col border-2 border-input rounded-xl bg-muted/30 backdrop-blur-sm sticky top-0 z-[60] overflow-hidden shadow-sm">
+        <div className="flex flex-wrap items-center gap-1.5 p-2 bg-white/80">
             <div className="flex items-center gap-1">
                 <Button variant={editor.isActive('bold') ? 'secondary' : 'ghost'} size="sm" type="button" onClick={() => editor.chain().focus().toggleBold().run()}><Bold className="h-4 w-4" /></Button>
                 <Button variant={editor.isActive('italic') ? 'secondary' : 'ghost'} size="sm" type="button" onClick={() => editor.chain().focus().toggleItalic().run()}><Italic className="h-4 w-4" /></Button>
@@ -159,7 +268,7 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
             <Separator orientation="vertical" className="mx-1 h-6" />
             <div className="flex items-center gap-2">
                 <Button variant='ghost' size="sm" type="button" onClick={() => triggerUpload('image')} title="Insert Image"><ImageIcon className="h-4 w-4" /></Button>
-                <Button variant='ghost' size="sm" type="button" onClick={() => triggerUpload('video')} title="Insert Video"><Video className="h-4 w-4" /></Button>
+                <Button variant='ghost' size="sm" type="button" onClick={() => triggerUpload('video')} title="Insert Video"><VideoIcon className="h-4 w-4" /></Button>
                 <Button variant='ghost' size="sm" type="button" onClick={() => triggerUpload('audio')} title="Insert Audio"><Music className="h-4 w-4" /></Button>
                 <Button variant={editor.isActive('link') ? 'secondary' : 'ghost'} size="sm" type="button" onClick={setLink}><Link2 className="h-4 w-4" /></Button>
             </div>
