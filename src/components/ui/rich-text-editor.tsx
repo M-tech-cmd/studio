@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEditor, EditorContent } from '@tiptap/react';
@@ -87,40 +86,40 @@ const Tiptap = ({ value, onChange }: { value: string; onChange: (value: string) 
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !editor || !storage) return;
+    if (!file || !editor) return;
 
     const tempUrl = URL.createObjectURL(file);
     const type = mediaTypeRef.current;
 
-    const deleteBtn = `<button class="media-delete-btn absolute top-2 left-2 z-50 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center border border-white/20 hover:bg-black transition-all"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>`;
-
+    // 1. Immediate UI Feedback: Insert temporary node
     if (type === 'image') {
-      editor.chain().focus().insertContent(`<div class="relative group isolate"><img src="${tempUrl}" class="w-full h-auto rounded-xl opacity-50" />${deleteBtn}</div>`).run();
+      editor.chain().focus().setImage({ src: tempUrl }).run();
     } else if (type === 'video') {
-       editor.chain().focus().insertContent(`<div class="relative group isolate"><video controls src="${tempUrl}" class="w-full rounded-xl opacity-50"></video>${deleteBtn}</div>`).run();
+       editor.chain().focus().insertContent(`<video controls src="${tempUrl}" class="w-full rounded-xl"></video>`).run();
     } else if (type === 'audio') {
-      editor.chain().focus().insertContent(`<div class="relative group isolate"><audio controls src="${tempUrl}" class="w-full opacity-50"></audio>${deleteBtn}</div>`).run();
+      editor.chain().focus().insertContent(`<audio controls src="${tempUrl}" class="w-full"></audio>`).run();
     }
 
-    try {
-        const storageRef = ref(storage, `editor-media/${Date.now()}_${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        const downloadURL = await getDownloadURL(snapshot.ref);
-        
-        if (downloadURL) {
-            const currentContent = editor.getHTML();
-            const updatedContent = currentContent.split(tempUrl).join(downloadURL);
-            editor.commands.setContent(updatedContent, false);
-            URL.revokeObjectURL(tempUrl);
+    // 2. Background Sync (If storage is available)
+    if (storage) {
+        try {
+            const storageRef = ref(storage, `editor-media/${Date.now()}_${file.name}`);
+            const snapshot = await uploadBytes(storageRef, file);
+            const downloadURL = await getDownloadURL(snapshot.ref);
+            
+            if (downloadURL) {
+                const currentContent = editor.getHTML();
+                const updatedContent = currentContent.split(tempUrl).join(downloadURL);
+                editor.commands.setContent(updatedContent, false);
+                URL.revokeObjectURL(tempUrl);
+            }
+        } catch (error: any) {
+            console.error("Editor Upload Sync Error:", error);
+            toast({ variant: 'destructive', title: 'Media Sync Delayed', description: 'Using local temporary visual.' });
         }
-    } catch (error: any) {
-        console.error("Editor Upload Failed:", error.code);
-        toast({ variant: 'destructive', title: 'Upload Failed', description: 'Network issue during media sync.' });
-        const content = editor.getHTML();
-        editor.commands.setContent(content.split(tempUrl).join(''), false);
-    } finally {
-        if (fileInputRef.current) fileInputRef.current.value = '';
     }
+
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
   
   const setLink = useCallback(() => {

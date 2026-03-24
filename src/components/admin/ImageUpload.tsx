@@ -128,11 +128,7 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
           >
             <X className="h-5 w-5" />
           </button>
-          {file && (
-            <div className="absolute bottom-2 right-2 px-2 py-1 bg-primary text-white text-[10px] font-bold rounded uppercase shadow-lg">
-              Pending Sync
-            </div>
-          )}
+        
         </div>
       )}
     </div>
