@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 
 const navLinks = [
@@ -90,14 +91,23 @@ export function Header() {
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <User />
+              <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0 overflow-hidden border-2 border-primary/10">
+                <Avatar className="h-full w-full">
+                  <AvatarImage 
+                    src={user?.photoURL || undefined} 
+                    alt={user?.displayName || userName} 
+                    className="object-cover"
+                  />
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                    {(user?.displayName || userName).charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
           {isRealUser && (
             <TooltipContent>
-              <p>{userName}</p>
+              <p>{user.displayName || userName}</p>
             </TooltipContent>
           )}
         </Tooltip>
@@ -213,11 +223,25 @@ export function Header() {
                    <div className="p-4 border-t space-y-4 pb-10">
                     <div className="sm:hidden">
                       {isRealUser ? (
-                         <div className="flex flex-col gap-2">
-                          <Button variant="outline" asChild><Link href="/register-profile" onClick={() => setSheetOpen(false)}>My Profile</Link></Button>
-                          <Button variant="outline" asChild><Link href="/chat" onClick={() => setSheetOpen(false)}>Private Chat</Link></Button>
-                          <Button variant="outline" asChild><Link href="/admin" onClick={() => setSheetOpen(false)}>Admin Portal</Link></Button>
-                          <Button variant="ghost" onClick={() => { handleLogout(); setSheetOpen(false); }}>Logout</Button>
+                         <div className="flex flex-col gap-4">
+                          <div className="flex items-center gap-3 px-2">
+                            <Avatar className="h-10 w-10 border-2 border-primary/10">
+                              <AvatarImage src={user?.photoURL || undefined} className="object-cover" />
+                              <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                                {(user?.displayName || userName).charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col overflow-hidden">
+                              <span className="font-bold truncate text-sm">{user.displayName || userName}</span>
+                              <span className="text-[10px] text-muted-foreground truncate">{user.email}</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Button variant="outline" asChild><Link href="/register-profile" onClick={() => setSheetOpen(false)}>My Profile</Link></Button>
+                            <Button variant="outline" asChild><Link href="/chat" onClick={() => setSheetOpen(false)}>Private Chat</Link></Button>
+                            <Button variant="outline" asChild><Link href="/admin" onClick={() => setSheetOpen(false)}>Admin Portal</Link></Button>
+                            <Button variant="ghost" onClick={() => { handleLogout(); setSheetOpen(false); }}>Logout</Button>
+                          </div>
                          </div>
                       ) : (
                         <div className="flex flex-col gap-2">
