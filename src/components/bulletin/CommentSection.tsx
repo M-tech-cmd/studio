@@ -42,23 +42,25 @@ const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 function CommentContent({ content }: { content: string }) {
     if (!content) return null;
 
-    // Split by words while preserving spaces/newlines
-    const parts = content.split(/(\s+)/);
+    // Split by @mentions (words starting with @) while capturing the mention part
+    // This allows us to map through parts and style mentions uniquely.
+    const parts = content.split(/(@[^\s]+)/g);
 
     return (
         <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words leading-relaxed">
             {parts.map((part, index) => {
-                // If part starts with @ and has content after it
+                // If part starts with @ and has at least one character after it
                 if (part.startsWith('@') && part.length > 1) {
                     return (
                         <span 
                             key={index} 
-                            className="text-primary font-semibold bg-primary/5 px-1 rounded-sm cursor-pointer hover:underline decoration-primary/30 transition-all"
+                            className="text-blue-600 font-semibold bg-blue-50/80 px-1 rounded-sm cursor-pointer hover:underline decoration-blue-400/30 transition-all"
                         >
                             {part}
                         </span>
                     );
                 }
+                // Return standard text for non-mention parts
                 return part;
             })}
         </p>
