@@ -1,12 +1,11 @@
-
 "use client";
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Calendar, Users, FileText, Church, Briefcase, BookOpen, Settings, LogOut, Menu, CreditCard, UserCheck, Newspaper, Clock, MapPin, Palette, DollarSign, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, FileText, Church, Briefcase, BookOpen, Settings, LogOut, Menu, CreditCard, UserCheck, Newspaper, Clock, MapPin, Palette, DollarSign, MessageSquare, Mail } from 'lucide-react';
 import { useState } from 'react';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, query, where } from 'firebase/firestore';
 import type { SiteSettings } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ import { Logo } from '../shared/Logo';
 const adminNavLinks = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/messages', label: 'Messages', icon: MessageSquare },
+  { href: '/admin/inquiries', label: 'Inquiries', icon: Mail },
   { href: '/admin/financials', label: 'Financial Ledger', icon: DollarSign },
   { href: '/admin/events', label: 'Events', icon: Calendar },
   { href: '/admin/bulletin', label: 'Bulletin', icon: Newspaper },
@@ -38,6 +38,14 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void; }) {
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
   const { data: settings } = useDoc<SiteSettings>(settingsRef);
 
+  // Unread Inquiries Badge Logic
+  const unreadInquiriesQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'inquiries'), where('status', '==', 'unread'));
+  }, [firestore]);
+  const { data: unreadInquiries } = useCollection(unreadInquiriesQuery);
+  const unreadCount = unreadInquiries?.length || 0;
+
   return (
     <>
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:hidden">
@@ -58,7 +66,12 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void; }) {
             <nav className="flex flex-col h-full bg-card text-card-foreground">
               <div className="flex-1 p-2 space-y-1 overflow-y-auto">
                 {adminNavLinks.map(link => (
-                    <SidebarLink key={link.href + link.label} {...link} onClick={() => isSheetOpen && setSheetOpen(false)} />
+                    <SidebarLink 
+                      key={link.href + link.label} 
+                      {...link} 
+                      badge={link.label === 'Inquiries' ? unreadCount : undefined}
+                      onClick={() => isSheetOpen && setSheetOpen(false)} 
+                    />
                 ))}
               </div>
               <div className="p-2 border-t mt-auto">
@@ -79,7 +92,11 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void; }) {
          <div className="flex flex-col h-full bg-card text-card-foreground">
             <nav className="flex-1 p-2 space-y-1 overflow-y-auto pt-4">
                 {adminNavLinks.map(link => (
-                    <SidebarLink key={link.href + link.label} {...link} />
+                    <SidebarLink 
+                      key={link.href + link.label} 
+                      {...link} 
+                      badge={link.label === 'Inquiries' ? unreadCount : undefined}
+                    />
                 ))}
             </nav>
             <div className="p-2 border-t">
@@ -94,7 +111,7 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void; }) {
   );
 }
 
-const SidebarLink = ({ href, label, icon: Icon, onClick }: { href: string; label: string; icon: React.ElementType, onClick?: () => void }) => {
+const SidebarLink = ({ href, label, icon: Icon, onClick, badge }: { href: string; label: string; icon: React.ElementType, onClick?: () => void, badge?: number }) => {
   const pathname = usePathname();
   const isActive = pathname === href;
 
@@ -103,14 +120,21 @@ const SidebarLink = ({ href, label, icon: Icon, onClick }: { href: string; label
       href={href}
       onClick={onClick}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2 transition-all text-sm font-medium',
+        'flex items-center justify-between rounded-lg px-3 py-2 transition-all text-sm font-medium',
         isActive 
             ? 'bg-primary text-primary-foreground shadow-md scale-[1.02]' 
             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
       )}
     >
-      <Icon className="h-4 w-4" />
-      <span>{label}</span>
+      <div className="flex items-center gap-3">
+        <Icon className="h-4 w-4" />
+        <span>{label}</span>
+      </div>
+      {badge ? (
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground animate-pulse">
+          {badge}
+        </span>
+      ) : null}
     </Link>
   );
 };

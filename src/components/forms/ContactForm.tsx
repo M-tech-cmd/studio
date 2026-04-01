@@ -4,6 +4,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { useFirestore } from "@/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +28,8 @@ const formSchema = z.object({
 
 export function ContactForm() {
   const { toast } = useToast();
+  const firestore = useFirestore();
+  
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -36,14 +40,31 @@ export function ContactForm() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    // In a real app, you would integrate with an email service here.
-    console.log(values);
-    toast({
-      title: "Message Sent!",
-      description: "Thank you for contacting us. We will get back to you shortly.",
-    });
-    form.reset();
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!firestore) return;
+
+    try {
+      await addDoc(collection(firestore, 'inquiries'), {
+        ...values,
+        status: 'unread',
+        createdAt: serverTimestamp(),
+        repliedAt: null,
+        replyMessage: null,
+      });
+
+      toast({
+        title: "Message sent!",
+        description: "We'll get back to you soon.",
+      });
+      form.reset();
+    } catch (error: any) {
+      console.error("Error submitting contact form:", error);
+      toast({
+        variant: "destructive",
+        title: "Submission failed",
+        description: "An unexpected error occurred. Please try again later.",
+      });
+    }
   }
 
   return (
@@ -105,7 +126,9 @@ export function ContactForm() {
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full md:w-auto">Send Message</Button>
+        <Button type="submit" className="w-full md:w-auto" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? "Sending..." : "Send Message"}
+        </Button>
       </form>
     </Form>
   );

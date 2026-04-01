@@ -165,6 +165,18 @@ export type FinancialEntry = {
   createdAt: Timestamp;
 };
 
+export type Inquiry = {
+  id: string;
+  name: string;
+  email: string;
+  subject: string;
+  message: string;
+  status: 'unread' | 'read' | 'replied';
+  createdAt: Timestamp;
+  repliedAt?: Timestamp | null;
+  replyMessage?: string | null;
+};
+
 export type SiteSettings = {
   id: string;
   brandName?: string;

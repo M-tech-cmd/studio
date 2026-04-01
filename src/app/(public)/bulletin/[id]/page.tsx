@@ -100,16 +100,10 @@ export default function BulletinPostPage() {
                         <PhotoGallery photos={post.galleryImages} title={post.title} />
                     </div>
                 </CardContent>
-                <CardFooter className="p-8 md:p-12 bg-muted/5 border-t flex flex-col gap-10">
-                   <div className="space-y-4">
-                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">Community Reactions</p>
-                        <Reactions post={post} postId={id} />
-                   </div>
-                   
+                <CardFooter className="p-8 md:p-12 bg-muted/5 border-t flex flex-col gap-10">   
                    <div className="pt-10 border-t border-dashed">
                         <div className="flex items-center justify-between mb-8">
-                            <h3 className="text-2xl font-black tracking-tighter uppercase">Parishioner Reflections</h3>
-                            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Support Area</p>
+                            <h3 className="text-2xl font-black tracking-tighter uppercase">Reflections</h3>
                         </div>
                         <CommentSection postId={id} />
                    </div>
