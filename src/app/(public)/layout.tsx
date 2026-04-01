@@ -1,14 +1,13 @@
-
 'use client';
 
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { PresenceManager } from "@/components/shared/PresenceManager";
 import { WhatsAppChatWidget } from "@/components/shared/WhatsAppChatWidget";
-import { useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
+import { useAuth, useDoc, useFirestore, useMemoFirebase } from "@/firebase"; // Added useAuth
 import { doc } from "firebase/firestore";
 import type { SiteSettings, RegisteredUser } from "@/lib/types";
-import { AlertTriangle, Hammer, Settings } from "lucide-react";
+import { AlertTriangle, Hammer, Loader2 } from "lucide-react"; // Added Loader2
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -36,18 +35,38 @@ export default function WebLayout({
   children: React.ReactNode;
 }) {
   const firestore = useFirestore();
-  const { user } = useUser();
+  // Use useAuth instead of useUser to get the loading/redirect states
+  const { user, isUserLoading, isRedirecting } = useAuth();
   
-  const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
-  const { data: settings } = useDoc<SiteSettings>(settingsRef);
+  // HOOKS MUST ALWAYS RUN - DO NOT PUT RETURNS ABOVE THESE
+  const settingsRef = useMemoFirebase(() => 
+    firestore ? doc(firestore, 'site_settings', 'main') : null, 
+    [firestore]
+  );
+  const { data: settings, isLoading: settingsLoading } = useDoc<SiteSettings>(settingsRef);
 
-  const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const userDocRef = useMemoFirebase(() => 
+    (user && firestore) ? doc(firestore, 'users', user.uid) : null, 
+    [firestore, user]
+  );
   const { data: userProfile } = useDoc<RegisteredUser>(userDocRef);
 
+  // 1. CRITICAL LOADING GUARD
+  // If we are redirecting from Google or still loading auth, show a spinner.
+  // This prevents the "undefined (reading 'call')" error by waiting for context.
+  if (isUserLoading || isRedirecting || settingsLoading) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background z-[110]">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // 2. Logic Check
   const isSuperAdmin = user?.email === 'kimaniemma20@gmail.com' || user?.uid === 'BKSmmIdohYQHlao5V9eZ9JQyaEV2';
   const isAdmin = userProfile?.isAdmin === true || isSuperAdmin;
 
-  // Maintenance Check: If maintenance mode is ON and user is NOT an admin, block the site.
+  // Maintenance Check
   if (settings?.maintenanceMode && !isAdmin) {
       return <MaintenanceShield message={settings.maintenanceMessage} />;
   }

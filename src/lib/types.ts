@@ -248,6 +248,7 @@ export type BulletinComment = {
     authorPhotoUrl?: string;
     content: string;
     createdAt: Timestamp;
+    reactions?: { [userId: string]: string };
 };
 
 export type ChatMessage = {

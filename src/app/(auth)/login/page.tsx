@@ -6,7 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useAuth, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import {
   signInWithEmailAndPassword,
@@ -41,7 +40,18 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [view, setView] = useState<View>('login');
   const router = useRouter();
-  const { user, isUserLoading, auth, startGoogleSignIn, isSigningIn } = useAuth();
+  
+  // Destructure signingInMethod and setSigningInMethod from your updated useAuth
+  const { 
+    user, 
+    isUserLoading, 
+    auth, 
+    startGoogleSignIn, 
+    isSigningIn, 
+    signingInMethod, 
+    setSigningInMethod 
+  } = useAuth();
+  
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -56,11 +66,16 @@ export default function LoginPage() {
 
   async function onLoginSubmit(values: z.infer<typeof loginSchema>) {
     if (!auth) return;
+    
+    // Set method to email so only the email button spins
+    setSigningInMethod('email');
     setFormLoading(true);
+    
     try {
       await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, values.email, values.password);
     } catch (error: any) {
+      setSigningInMethod(null);
       toast({
         variant: 'destructive',
         title: 'Login Failed',
@@ -137,7 +152,11 @@ export default function LoginPage() {
                                 <FormControl>
                                     <div className="relative">
                                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input placeholder="you@example.com" {...field} className="pl-10" />
+                                        <input 
+                                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-10" 
+                                          placeholder="you@example.com" 
+                                          {...field} 
+                                        />
                                     </div>
                                 </FormControl>
                                 <FormMessage />
@@ -169,12 +188,17 @@ export default function LoginPage() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <Button variant="outline" className="w-full h-12 font-bold" onClick={handleGoogleSignIn} disabled={formLoading || isSigningIn}>
-            {formLoading || isSigningIn ? (
+          <Button 
+            variant="outline" 
+            className="w-full h-12 font-bold" 
+            onClick={handleGoogleSignIn} 
+            disabled={formLoading || isSigningIn}
+          >
+            {/* Show spinner only if Google is the active method */}
+            {signingInMethod === 'google' ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <div className="mr-2 flex items-center justify-center">
-                {/* Embedded SVG for the Google Logo to ensure reliable rendering */}
                 <svg width="18" height="18" viewBox="0 0 18 18">
                   <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285f4"/>
                   <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34a853"/>
@@ -226,8 +250,12 @@ export default function LoginPage() {
                 )}
               />
               <Button type="submit" className="w-full h-12 font-bold" disabled={formLoading || isSigningIn}>
-                {formLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Sign In
+                {/* Show spinner only if email is the active method */}
+                {signingInMethod === 'email' ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  "Sign In"
+                )}
               </Button>
             </form>
           </Form>
