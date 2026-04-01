@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
-import { Calendar, MessageCircle, Play, Mic } from 'lucide-react';
+import { Calendar, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import type { BulletinPost, RegisteredUser } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -11,11 +10,28 @@ import { Button } from '@/components/ui/button';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
+
+/**
+ * Extracts the first media source from HTML content.
+ */
+function extractFirstMedia(html: string): { type: 'image' | 'video' | 'audio', src: string } | null {
+  if (!html) return null;
+  
+  const imgMatch = html.match(/<img[^>]+src="([^">]+)"/i);
+  if (imgMatch) return { type: 'image', src: imgMatch[1] };
+  
+  const videoMatch = html.match(/<video[^>]+src="([^">]+)"/i);
+  if (videoMatch) return { type: 'video', src: videoMatch[1] };
+  
+  const audioMatch = html.match(/<audio[^>]+src="([^">]+)"/i);
+  if (audioMatch) return { type: 'audio', src: audioMatch[1] };
+  
+  return null;
+}
 
 /**
  * Modernized Bulletin Card: Vertical layout consistent with EventCard.
- * Features a top media slot, dynamic author identity, and standardized metadata.
+ * Features a top media slot extracted from rich text content.
  */
 export function BulletinPostCard({ post }: { post: BulletinPost }) {
   const firestore = useFirestore();
@@ -27,11 +43,6 @@ export function BulletinPostCard({ post }: { post: BulletinPost }) {
   );
   const { data: author } = useDoc<RegisteredUser>(authorRef);
 
-  const isVideo = (url: string) => /\.(mp4|webm|ogg|mov)/i.test(url);
-  const isAudio = (url: string) => /\.(mp3|wav|flac)/i.test(url);
-
-  // Extract first image from gallery as hero
-  const mainImageUrl = post.galleryImages && post.galleryImages.length > 0 ? post.galleryImages[0] : null;
   const contentSnippet = post.content.replace(/<[^>]+>/g, '').substring(0, 120) + '...';
 
   const formattedDate = post.createdAt 
@@ -40,41 +51,39 @@ export function BulletinPostCard({ post }: { post: BulletinPost }) {
 
   return (
     <Link href={`/bulletin/${post.id}`} className="block h-full group">
-      <Card className="flex flex-col w-full h-full overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white border-none rounded-xl">
-        {/* Top Section: Media Slot (Fixed Aspect Ratio) */}
-        <div className="relative w-full aspect-video bg-muted/20">
-          {mainImageUrl ? (
-            isVideo(mainImageUrl) ? (
-              <div className="h-full w-full flex items-center justify-center bg-slate-900">
-                <Play className="h-10 w-10 text-white opacity-40" />
-                <span className="absolute bottom-2 right-2 text-[8px] font-bold text-white uppercase bg-black/40 px-1.5 py-0.5 rounded">Video</span>
-              </div>
-            ) : isAudio(mainImageUrl) ? (
-              <div className="h-full w-full flex items-center justify-center bg-slate-100">
-                <Mic className="h-10 w-10 text-primary opacity-40" />
-                <span className="absolute bottom-2 right-2 text-[8px] font-bold text-slate-500 uppercase bg-black/5 px-1.5 py-0.5 rounded">Audio</span>
-              </div>
-            ) : (
-              <Image
-                src={mainImageUrl}
-                alt={post.title}
-                fill
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
-                unoptimized
-              />
-            )
-          ) : (
-            <div className="h-full w-full flex items-center justify-center bg-primary/5">
-               <Skeleton className="h-full w-full" />
-            </div>
-          )}
+      <Card className="flex flex-col w-full h-full overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white border-none rounded-xl relative">
+        
+        {/* Media Slot: Extracted from Tiptap Content */}
+        {(() => {
+          const media = extractFirstMedia(post.content);
+          if (!media) return null;
           
-          <Badge className="absolute top-3 right-3 bg-primary text-white uppercase font-black text-[9px] tracking-widest border-none shadow-md">
-            {post.category}
-          </Badge>
-        </div>
+          if (media.type === 'image') return (
+            <img src={media.src} alt="" className="w-full aspect-video object-cover rounded-t-xl" />
+          );
+          
+          if (media.type === 'video') return (
+            <video 
+              src={media.src} 
+              autoPlay 
+              muted 
+              loop 
+              playsInline 
+              className="w-full aspect-video object-cover rounded-t-xl" 
+            />
+          );
+          
+          if (media.type === 'audio') return (
+            <div className="px-4 pt-4">
+              <audio controls src={media.src} className="w-full h-8" />
+            </div>
+          );
+        })()}
 
-        {/* Bottom Section: Details Slot */}
+        <Badge className="absolute top-3 right-3 bg-primary text-white uppercase font-black text-[9px] tracking-widest border-none shadow-md z-10">
+          {post.category}
+        </Badge>
+
         <CardHeader className="p-5 pb-2">
           <CardTitle className="text-lg font-headline font-bold line-clamp-2 text-[#1e3a5f] leading-tight min-h-[3.5rem] group-hover:text-primary transition-colors">
             {post.title}
