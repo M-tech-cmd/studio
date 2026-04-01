@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -11,6 +10,10 @@ import { BulletinPostCard } from '@/components/bulletin/BulletinPostCard';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+/**
+ * Bulletin Feed: Restructured to 4-column grid mirroring the Events page.
+ * Provides a modern magazine-style layout for parish updates.
+ */
 function BulletinFeed() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const firestore = useFirestore();
@@ -36,9 +39,9 @@ function BulletinFeed() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-64 w-full" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} className="h-[400px] w-full rounded-2xl" />
         ))}
       </div>
     );
@@ -47,7 +50,7 @@ function BulletinFeed() {
   return (
     <div className="space-y-8">
       {/* Category Filter Bar */}
-      <div className="flex flex-wrap gap-2 pb-4 border-b">
+      <div className="flex flex-wrap gap-2 pb-6 border-b border-dashed">
         {categories.map((cat) => (
           <Button
             key={cat}
@@ -55,7 +58,7 @@ function BulletinFeed() {
             size="sm"
             onClick={() => setSelectedCategory(cat)}
             className={cn(
-              "rounded-full transition-all",
+              "rounded-full transition-all px-6 h-9 font-bold",
               selectedCategory === cat && "shadow-md scale-105"
             )}
           >
@@ -65,21 +68,21 @@ function BulletinFeed() {
       </div>
 
       {!filteredPosts || filteredPosts.length === 0 ? (
-        <div className="text-center py-20 bg-muted/10 rounded-xl border border-dashed">
-          <h2 className="text-2xl font-semibold text-muted-foreground">No Posts Found</h2>
-          <p className="text-muted-foreground mt-2">
+        <div className="text-center py-20 bg-muted/10 rounded-[2rem] border-2 border-dashed max-w-2xl mx-auto">
+          <h2 className="text-2xl font-black uppercase tracking-tight text-foreground/80">No Posts Found</h2>
+          <p className="text-muted-foreground mt-3 font-medium">
             {selectedCategory === 'All' 
               ? 'Check back soon for the latest news and announcements.' 
               : `No posts found in the "${selectedCategory}" category.`}
           </p>
           {selectedCategory !== 'All' && (
-            <Button variant="link" onClick={() => setSelectedCategory('All')} className="mt-4">
+            <Button variant="link" onClick={() => setSelectedCategory('All')} className="mt-4 font-bold">
               Clear Filter
             </Button>
           )}
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {filteredPosts.map((post) => (
             <BulletinPostCard key={post.id} post={post} />
           ))}
@@ -95,7 +98,7 @@ function BulletinContent() {
     const { data: settings } = useDoc<SiteSettings>(settingsRef);
 
     return (
-        <div className="bg-transparent">
+        <div className="bg-transparent pb-20">
             <PageHeader
                 title={settings?.bulletinTitle || "Church Bulletin"}
                 subtitle={settings?.bulletinDescription || "Stay up-to-date with the latest parish news, announcements, and reflections."}
@@ -103,7 +106,7 @@ function BulletinContent() {
                 subtitleColor={settings?.bulletinDescriptionColor}
             />
             <section className="py-10 bg-transparent">
-                <div className="container max-w-4xl mx-auto px-4">
+                <div className="container max-w-7xl mx-auto px-4">
                     <BulletinFeed />
                 </div>
             </section>
