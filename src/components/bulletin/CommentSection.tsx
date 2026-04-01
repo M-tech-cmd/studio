@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -33,6 +34,36 @@ import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+/**
+ * Renders comment text with professional @mention highlighting.
+ * Differentiates between the mention handle and the actual message content.
+ */
+function CommentContent({ content }: { content: string }) {
+    if (!content) return null;
+
+    // Split by words while preserving spaces/newlines
+    const parts = content.split(/(\s+)/);
+
+    return (
+        <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words leading-relaxed">
+            {parts.map((part, index) => {
+                // If part starts with @ and has content after it
+                if (part.startsWith('@') && part.length > 1) {
+                    return (
+                        <span 
+                            key={index} 
+                            className="text-primary font-semibold bg-primary/5 px-1 rounded-sm cursor-pointer hover:underline decoration-primary/30 transition-all"
+                        >
+                            {part}
+                        </span>
+                    );
+                }
+                return part;
+            })}
+        </p>
+    );
+}
 
 function Comment({ comment, postId }: { comment: BulletinComment; postId: string }) {
     const { user } = useAuth();
@@ -147,7 +178,7 @@ function Comment({ comment, postId }: { comment: BulletinComment; postId: string
                                 </div>
                             </div>
                         ) : (
-                            <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words leading-relaxed">{comment.content}</p>
+                            <CommentContent content={comment.content} />
                         )}
 
                         {isOwner && !isEditing && (
