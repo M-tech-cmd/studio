@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -37,37 +36,42 @@ const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
 /**
  * Renders comment text with professional @mention highlighting.
- * Differentiates between the mention handle and the actual message content.
+ * Ensures the handle is blue while the content remains standard color.
  */
 function CommentContent({ content }: { content: string }) {
     if (!content) return null;
 
-    // Split by @mentions (words starting with @) while capturing the mention part
-    // This allows us to map through parts and style mentions uniquely.
+    // Matches @ followed by non-whitespace characters
     const parts = content.split(/(@[^\s]+)/g);
 
     return (
         <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words leading-relaxed">
             {parts.map((part, index) => {
-                // If part starts with @ and has at least one character after it
                 if (part.startsWith('@') && part.length > 1) {
                     return (
                         <span 
                             key={index} 
-                            className="text-blue-600 font-semibold bg-blue-50/80 px-1 rounded-sm cursor-pointer hover:underline decoration-blue-400/30 transition-all"
+                            className="text-blue-600 font-semibold bg-blue-50/50 px-1 rounded-sm cursor-default hover:underline decoration-blue-400/30 transition-all"
                         >
                             {part}
                         </span>
                     );
                 }
-                // Return standard text for non-mention parts
                 return part;
             })}
         </p>
     );
 }
 
-function Comment({ comment, postId }: { comment: BulletinComment; postId: string }) {
+function Comment({ 
+    comment, 
+    postId, 
+    onReply 
+}: { 
+    comment: BulletinComment; 
+    postId: string;
+    onReply: (c: BulletinComment) => void;
+}) {
     const { user } = useAuth();
     const firestore = useFirestore();
     const { toast } = useToast();
@@ -109,7 +113,7 @@ function Comment({ comment, postId }: { comment: BulletinComment; postId: string
 
     const toggleReaction = async (emoji: string) => {
         if (!user || !firestore) {
-            toast({ title: "Sign in required", description: "Login to react to reflections." });
+            toast({ title: "Sign in required", description: "Login to react." });
             return;
         }
         const commentRef = doc(firestore, 'bulletins', postId, 'comments', comment.id);
@@ -141,8 +145,6 @@ function Comment({ comment, postId }: { comment: BulletinComment; postId: string
             .map(([emoji]) => emoji);
     }, [reactionCounts]);
 
-    const totalReactions = Object.keys(reactions).length;
-
     return (
         <div className="flex space-x-3 group/comment">
             <div className="flex-shrink-0">
@@ -156,7 +158,7 @@ function Comment({ comment, postId }: { comment: BulletinComment; postId: string
             <div className="flex-grow space-y-1">
                 <div className="relative inline-block max-w-full">
                     <div className={cn(
-                        "bg-muted rounded-2xl p-3 pr-10 min-w-[120px]",
+                        "bg-muted rounded-2xl p-3 pr-10 min-w-[140px]",
                         isEditing && "w-full min-w-[300px]"
                     )}>
                         <div className="flex items-center gap-2 mb-1">
@@ -176,7 +178,7 @@ function Comment({ comment, postId }: { comment: BulletinComment; postId: string
                                 />
                                 <div className="flex justify-end gap-2">
                                     <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
-                                    <Button size="sm" onClick={handleUpdate}>Save Changes</Button>
+                                    <Button size="sm" onClick={handleUpdate}>Save</Button>
                                 </div>
                             </div>
                         ) : (
@@ -204,14 +206,14 @@ function Comment({ comment, postId }: { comment: BulletinComment; postId: string
                         )}
                     </div>
 
-                    {totalReactions > 0 && !isEditing && (
+                    {Object.keys(reactions).length > 0 && !isEditing && (
                         <div className="absolute -bottom-2 -right-2 flex items-center gap-1 bg-white shadow-md border rounded-full px-1.5 py-0.5 z-10 animate-in zoom-in">
                             <div className="flex -space-x-1">
                                 {topEmojis.map(emoji => (
                                     <span key={emoji} className="text-[10px] drop-shadow-sm">{emoji}</span>
                                 ))}
                             </div>
-                            <span className="text-[10px] font-black text-muted-foreground pr-0.5">{totalReactions}</span>
+                            <span className="text-[10px] font-black text-muted-foreground pr-0.5">{Object.keys(reactions).length}</span>
                         </div>
                     )}
                 </div>
@@ -250,7 +252,10 @@ function Comment({ comment, postId }: { comment: BulletinComment; postId: string
                             </PopoverContent>
                         </Popover>
 
-                        <button className="text-xs font-black uppercase tracking-widest text-muted-foreground hover:underline">
+                        <button 
+                            onClick={() => onReply(comment)}
+                            className="text-xs font-black uppercase tracking-widest text-muted-foreground hover:underline"
+                        >
                             Reply
                         </button>
                     </div>
@@ -260,9 +265,9 @@ function Comment({ comment, postId }: { comment: BulletinComment; postId: string
             <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                 <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-2xl font-black uppercase tracking-tighter">Delete Reflection?</AlertDialogTitle>
+                        <AlertDialogTitle className="text-2xl font-black">Delete Reflection?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will permanently remove your comment from the bulletin thread. This action is final.
+                            This will permanently remove your comment. This action is final.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -277,6 +282,7 @@ function Comment({ comment, postId }: { comment: BulletinComment; postId: string
 
 export function CommentSection({ postId }: { postId: string }) {
     const firestore = useFirestore();
+    const [replyingTo, setReplyingTo] = useState<BulletinComment | null>(null);
     
     const commentsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -295,18 +301,28 @@ export function CommentSection({ postId }: { postId: string }) {
             )}
             {!isLoading && comments && comments.length > 0 && (
                  <div className="space-y-6">
-                    {comments.map(comment => <Comment key={comment.id} comment={comment} postId={postId} />)}
+                    {comments.map(comment => (
+                        <Comment 
+                            key={comment.id} 
+                            comment={comment} 
+                            postId={postId} 
+                            onReply={setReplyingTo}
+                        />
+                    ))}
                 </div>
             )}
              {!isLoading && (!comments || comments.length === 0) && (
                 <div className="text-center py-12 bg-muted/5 rounded-[2rem] border-2 border-dashed">
                     <MessageCircle className="h-10 w-10 mx-auto mb-4 text-muted-foreground opacity-20" />
                     <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">No reflections shared yet</p>
-                    <p className="text-xs text-muted-foreground/60 mt-1">Be the first to share your thoughts with the community.</p>
                 </div>
             )}
             <div className="pt-6 border-t border-dashed">
-                <AddCommentForm postId={postId} />
+                <AddCommentForm 
+                    postId={postId} 
+                    replyTo={replyingTo} 
+                    onCancelReply={() => setReplyingTo(null)}
+                />
             </div>
         </div>
     )
