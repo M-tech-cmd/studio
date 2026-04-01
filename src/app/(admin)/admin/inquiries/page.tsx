@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { Trash2, Eye, Mail, Reply, CheckCircle2, Loader2 } from 'lucide-react';
+import { Trash2, Eye, Mail, Reply, CheckCircle2, Loader2, Send } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +24,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import emailjs from '@emailjs/browser';
 
 export default function AdminInquiriesPage() {
   const firestore = useFirestore();
@@ -59,26 +58,12 @@ export default function AdminInquiriesPage() {
     setIsReplyOpen(true);
   };
 
-  const handleSendReply = async () => {
+  const handleDispatchResponse = async () => {
     if (!selectedInquiry || !replyText.trim() || !firestore) return;
     
     setIsSending(true);
     try {
-      // Send via EmailJS
-      // NOTE: User should replace 'YOUR_PUBLIC_KEY' with their actual EmailJS Public Key in the EmailJS Dashboard
-      await emailjs.send(
-        'service_02on4rm',
-        'template_r2wd65',
-        {
-          name: selectedInquiry.name,
-          email: selectedInquiry.email,
-          subject: selectedInquiry.subject,
-          message: replyText,
-        },
-        'YOUR_PUBLIC_KEY' 
-      );
-
-      // Update Firestore
+      // 1. Update Firestore status and archive the reply
       const docRef = doc(firestore, 'inquiries', selectedInquiry.id);
       await updateDoc(docRef, {
         status: 'replied',
@@ -86,15 +71,21 @@ export default function AdminInquiriesPage() {
         repliedAt: serverTimestamp(),
       });
 
-      toast({ title: 'Reply Sent', description: 'Email dispatched and record updated.' });
+      // 2. Open Native Email Client with pre-filled data (The WayFare Method)
+      const subject = `Regarding your inquiry: ${selectedInquiry.subject}`;
+      const mailtoLink = `mailto:${selectedInquiry.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(replyText)}`;
+      
+      window.location.href = mailtoLink;
+
+      toast({ title: 'Success', description: 'Registry updated and email client triggered.' });
       setIsReplyOpen(false);
       setSelectedInquiry(null);
     } catch (error: any) {
-      console.error("EmailJS Error:", error);
+      console.error("Dispatch Error:", error);
       toast({ 
         variant: 'destructive', 
-        title: 'Error sending reply', 
-        description: error.text || 'EmailJS service error. Check your Public Key configuration.' 
+        title: 'Sync Failed', 
+        description: error.message || 'Could not update registry records.' 
       });
     } finally {
       setIsSending(false);
@@ -262,11 +253,11 @@ export default function AdminInquiriesPage() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setIsReplyOpen(false)} className="rounded-full">Discard</Button>
             <Button 
-              onClick={handleSendReply} 
+              onClick={handleDispatchResponse} 
               disabled={isSending || !replyText.trim()} 
               className="flex-1 rounded-full h-12 font-black uppercase tracking-widest shadow-xl"
             >
-              {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Reply className="mr-2 h-4 w-4" />}
+              {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
               Dispatch Response
             </Button>
           </DialogFooter>

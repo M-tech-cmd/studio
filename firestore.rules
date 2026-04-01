@@ -1,12 +1,105 @@
 rules_version = '2';
-
-// FORCED RECOVERY RULES (v2.0)
-// Absolute override to resolve all 'Missing or insufficient permissions' errors.
-// Allows the Admin portal and Registry to function without database barriers.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // ✅ Super Admin (Foundation Identity)
+    // Primary authorization for site settings and critical registry infrastructure.
+    function isSuperAdmin() {
+      return request.auth != null && 
+        (
+          request.auth.uid == 'BKSmmIdohYQHlao5V9eZ9JQyaEV2' ||
+          request.auth.token.email.lower() == 'kimaniemma20@gmail.com'
+        );
+    }
+
+    // ✅ Safe Admin Check
+    // Verifies if the current session belongs to the owner or an authorized administrator.
+    function isAdmin() {
+      return isSuperAdmin() || 
+        (
+          request.auth != null &&
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
+        );
+    }
+
+    // ✅ SITE SETTINGS (Foundation & Branding)
+    match /site_settings/{settingsId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ✅ MESSAGES & INQUIRIES
+    // Anyone can send a message; only admins can manage them.
+    match /messages/{messageId} {
+      allow create: if true;
+      allow read, write: if isAdmin();
+    }
+
+    // ✅ PUBLIC DATA COLLECTIONS
+    match /masses/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /community_groups/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /bulletins/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /events/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /development_projects/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /documents/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /profiles/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /bible_readings/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /site_content/{id} { allow read: if true; allow write: if isAdmin(); }
+
+    // ✅ USER REGISTRY
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && 
+        (request.auth.uid == userId || isAdmin());
+    }
+
+    // ✅ MEMBER PROFILES
+    match /members/{userId} {
+      allow read, write: if isAdmin() || 
+        (request.auth != null && request.auth.uid == userId);
+    }
+
+    // ✅ FINANCIAL TREASURY
+    match /financial_ledger/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    // ✅ PRIVATE COMMUNICATION
+    match /private_chats/{chatId} {
+      allow create: if request.auth != null && 
+        request.auth.uid in request.resource.data.participants;
+
+      allow read, update, delete: if request.auth != null && 
+        (request.auth.uid in resource.data.participants || isAdmin());
+
+      match /messages/{messageId} {
+        allow read: if request.auth != null && 
+          (
+            request.auth.uid in get(/databases/$(database)/documents/private_chats/$(chatId)).data.participants || 
+            isAdmin()
+          );
+        allow write: if request.auth != null && 
+          (
+            request.auth.uid == resource.data.senderId || 
+            isAdmin() ||
+            (request.method == 'create' && request.auth.uid in get(/databases/$(database)/documents/private_chats/$(chatId)).data.participants)
+          );
+      }
+    }
+    
+ // 2. Inquiry System (Strictly for your Contact Form)
+    match /inquiries/{id} {
+      allow create: if true; // Anyone can send a message
+      allow read, update, delete: if isAdmin(); // Only M-tech-cmd or admins can manage
+    }
+    
+    // ✅ COMMUNITY REFLECTIONS (Comments)
+    match /bulletins/{postId}/comments/{commentId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if isAdmin() || 
+        (request.auth != null && request.auth.uid == resource.data.authorId);
     }
   }
 }
