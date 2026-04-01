@@ -48,7 +48,8 @@ export default function AdminInquiriesPage() {
     
     if (inquiry.status === 'unread' && firestore) {
       const docRef = doc(firestore, 'inquiries', inquiry.id);
-      await updateDoc(docRef, { status: 'read' });
+      // Background sync
+      updateDoc(docRef, { status: 'read' }).catch(err => console.error("Update read status failed:", err));
     }
   };
 
@@ -58,12 +59,17 @@ export default function AdminInquiriesPage() {
     setIsReplyOpen(true);
   };
 
+  /**
+   * Dual-Phase Dispatch Response (WayFare Workflow)
+   * 1. Step A: Archive response in Firestore
+   * 2. Step B: Trigger native email client with pre-filled content
+   */
   const handleDispatchResponse = async () => {
     if (!selectedInquiry || !replyText.trim() || !firestore) return;
     
     setIsSending(true);
     try {
-      // 1. Update Firestore status and archive the reply
+      // Phase A: Update Firestore status and archive the reply
       const docRef = doc(firestore, 'inquiries', selectedInquiry.id);
       await updateDoc(docRef, {
         status: 'replied',
@@ -71,20 +77,25 @@ export default function AdminInquiriesPage() {
         repliedAt: serverTimestamp(),
       });
 
-      // 2. Open Native Email Client with pre-filled data (The WayFare Method)
+      // Phase B: Open Native Email Client with pre-filled data (The WayFare Method)
       const subject = `Regarding your inquiry: ${selectedInquiry.subject}`;
       const mailtoLink = `mailto:${selectedInquiry.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(replyText)}`;
       
+      // Trigger native client
       window.location.href = mailtoLink;
 
-      toast({ title: 'Success', description: 'Registry updated and email client triggered.' });
+      toast({ 
+        title: 'Response Dispatched', 
+        description: 'Registry records updated and email client triggered.' 
+      });
+      
       setIsReplyOpen(false);
       setSelectedInquiry(null);
     } catch (error: any) {
-      console.error("Dispatch Error:", error);
+      console.error("Dispatch Sync Error:", error);
       toast({ 
         variant: 'destructive', 
-        title: 'Sync Failed', 
+        title: 'Dispatch Failed', 
         description: error.message || 'Could not update registry records.' 
       });
     } finally {
@@ -213,7 +224,7 @@ export default function AdminInquiriesPage() {
             {selectedInquiry?.replyMessage && (
               <div className="space-y-1 pt-4 border-t border-dashed bg-green-50/30 p-4 rounded-2xl border-2 border-green-100">
                 <p className="text-[10px] font-black uppercase text-green-600 tracking-widest flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" /> Official Office Reply
+                  <CheckCircle2 className="h-3 w-3" /> Official Response Sent
                 </p>
                 <p className="text-sm leading-relaxed italic text-foreground/80">{selectedInquiry.replyMessage}</p>
                 <p className="text-[9px] text-muted-foreground mt-2 font-bold uppercase">
@@ -251,7 +262,7 @@ export default function AdminInquiriesPage() {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setIsReplyOpen(false)} className="rounded-full">Discard</Button>
+            <Button variant="outline" onClick={() => setIsReplyOpen(false)} className="rounded-full" disabled={isSending}>Discard</Button>
             <Button 
               onClick={handleDispatchResponse} 
               disabled={isSending || !replyText.trim()} 
