@@ -226,7 +226,7 @@ export function Header() {
                          <div className="flex flex-col gap-4">
                           <div className="flex items-center gap-3 px-2">
                             <Avatar className="h-10 w-10 border-2 border-primary/10">
-                              <AvatarImage src={user?.photoURL || undefined} className="object-cover" />
+                              <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || userName} className="object-cover" />
                               <AvatarFallback className="bg-primary/10 text-primary font-bold">
                                 {(user?.displayName || userName).charAt(0).toUpperCase()}
                               </AvatarFallback>

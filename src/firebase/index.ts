@@ -7,7 +7,7 @@ import {
   initializeFirestore, 
   getFirestore, 
   persistentLocalCache, 
-  persistentIndexedDbWebProvider,
+  persistentMultipleTabManager,
   Firestore
 } from 'firebase/firestore';
 import { getDatabase } from 'firebase/database';
@@ -32,18 +32,14 @@ export function getSdks(firebaseApp: FirebaseApp) {
   let firestore: Firestore;
   
   try {
-    // Modern persistent cache implementation
     firestore = initializeFirestore(firebaseApp, {
       localCache: persistentLocalCache({
-        tabManager: persistentIndexedDbWebProvider()
+        tabManager: persistentMultipleTabManager()
       })
     });
   } catch (e) {
     firestore = getFirestore(firebaseApp);
   }
-
-  // DEACTIVATED: Firebase Storage removed in favor of Cloudinary to resolve 403 billing errors.
-  // const storage = getStorage(firebaseApp);
 
   return {
     firebaseApp,

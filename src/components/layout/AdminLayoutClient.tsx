@@ -59,7 +59,7 @@ export function AdminLayoutClient({
 
   if(isVerifying) {
     return (
-        <div className="flex h-screen flex-col items-center justify-center bg-white">
+        <div className="fixed inset-0 flex flex-col items-center justify-center bg-white z-50">
             <div className="animate-pulse flex flex-col items-center gap-6">
                 <Logo url={settings?.logoUrl} className="h-24 w-24 grayscale opacity-50" />
                 <div className="flex flex-col items-center gap-2">
