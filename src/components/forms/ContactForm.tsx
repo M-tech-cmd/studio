@@ -77,7 +77,7 @@ export function ContactForm() {
             <FormItem>
               <FormLabel>Your Name</FormLabel>
               <FormControl>
-                <Input placeholder="John Doe" {...field} />
+                <Input placeholder="please enter your name" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -90,7 +90,7 @@ export function ContactForm() {
             <FormItem>
               <FormLabel>Your Email</FormLabel>
               <FormControl>
-                <Input placeholder="john.doe@example.com" {...field} />
+                <Input placeholder="your email address..." {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
