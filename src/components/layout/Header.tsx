@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { signOut as firebaseSignOut, User as FirebaseUser } from 'firebase/auth';
 import { useAuth, useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import type { SiteSettings } from '@/lib/types';
+import type { SiteSettings, RegisteredUser } from '@/lib/types';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -58,6 +58,9 @@ export function Header() {
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
   const { data: settings } = useDoc<SiteSettings>(settingsRef);
 
+  const userDocRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile } = useDoc<RegisteredUser>(userDocRef);
+
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -75,15 +78,10 @@ export function Header() {
 
   const isRealUser = user && !user.isAnonymous;
 
-  const getUserFirstName = (user: FirebaseUser | null): string => {
-    if (!user) return 'User';
-    const name = user.displayName || user.email;
-    if (!name) return 'User';
-    const firstName = name.split('@')[0].split('.')[0];
-    return firstName.charAt(0).toUpperCase() + firstName.slice(1);
-  }
-
-  const userName = getUserFirstName(user);
+  // Identity logic: Use masked name if hideRealName is true
+  const displayIdentity = userProfile?.hideRealName 
+    ? `St. Martin De Porres ${userProfile.customTitle || 'Admin'}`
+    : (userProfile?.name || user?.displayName || user?.email?.split('@')[0] || 'Member');
 
   const userNavigation = (
     <TooltipProvider>
@@ -94,12 +92,12 @@ export function Header() {
               <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0 overflow-hidden border-2 border-primary/10">
                 <Avatar className="h-full w-full">
                   <AvatarImage 
-                    src={user?.photoURL || undefined} 
-                    alt={user?.displayName || userName} 
+                    src={user?.photoURL || userProfile?.photoURL || undefined} 
+                    alt={displayIdentity} 
                     className="object-cover"
                   />
                   <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                    {(user?.displayName || userName).charAt(0).toUpperCase()}
+                    {displayIdentity.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -107,7 +105,7 @@ export function Header() {
           </TooltipTrigger>
           {isRealUser && (
             <TooltipContent>
-              <p>{user.displayName || userName}</p>
+              <p>{displayIdentity}</p>
             </TooltipContent>
           )}
         </Tooltip>
@@ -116,7 +114,7 @@ export function Header() {
             <>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user.displayName || userName}</p>
+                  <p className="text-sm font-medium leading-none">{displayIdentity}</p>
                   {user.email && <p className="text-xs leading-none text-muted-foreground">
                     {user.email}
                   </p>}
@@ -226,13 +224,13 @@ export function Header() {
                          <div className="flex flex-col gap-4">
                           <div className="flex items-center gap-3 px-2">
                             <Avatar className="h-10 w-10 border-2 border-primary/10">
-                              <AvatarImage src={user?.photoURL || undefined} alt={user?.displayName || userName} className="object-cover" />
+                              <AvatarImage src={user?.photoURL || userProfile?.photoURL || undefined} alt={displayIdentity} className="object-cover" />
                               <AvatarFallback className="bg-primary/10 text-primary font-bold">
-                                {(user?.displayName || userName).charAt(0).toUpperCase()}
+                                {displayIdentity.charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col overflow-hidden">
-                              <span className="font-bold truncate text-sm">{user.displayName || userName}</span>
+                              <span className="font-bold truncate text-sm">{displayIdentity}</span>
                               <span className="text-[10px] text-muted-foreground truncate">{user.email}</span>
                             </div>
                           </div>

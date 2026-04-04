@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
-import { createUserWithEmailAndPassword, setPersistence, browserLocalPersistence } from 'firebase/auth';
+import { createUserWithEmailAndPassword, setPersistence, browserLocalPersistence, updateProfile, signOut } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import type { SiteSettings } from '@/lib/types';
 
@@ -16,10 +16,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Mail, Lock, ArrowLeft, Eye, EyeOff, User } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 
 const signupSchema = z.object({
+  fullName: z.string().min(2, { message: 'Please enter your full name.' }),
   email: z.string().email({ message: 'Please enter a valid email.' }),
   password: z.string().min(8, { message: 'Password must be at least 8 characters.' }),
   confirmPassword: z.string()
@@ -44,6 +45,7 @@ export default function SignupPage() {
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
+      fullName: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -64,12 +66,18 @@ export default function SignupPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       
       const user = userCredential.user;
+
+      // Update Profile displayName in Firebase Auth
+      await updateProfile(user, {
+        displayName: values.fullName
+      });
+
       const userDocRef = doc(firestore, 'users', user.uid);
 
       await setDoc(userDocRef, {
         id: user.uid,
         email: user.email,
-        name: user.email?.split('@')[0] || 'New User',
+        name: values.fullName,
         photoURL: user.photoURL || null,
         role: 'user',
         isAdmin: false,
@@ -78,9 +86,12 @@ export default function SignupPage() {
         lastSeen: serverTimestamp(),
       });
 
+      // Requirement: Do NOT auto-login. Sign out immediately.
+      await signOut(auth);
+
       toast({
-        title: 'Account Created',
-        description: "Welcome! Please sign in to continue.",
+        title: 'Account Created!',
+        description: "Welcome! Please sign in to verify your account.",
       });
       router.push('/login');
     } catch (error: any) {
@@ -119,6 +130,22 @@ export default function SignupPage() {
       <CardContent>
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+                control={form.control}
+                name="fullName"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl>
+                        <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="John Doe" {...field} className="pl-10 h-12" />
+                        </div>
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
             <FormField
                 control={form.control}
                 name="email"

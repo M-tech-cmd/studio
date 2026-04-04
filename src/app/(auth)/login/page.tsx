@@ -41,7 +41,6 @@ export default function LoginPage() {
   const [view, setView] = useState<View>('login');
   const router = useRouter();
   
-  // Destructure signingInMethod and setSigningInMethod from your updated useAuth
   const { 
     user, 
     isUserLoading, 
@@ -60,14 +59,14 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!isUserLoading && user && !user.isAnonymous) {
+      toast({ title: `Welcome back!`, description: `Signed in as ${user.displayName || user.email}` });
       router.replace('/');
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, router, toast]);
 
   async function onLoginSubmit(values: z.infer<typeof loginSchema>) {
     if (!auth) return;
     
-    // Set method to email so only the email button spins
     setSigningInMethod('email');
     setFormLoading(true);
     
@@ -194,7 +193,6 @@ export default function LoginPage() {
             onClick={handleGoogleSignIn} 
             disabled={formLoading || isSigningIn}
           >
-            {/* Show spinner only if Google is the active method */}
             {signingInMethod === 'google' ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -250,7 +248,6 @@ export default function LoginPage() {
                 )}
               />
               <Button type="submit" className="w-full h-12 font-bold" disabled={formLoading || isSigningIn}>
-                {/* Show spinner only if email is the active method */}
                 {signingInMethod === 'email' ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (

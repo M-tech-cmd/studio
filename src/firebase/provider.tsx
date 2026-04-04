@@ -3,7 +3,7 @@
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect, useRef } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore, doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged, User as FirebaseUser, setPersistence, browserLocalPersistence, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { Auth, User, onAuthStateChanged, User as FirebaseUser, setPersistence, browserLocalPersistence, GoogleAuthProvider, signInWithRedirect, getRedirectResult, updateProfile } from 'firebase/auth';
 import { Database } from 'firebase/database';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 import { useToast } from '@/hooks/use-toast';
@@ -37,8 +37,8 @@ export interface FirebaseContextState {
   isRedirecting: boolean;
   userError: Error | null;
   isSigningIn: boolean;
-  signingInMethod: AuthMethod; // Added this
-  setSigningInMethod: (method: AuthMethod) => void; // Added this
+  signingInMethod: AuthMethod;
+  setSigningInMethod: (method: AuthMethod) => void;
   startGoogleSignIn: () => Promise<void>;
 }
 
@@ -71,11 +71,15 @@ async function upsertUserProfile(firestore: Firestore, user: FirebaseUser) {
                 lastSeen: serverTimestamp(),
             }, { merge: true });
         } else {
-            const updateData = {
+            // For existing users, ensure display data is synced (especially for Google logins)
+            const updateData: any = {
                 email: user.email,
-                name: name,
                 photoURL: user.photoURL || null,
             };
+            // Only overwrite name if display name exists (prevents losing email signup name)
+            if (user.displayName) {
+                updateData.name = user.displayName;
+            }
             await setDoc(userDocRef, updateData, { merge: true });
         }
     } catch (err) {
@@ -97,7 +101,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   });
   const [isRedirecting, setIsRedirecting] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
-  const [signingInMethod, setSigningInMethod] = useState<AuthMethod>(null); // Added this
+  const [signingInMethod, setSigningInMethod] = useState<AuthMethod>(null);
   const isAuthListenerInitialized = useRef(false);
   const { toast } = useToast();
 
@@ -109,13 +113,13 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
       getRedirectResult(auth).then((result) => {
         if (result?.user) {
-          toast({ title: "Authorized", description: "Identity verified via Google." });
+          toast({ title: "Welcome back!", description: `Signed in as ${result.user.displayName || result.user.email}` });
         }
         setIsRedirecting(false);
-        setSigningInMethod(null); // Reset on success
+        setSigningInMethod(null);
       }).catch((error) => {
         setIsRedirecting(false);
-        setSigningInMethod(null); // Reset on error
+        setSigningInMethod(null);
         if (error.code !== 'auth/no-auth-event') {
             console.error("Auth: Redirect sync error:", error);
             toast({ variant: 'destructive', title: 'Auth Error', description: 'Could not complete redirect. Try again.' });
@@ -160,7 +164,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   const startGoogleSignIn = async () => {
     if (isSigningIn || signingInMethod || !auth) return;
 
-    setSigningInMethod('google'); // Set to google
+    setSigningInMethod('google');
     setIsSigningIn(true);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
@@ -171,7 +175,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         console.error("Auth: Sign-in error:", error.code, error.message);
         toast({ variant: 'destructive', title: 'Sign-In Failed', description: error.message });
         setIsSigningIn(false);
-        setSigningInMethod(null); // Reset on error
+        setSigningInMethod(null);
     }
   };
 
@@ -188,8 +192,8 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       isRedirecting,
       userError: userAuthState.userError,
       isSigningIn,
-      signingInMethod, // Added
-      setSigningInMethod, // Added
+      signingInMethod,
+      setSigningInMethod,
       startGoogleSignIn
     };
   }, [firebaseApp, firestore, auth, database, userAuthState, isSigningIn, isRedirecting, signingInMethod]);
