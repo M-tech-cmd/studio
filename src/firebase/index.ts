@@ -6,8 +6,7 @@ import { getAuth } from 'firebase/auth';
 import { 
   initializeFirestore, 
   getFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager,
+  memoryLocalCache,
   Firestore
 } from 'firebase/firestore';
 import { getDatabase } from 'firebase/database';
@@ -33,9 +32,7 @@ export function getSdks(firebaseApp: FirebaseApp) {
   
   try {
     firestore = initializeFirestore(firebaseApp, {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-      })
+      localCache: memoryLocalCache()
     });
   } catch (e) {
     firestore = getFirestore(firebaseApp);

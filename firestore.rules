@@ -4,13 +4,11 @@ service cloud.firestore {
 
     // ✅ Super Admin (Foundation Identity)
     // Primary authorization for site settings and critical registry infrastructure.
-    function isSuperAdmin() {
+       function isSuperAdmin() {
       return request.auth != null && 
-        (
-          request.auth.uid == 'BKSmmIdohYQHlao5V9eZ9JQyaEV2' ||
-          request.auth.token.email.lower() == 'kimaniemma20@gmail.com'
-        );
+        request.auth.uid == 'BKSmmIdohYQHlao5V9eZ9JQyaEV2';
     }
+
 
     // ✅ Safe Admin Check
     // Verifies if the current session belongs to the owner or an authorized administrator.
