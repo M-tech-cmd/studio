@@ -206,7 +206,7 @@ export default function AdminFinancialsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full overflow-y-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-black tracking-tighter uppercase">Parish Treasury</h1>
@@ -342,7 +342,7 @@ export default function AdminFinancialsPage() {
         </Card>
       </div>
 
-      <Card className="border-none shadow-xl rounded-2xl overflow-hidden">
+      <Card className="border-none shadow-md overflow-hidden">
         <CardHeader className="bg-muted/30 border-b">
           <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
@@ -351,68 +351,70 @@ export default function AdminFinancialsPage() {
           <CardDescription>Comprehensive list of all office-recorded contributions.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-muted/10">
-              <TableRow>
-                <TableHead className="font-bold">Date</TableHead>
-                <TableHead className="font-bold">Contributor</TableHead>
-                <TableHead className="font-bold">Category</TableHead>
-                <TableHead className="font-bold">Amount</TableHead>
-                <TableHead className="text-right font-bold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-20 animate-pulse">Syncing Treasury...</TableCell></TableRow>
-              ) : financials?.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic">No financial records found in registry.</TableCell></TableRow>
-              ) : (
-                (financials || []).map((entry) => (
-                  <TableRow key={entry.id} className="hover:bg-muted/30">
-                    <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                            {entry.date ? format((entry.date as any).toDate ? (entry.date as any).toDate() : new Date(entry.date as any), 'MMM dd, yyyy') : 'N/A'}
-                        </div>
-                    </TableCell>
-                    <TableCell>
-                        <div className="flex items-center gap-2">
-                            {entry.entryType === 'General' ? <Users className="h-4 w-4 text-muted-foreground" /> : <User className="h-4 w-4 text-primary" />}
-                            <div className="flex flex-col">
-                                <span className={cn("font-bold", entry.entryType === 'General' && "text-muted-foreground uppercase text-[10px]")}>{entry.memberName}</span>
-                                {entry.notes && <span className="text-[10px] text-muted-foreground italic truncate max-w-[200px]">{entry.notes}</span>}
-                            </div>
-                        </div>
-                    </TableCell>
-                    <TableCell>
-                        <Badge variant="outline" className={cn(
-                            "font-black text-[10px] uppercase tracking-widest",
-                            entry.category === 'Tithe' ? "border-blue-200 text-blue-700 bg-blue-50" :
-                            entry.category === 'Offertory' ? "border-purple-200 text-purple-700 bg-purple-50" :
-                            entry.category === 'Project' ? "border-emerald-200 text-emerald-700 bg-emerald-50" :
-                            "border-slate-200 text-slate-700 bg-slate-50"
-                        )}>
-                            {entry.category}
-                        </Badge>
-                    </TableCell>
-                    <TableCell className="font-black text-lg">
-                        {formatCurrency(entry.amount)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" className="text-primary hover:bg-primary/10 rounded-full" onClick={() => handleEditClick(entry)}>
-                                <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 rounded-full" onClick={() => handleDelete(entry.id)}>
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[800px]">
+              <TableHeader className="bg-muted/10">
+                <TableRow>
+                  <TableHead className="font-bold">Date</TableHead>
+                  <TableHead className="font-bold">Contributor</TableHead>
+                  <TableHead className="font-bold">Category</TableHead>
+                  <TableHead className="font-bold">Amount</TableHead>
+                  <TableHead className="text-right font-bold">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow><TableCell colSpan={5} className="text-center py-20 animate-pulse">Syncing Treasury...</TableCell></TableRow>
+                ) : financials?.length === 0 ? (
+                  <TableRow><TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic">No financial records found in registry.</TableCell></TableRow>
+                ) : (
+                  (financials || []).map((entry) => (
+                    <TableRow key={entry.id} className="hover:bg-muted/30">
+                      <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                              {entry.date ? format((entry.date as any).toDate ? (entry.date as any).toDate() : new Date(entry.date as any), 'MMM dd, yyyy') : 'N/A'}
+                          </div>
+                      </TableCell>
+                      <TableCell>
+                          <div className="flex items-center gap-2">
+                              {entry.entryType === 'General' ? <Users className="h-4 w-4 text-muted-foreground" /> : <User className="h-4 w-4 text-primary" />}
+                              <div className="flex flex-col">
+                                  <span className={cn("font-bold", entry.entryType === 'General' && "text-muted-foreground uppercase text-[10px]")}>{entry.memberName}</span>
+                                  {entry.notes && <span className="text-[10px] text-muted-foreground italic truncate max-w-[200px]">{entry.notes}</span>}
+                              </div>
+                          </div>
+                      </TableCell>
+                      <TableCell>
+                          <Badge variant="outline" className={cn(
+                              "font-black text-[10px] uppercase tracking-widest",
+                              entry.category === 'Tithe' ? "border-blue-200 text-blue-700 bg-blue-50" :
+                              entry.category === 'Offertory' ? "border-purple-200 text-purple-700 bg-purple-50" :
+                              entry.category === 'Project' ? "border-emerald-200 text-emerald-700 bg-emerald-50" :
+                              "border-slate-200 text-slate-700 bg-slate-50"
+                          )}>
+                              {entry.category}
+                          </Badge>
+                      </TableCell>
+                      <TableCell className="font-black text-lg">
+                          {formatCurrency(entry.amount)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="icon" className="text-primary hover:bg-primary/10 rounded-full" onClick={() => handleEditClick(entry)}>
+                                  <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 rounded-full" onClick={() => handleDelete(entry.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                              </Button>
+                          </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

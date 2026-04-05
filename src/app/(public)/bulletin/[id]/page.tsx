@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
@@ -14,8 +13,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Calendar, Info } from 'lucide-react';
 import { format } from 'date-fns';
-import { Reactions } from '@/components/bulletin/Reactions';
-import { CommentSection } from '@/components/bulletin/CommentSection';
 import { AuthorBadge } from '@/components/shared/AuthorBadge';
 import Link from 'next/link';
 
@@ -23,6 +20,22 @@ const PhotoGallery = dynamic(() => import('@/components/shared/PhotoGallery').th
   ssr: false,
   loading: () => <div className="h-48 w-full animate-pulse bg-muted rounded-2xl" />
 });
+
+const CommentSection = dynamic(
+  () => import('@/components/bulletin/CommentSection').then(
+    m => m.CommentSection
+  ),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="animate-pulse space-y-4 mt-8">
+        <div className="h-8 bg-muted rounded w-1/3" />
+        <div className="h-20 bg-muted rounded" />
+        <div className="h-20 bg-muted rounded" />
+      </div>
+    )
+  }
+);
 
 export default function BulletinPostPage() {
   const params = useParams();
@@ -101,7 +114,7 @@ export default function BulletinPostPage() {
                     </div>
                 </CardContent>
                 <CardFooter className="p-8 md:p-12 bg-muted/5 border-t flex flex-col gap-10">   
-                   <div className="pt-10 border-t border-dashed">
+                   <div className="pt-10 border-t border-dashed w-full">
                         <div className="flex items-center justify-between mb-8">
                             <h3 className="text-2xl font-black tracking-tighter uppercase">Reflections</h3>
                         </div>

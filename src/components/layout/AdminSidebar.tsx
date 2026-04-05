@@ -50,11 +50,11 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void; }) {
     <>
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:hidden">
          <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
-          <SheetTrigger asChild>
+         <SheetTrigger asChild>
             <Button variant="outline" size="icon">
               <Menu className="h-6 w-6" />
             </Button>
-          </Trigger>
+          </SheetTrigger>  {/* ✅ was </Trigger> */}
           <SheetContent side="left" className="p-0 w-72 sm:max-w-xs">
             <SheetHeader className="p-4 border-b">
                 <SheetTitle className="sr-only">Admin Menu</SheetTitle>
