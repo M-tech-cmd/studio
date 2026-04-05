@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Calendar, Users, FileText, Church, Briefcase, BookOpen, Settings, LogOut, Menu, CreditCard, UserCheck, Newspaper, Clock, MapPin, Palette, DollarSign, MessageSquare, Mail } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, FileText, Church, Briefcase, BookOpen, LogOut, Menu, CreditCard, UserCheck, Newspaper, Clock, MapPin, Palette, DollarSign, MessageSquare, Mail } from 'lucide-react';
 import { useState } from 'react';
 import { useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
@@ -54,7 +54,7 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void; }) {
             <Button variant="outline" size="icon">
               <Menu className="h-6 w-6" />
             </Button>
-          </SheetTrigger>
+          </Trigger>
           <SheetContent side="left" className="p-0 w-72 sm:max-w-xs">
             <SheetHeader className="p-4 border-b">
                 <SheetTitle className="sr-only">Admin Menu</SheetTitle>
@@ -69,7 +69,7 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void; }) {
                     <SidebarLink 
                       key={link.href + link.label} 
                       {...link} 
-                      badge={link.label === 'Inquiries' ? unreadCount : undefined}
+                      badge={link.label === 'Inquiries' ? unreadCount : 0}
                       onClick={() => isSheetOpen && setSheetOpen(false)} 
                     />
                 ))}
@@ -95,7 +95,7 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void; }) {
                     <SidebarLink 
                       key={link.href + link.label} 
                       {...link} 
-                      badge={link.label === 'Inquiries' ? unreadCount : undefined}
+                      badge={link.label === 'Inquiries' ? unreadCount : 0}
                     />
                 ))}
             </nav>
@@ -130,9 +130,9 @@ const SidebarLink = ({ href, label, icon: Icon, onClick, badge }: { href: string
         <Icon className="h-4 w-4" />
         <span>{label}</span>
       </div>
-      {badge ? (
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground animate-pulse">
-          {badge}
+      {badge && badge > 0 ? (
+        <span className="ml-auto bg-destructive text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-in zoom-in duration-300">
+          {badge > 9 ? '9+' : badge}
         </span>
       ) : null}
     </Link>

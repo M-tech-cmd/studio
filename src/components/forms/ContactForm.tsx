@@ -4,8 +4,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore } from "@/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useDoc, useMemoFirebase } from "@/firebase";
+import { collection, addDoc, serverTimestamp, doc } from "firebase/firestore";
+import type { SiteSettings } from "@/lib/types";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,9 @@ const formSchema = z.object({
 export function ContactForm() {
   const { toast } = useToast();
   const firestore = useFirestore();
+
+  const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
+  const { data: settings } = useDoc<SiteSettings>(settingsRef);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -44,12 +48,34 @@ export function ContactForm() {
     if (!firestore) return;
 
     try {
+      // 1. Save to Registry
       await addDoc(collection(firestore, 'inquiries'), {
         ...values,
         status: 'unread',
         createdAt: serverTimestamp(),
         repliedAt: null,
         replyMessage: null,
+      });
+
+      // 2. Dispatch Notification via Resend API
+      await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: settings?.email || 'martindeporres2022@gmail.com',
+          subject: `New Message: ${values.subject}`,
+          html: `
+            <div style="font-family: sans-serif; padding: 20px; color: #1e3a5f;">
+              <h2 style="color: #d4a574;">New Contact Form Submission</h2>
+              <p><strong>From:</strong> ${values.name}</p>
+              <p><strong>Email:</strong> ${values.email}</p>
+              <p><strong>Subject:</strong> ${values.subject}</p>
+              <hr />
+              <p><strong>Message:</strong></p>
+              <p style="white-space: pre-wrap;">${values.message}</p>
+            </div>
+          `
+        })
       });
 
       toast({

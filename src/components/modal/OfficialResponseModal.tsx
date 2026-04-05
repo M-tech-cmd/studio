@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useFirestore } from "@/firebase";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
-import emailjs from "@emailjs/browser";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,33 +23,40 @@ export function OfficialResponseModal({ isOpen, onClose, inquiry }: any) {
     setLoading(true);
 
     try {
-      // 1. Send email via EmailJS — appears from St. Martin De Porres
-      await emailjs.send(
-        process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID!,
-        process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID!,
-        {
-          name: "St. Martin De Porres Parish",  // ✅ From name
-          email: "martindeporres2022@gmail.com", // ✅ From email
-          to_email: inquiry.email,               // ✅ To the parishioner
+      // 1. Dispatch via Resend API
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: inquiry.email,
           subject: `Re: ${inquiry.subject}`,
-          message: `${replyText}\n\n---\nBlessings,\nAdmin Team\nSt. Martin De Porres Parish\n"In Service to God and Community"`,
-        },
-        process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY!
-      );
+          html: `
+            <div style="font-family: sans-serif; color: #1e3a5f; padding: 20px;">
+              <p>${replyText}</p>
+              <br/>
+              <p>Blessings,<br/>
+              Admin Team<br/>
+              <strong>St. Martin De Porres Parish</strong></p>
+            </div>
+          `
+        })
+      });
 
-      // 2. Update Firestore
+      if (!response.ok) throw new Error('Email dispatch failed');
+
+      // 2. Update Firestore Registry
       await updateDoc(doc(firestore, "inquiries", inquiry.id), {
         replyMessage: replyText,
         repliedAt: serverTimestamp(),
         status: 'replied'
       });
 
-      toast({ title: "Reply Sent", description: `Response sent to ${inquiry.email}` });
+      toast({ title: "Reply Sent", description: `Response dispatched to ${inquiry.email}` });
       setReplyText("");
       onClose();
     } catch (error: any) {
       console.error("Reply error:", error);
-      toast({ variant: "destructive", title: "Send Failed", description: "Could not send reply. Try again." });
+      toast({ variant: "destructive", title: "Send Failed", description: "Could not send reply via Resend API. Try again." });
     } finally {
       setLoading(false);
     }
