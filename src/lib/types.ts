@@ -260,6 +260,7 @@ export type BulletinComment = {
     authorPhotoUrl?: string;
     content: string;
     createdAt: Timestamp;
+    parentId?: string | null;
     reactions?: { [userId: string]: string };
 };
 

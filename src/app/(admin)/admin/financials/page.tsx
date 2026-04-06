@@ -206,8 +206,8 @@ export default function AdminFinancialsPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="flex flex-col h-screen overflow-hidden p-6 space-y-6">
+      <div className="flex justify-between items-center shrink-0">
         <div>
           <h1 className="text-3xl font-black tracking-tighter uppercase">Parish Treasury</h1>
           <p className="text-muted-foreground font-medium">Record tithes, offertory, and project contributions.</p>
@@ -305,7 +305,7 @@ export default function AdminFinancialsPage() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 shrink-0">
         <Card className="border-none shadow-md bg-emerald-50">
             <CardHeader className="pb-2">
                 <CardTitle className="text-xs font-black uppercase tracking-widest text-emerald-800 flex items-center justify-between">
@@ -342,24 +342,24 @@ export default function AdminFinancialsPage() {
         </Card>
       </div>
 
-      <Card className="border-none shadow-md overflow-hidden">
-        <CardHeader className="bg-muted/30 border-b">
+      <Card className="border-none shadow-md overflow-hidden flex flex-col flex-1 min-h-0">
+        <CardHeader className="bg-muted/30 border-b shrink-0">
           <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
               Registry Transaction History
           </CardTitle>
           <CardDescription>Comprehensive list of all office-recorded contributions.</CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 flex-1 overflow-auto">
           <div className="w-full overflow-x-auto">
             <Table className="min-w-[800px]">
-              <TableHeader className="bg-muted/10">
+              <TableHeader className="bg-muted/10 sticky top-0 z-10">
                 <TableRow>
-                  <TableHead className="font-bold">Date</TableHead>
-                  <TableHead className="font-bold">Contributor</TableHead>
-                  <TableHead className="font-bold">Category</TableHead>
-                  <TableHead className="font-bold">Amount</TableHead>
-                  <TableHead className="text-right font-bold">Actions</TableHead>
+                  <TableHead className="font-bold bg-muted/10">Date</TableHead>
+                  <TableHead className="font-bold bg-muted/10">Contributor</TableHead>
+                  <TableHead className="font-bold bg-muted/10">Category</TableHead>
+                  <TableHead className="font-bold bg-muted/10">Amount</TableHead>
+                  <TableHead className="text-right font-bold bg-muted/10">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
