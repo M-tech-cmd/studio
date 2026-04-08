@@ -20,6 +20,16 @@ export type Value = {
   description: string;
 };
 
+/**
+ * Cloudinary Asset Structure.
+ * Stores the permanent public_id and type to allow dynamic URL generation.
+ */
+export type CloudinaryAsset = {
+  public_id: string;
+  resource_type: string;
+  secure_url?: string; // Kept for legacy support/previews
+};
+
 export type Event = {
   id: string;
   title: string;
@@ -28,12 +38,12 @@ export type Event = {
   endTime?: string;
   location: string;
   description: string;
-  imageUrl: string;
+  imageUrl: string | CloudinaryAsset;
   imageHint: string;
   category: 'Mass' | 'Ministry' | 'Community' | 'Special' | 'Other' | 'Youth';
   featured: boolean;
   mass?: '1st Mass' | '2nd Mass';
-  galleryImages?: string[];
+  galleryImages?: (string | CloudinaryAsset)[];
 };
 
 export type Profile = {
@@ -44,7 +54,7 @@ export type Profile = {
   role: 'Pastor' | 'Associate Pastor' | 'Deacon' | 'Staff' | 'Ministry Leader';
   email: string;
   phone: string;
-  imageUrl: string;
+  imageUrl: string | CloudinaryAsset;
   imageHint: string;
   active?: boolean;
 };
@@ -57,26 +67,12 @@ export type CommunityGroup = {
   leader: string;
   contactPhone: string;
   schedule: string;
-  imageUrl: string;
+  imageUrl: string | CloudinaryAsset;
   imageHint: string;
   memberCount: number;
   familyCount: number;
   goals?: string;
-  galleryImages?: string[];
-};
-
-export type DevelopmentProject = {
-  id:string;
-  title: string;
-  description: string;
-  goalAmount: number;
-  currentAmount: number;
-  status: 'Upcoming' | 'Ongoing' | 'Completed';
-  imageUrl: string;
-  imageHint: string;
-  public: boolean;
-  galleryImages?: string[];
-  contactPhone?: string;
+  galleryImages?: (string | CloudinaryAsset)[];
 };
 
 export type Document = {
@@ -126,7 +122,7 @@ export type SiteContent = {
   pageName: string;
   title: string;
   content: string;
-  imageUrl?: string;
+  imageUrl?: string | CloudinaryAsset;
   imageHint?: string;
 };
 
@@ -149,7 +145,7 @@ export type PaymentMethod = {
   method: string;
   details: string;
   instructions: string;
-  imageUrl?: string;
+  imageUrl?: string | CloudinaryAsset;
   iconType?: IconType;
 };
 
@@ -180,7 +176,7 @@ export type Inquiry = {
 export type SiteSettings = {
   id: string;
   brandName?: string;
-  logoUrl?: string;
+  logoUrl?: string | CloudinaryAsset;
   address: string;
   phone: string;
   email: string;
@@ -211,7 +207,7 @@ export type SiteSettings = {
   heroTitle?: string;
   heroTitleColor?: string;
   heroDescriptionColor?: string;
-  heroImageUrl?: string;
+  heroImageUrl?: string | CloudinaryAsset;
 
   // Global Section Styling
   globalSectionTitleColor?: string;
@@ -219,17 +215,17 @@ export type SiteSettings = {
   globalSectionBoxColor?: string;
   
   // Section Controls
-  massTitle?: string; massDescription?: string; massTitleColor?: string; massDescriptionColor?: string; massBoxColor?: string; massImageUrl?: string;
-  eventsTitle?: string; eventsDescription?: string; eventsTitleColor?: string; eventsDescriptionColor?: string; eventsBoxColor?: string; eventsImageUrl?: string;
-  clergyTitle?: string; clergyDescription?: string; clergyTitleColor?: string; clergyDescriptionColor?: string; clergyBoxColor?: string; clergyImageUrl?: string;
-  bulletinTitle?: string; bulletinDescription?: string; bulletinTitleColor?: string; bulletinDescriptionColor?: string; bulletinBoxColor?: string; bulletinImageUrl?: string;
-  projectsTitle?: string; projectsDescription?: string; projectsTitleColor?: string; projectsDescriptionColor?: string; projectsBoxColor?: string; projectsImageUrl?: string;
-  communityTitle?: string; communityDescription?: string; communityTitleColor?: string; communityDescriptionColor?: string; communityBoxColor?: string; communityImageUrl?: string;
-  ministriesTitle?: string; ministriesDescription?: string; ministriesTitleColor?: string; ministriesDescriptionColor?: string; ministriesBoxColor?: string; ministriesImageUrl?: string;
-  bibleReadingsTitle?: string; bibleReadingsDescription?: string; bibleReadingsTitleColor?: string; bibleReadingsDescriptionColor?: string; bibleReadingsBoxColor?: string; bibleReadingsImageUrl?: string;
-  documentsTitle?: string; documentsDescription?: string; documentsTitleColor?: string; documentsDescriptionColor?: string; documentsBoxColor?: string; documentsImageUrl?: string;
-  findUsTitle?: string; findUsDescription?: string; findUsTitleColor?: string; findUsDescriptionColor?: string; findUsBoxColor?: string; findUsImageUrl?: string;
-  paymentsTitle?: string; paymentsDescription?: string; paymentsTitleColor?: string; paymentsDescriptionColor?: string; paymentsBoxColor?: string; paymentsImageUrl?: string;
+  massTitle?: string; massDescription?: string; massTitleColor?: string; massDescriptionColor?: string; massBoxColor?: string; massImageUrl?: string | CloudinaryAsset;
+  eventsTitle?: string; eventsDescription?: string; eventsTitleColor?: string; eventsDescriptionColor?: string; eventsBoxColor?: string; eventsImageUrl?: string | CloudinaryAsset;
+  clergyTitle?: string; clergyDescription?: string; clergyTitleColor?: string; clergyDescriptionColor?: string; clergyBoxColor?: string; clergyImageUrl?: string | CloudinaryAsset;
+  bulletinTitle?: string; bulletinDescription?: string; bulletinTitleColor?: string; bulletinDescriptionColor?: string; bulletinBoxColor?: string; bulletinImageUrl?: string | CloudinaryAsset;
+  projectsTitle?: string; projectsDescription?: string; projectsTitleColor?: string; projectsDescriptionColor?: string; projectsBoxColor?: string; projectsImageUrl?: string | CloudinaryAsset;
+  communityTitle?: string; communityDescription?: string; communityTitleColor?: string; communityDescriptionColor?: string; communityBoxColor?: string; communityImageUrl?: string | CloudinaryAsset;
+  ministriesTitle?: string; ministriesDescription?: string; ministriesTitleColor?: string; ministriesDescriptionColor?: string; ministriesBoxColor?: string; ministriesImageUrl?: string | CloudinaryAsset;
+  bibleReadingsTitle?: string; bibleReadingsDescription?: string; bibleReadingsTitleColor?: string; bibleReadingsDescriptionColor?: string; bibleReadingsBoxColor?: string; bibleReadingsImageUrl?: string | CloudinaryAsset;
+  documentsTitle?: string; documentsDescription?: string; documentsTitleColor?: string; documentsDescriptionColor?: string; documentsBoxColor?: string; documentsImageUrl?: string | CloudinaryAsset;
+  findUsTitle?: string; findUsDescription?: string; findUsTitleColor?: string; findUsDescriptionColor?: string; findUsBoxColor?: string; findUsImageUrl?: string | CloudinaryAsset;
+  paymentsTitle?: string; paymentsDescription?: string; paymentsTitleColor?: string; paymentsDescriptionColor?: string; paymentsBoxColor?: string; paymentsImageUrl?: string | CloudinaryAsset;
   
   paymentMethods?: PaymentMethod[];
 
@@ -249,7 +245,7 @@ export type BulletinPost = {
   createdAt: Timestamp;
   updatedAt: Timestamp;
   reactions: { [userId: string]: ReactionType };
-  galleryImages?: string[];
+  galleryImages?: (string | CloudinaryAsset)[];
 };
 
 export type BulletinComment = {

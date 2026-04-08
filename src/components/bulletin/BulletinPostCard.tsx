@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { resolveMediaUrl } from '@/lib/upload-utils';
 
 /**
  * Extracts the first media source from HTML content.
@@ -31,12 +32,11 @@ function extractFirstMedia(html: string): { type: 'image' | 'video' | 'audio', s
 
 /**
  * Modernized Bulletin Card: Vertical layout consistent with EventCard.
- * Features a top media slot extracted from rich text content.
+ * Features a top media slot extracted from rich text content or gallery.
  */
 export function BulletinPostCard({ post }: { post: BulletinPost }) {
   const firestore = useFirestore();
   
-  // Dynamic fetch for Author profile photo
   const authorRef = useMemoFirebase(() => 
     post.authorId ? doc(firestore, 'users', post.authorId) : null, 
     [firestore, post.authorId]
@@ -53,18 +53,33 @@ export function BulletinPostCard({ post }: { post: BulletinPost }) {
     <Link href={`/bulletin/${post.id}`} className="block h-full group">
       <Card className="flex flex-col w-full h-full overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white border-none rounded-xl relative">
         
-        {/* Media Slot: Extracted from Tiptap Content */}
+        {/* Media Slot: Priority 1: First Gallery Image | Priority 2: Extracted from Tiptap */}
         {(() => {
-          const media = extractFirstMedia(post.content);
-          if (!media) return null;
+          // Resolve first gallery image if present
+          let mediaUrl = '';
+          let mediaType: 'image' | 'video' | 'audio' = 'image';
+
+          if (post.galleryImages && post.galleryImages.length > 0) {
+              const firstAsset = post.galleryImages[0];
+              mediaUrl = resolveMediaUrl(firstAsset);
+              mediaType = (typeof firstAsset !== 'string' && firstAsset.resource_type === 'video') ? 'video' : 'image';
+          } else {
+              const extracted = extractFirstMedia(post.content);
+              if (extracted) {
+                  mediaUrl = extracted.src;
+                  mediaType = extracted.type;
+              }
+          }
+
+          if (!mediaUrl) return null;
           
-          if (media.type === 'image') return (
-            <img src={media.src} alt="" className="w-full aspect-video object-cover rounded-t-xl" />
+          if (mediaType === 'image') return (
+            <img src={mediaUrl} alt="" className="w-full aspect-video object-cover rounded-t-xl" />
           );
           
-          if (media.type === 'video') return (
+          if (mediaType === 'video') return (
             <video 
-              src={media.src} 
+              src={mediaUrl} 
               autoPlay 
               muted 
               loop 
@@ -73,9 +88,9 @@ export function BulletinPostCard({ post }: { post: BulletinPost }) {
             />
           );
           
-          if (media.type === 'audio') return (
+          if (mediaType === 'audio') return (
             <div className="px-4 pt-4">
-              <audio controls src={media.src} className="w-full h-8" />
+              <audio controls src={mediaUrl} className="w-full h-8" />
             </div>
           );
         })()}

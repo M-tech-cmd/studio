@@ -2,27 +2,28 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { Upload, Link as LinkIcon, X, Film, Music, Mic } from 'lucide-react';
+import { Upload, Link as LinkIcon, X, Mic } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { resolveMediaUrl } from '@/lib/upload-utils';
+import type { CloudinaryAsset } from '@/lib/types';
 
 interface ImageUploadProps {
-  value: string; // Current URL
-  file: File | null; // Current pending file
-  onChange: (url: string, file: File | null) => void;
+  value: string | CloudinaryAsset; 
+  file: File | null; 
+  onChange: (url: string | CloudinaryAsset, file: File | null) => void;
   label?: string;
   className?: string;
   folder?: string;
 }
 
 /**
- * Individual Media Selection Component (Cloudinary Ready).
- * Supports URL entry or File selection (Image, Video, Audio) with instant local preview.
+ * Individual Media Selection Component.
  */
 export function ImageUpload({ value, file, onChange, label, className }: ImageUploadProps) {
-  const [preview, setPreview] = useState<string>(value || '');
+  const [preview, setPreview] = useState<string>('');
   const [fileType, setFileType] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,7 +36,7 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
           if (objectUrl.startsWith('blob:')) URL.revokeObjectURL(objectUrl);
       };
     } else {
-      setPreview(value || '');
+      setPreview(resolveMediaUrl(value));
       setFileType('');
     }
   }, [value, file]);
@@ -93,7 +94,7 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
         <TabsContent value="url" className="mt-2">
           <Input 
             placeholder="Paste media link here..." 
-            value={value || ''}
+            value={typeof value === 'string' ? value : ''}
             autoComplete="off"
             onChange={(e) => handleUrlChange(e.target.value)}
             className="h-12"
@@ -128,7 +129,6 @@ export function ImageUpload({ value, file, onChange, label, className }: ImageUp
           >
             <X className="h-5 w-5" />
           </button>
-        
         </div>
       )}
     </div>

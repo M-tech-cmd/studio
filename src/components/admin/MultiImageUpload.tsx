@@ -4,17 +4,17 @@ import { useState, useEffect } from 'react';
 import { Upload } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { MediaItem } from '../shared/MediaItem';
+import type { CloudinaryAsset } from '@/lib/types';
 
 interface MultiImageUploadProps {
-  existingImages: string[];
+  existingImages: (string | CloudinaryAsset)[];
   newFiles: File[];
-  onChange: (existing: string[], newFiles: File[]) => void;
+  onChange: (existing: (string | CloudinaryAsset)[], newFiles: File[]) => void;
   label?: string;
 }
 
 /**
  * Multi-Media Selection Component (Cloudinary Engine).
- * Supports Images, Video, and Audio concurrently.
  */
 export function MultiImageUpload({ existingImages = [], newFiles = [], onChange, label }: MultiImageUploadProps) {
   const [previews, setPreviews] = useState<{ id: string; url: string }[]>([]);
@@ -82,10 +82,10 @@ export function MultiImageUpload({ existingImages = [], newFiles = [], onChange,
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {(existingImages || []).map((url, index) => (
+        {(existingImages || []).map((asset, index) => (
           <MediaItem 
             key={`existing-${index}`} 
-            url={url} 
+            url={asset} 
             onRemove={() => removeExisting(index)} 
           />
         ))}

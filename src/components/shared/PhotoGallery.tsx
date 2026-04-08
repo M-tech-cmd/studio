@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Maximize2, Film } from 'lucide-react';
+import { Film } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,25 +12,28 @@ import {
 } from '@/components/ui/dialog';
 import { CustomVideoPlayer } from '@/components/ui/custom-video-player';
 import { MediaItem } from './MediaItem';
+import { resolveMediaUrl } from '@/lib/upload-utils';
+import type { CloudinaryAsset } from '@/lib/types';
 
 interface PhotoGalleryProps {
-  photos?: string[];
+  photos?: (string | CloudinaryAsset)[];
   title?: string;
 }
 
 export function PhotoGallery({ photos, title = "Photo Gallery" }: PhotoGalleryProps) {
-  const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
-
   if (!photos || photos.length === 0) return null;
 
-  const isVideo = (url: string) => {
-    if (!url) return false;
-    const lowerUrl = url.toLowerCase();
-    return lowerUrl.includes('.mp4') || 
-           lowerUrl.includes('.mov') || 
-           lowerUrl.includes('.webm') ||
-           lowerUrl.includes('video') ||
-           url.startsWith('data:video');
+  const isVideo = (item: string | CloudinaryAsset) => {
+    if (typeof item !== 'string' && item.resource_type === 'video') return true;
+    if (typeof item === 'string') {
+        const lowerUrl = item.toLowerCase();
+        return lowerUrl.includes('.mp4') || 
+               lowerUrl.includes('.mov') || 
+               lowerUrl.includes('.webm') ||
+               lowerUrl.includes('video') ||
+               item.startsWith('data:video');
+    }
+    return false;
   };
 
   return (
@@ -44,12 +47,14 @@ export function PhotoGallery({ photos, title = "Photo Gallery" }: PhotoGalleryPr
       </div>
       
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {photos.map((url, index) => {
-          const video = isVideo(url);
+        {photos.map((item, index) => {
+          const video = isVideo(item);
+          const url = resolveMediaUrl(item);
+
           return (
             <Dialog key={index}>
               <DialogTrigger asChild>
-                <div className="cursor-pointer" onClick={() => setSelectedMedia(url)}>
+                <div className="cursor-pointer">
                     <MediaItem url={url} showIconOverlay={true} />
                 </div>
               </DialogTrigger>

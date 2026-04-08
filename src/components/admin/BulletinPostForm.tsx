@@ -9,7 +9,7 @@ import { useFirestore, useUser } from '@/firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadMultipleFiles } from '@/lib/upload-utils';
 
-import type { BulletinPost } from '@/lib/types';
+import type { BulletinPost, CloudinaryAsset } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -37,7 +37,7 @@ const postSchema = z.object({
   title: z.string().min(3, 'Title is required.'),
   content: z.string().min(10, 'Content is required.'),
   category: z.string().min(2, 'Category is required.'),
-  galleryImages: z.array(z.string()).default([]),
+  galleryImages: z.array(z.any()).default([]),
 });
 
 type BulletinPostFormProps = {
@@ -72,13 +72,13 @@ export function BulletinPostForm({ post, onClose }: BulletinPostFormProps) {
     setIsSaving(true);
 
     try {
-        console.log('[Bulletin] Initiating sync for:', values.title);
-        
-        const newUrls = (galleryFiles && galleryFiles.length > 0) 
+        // 1. Upload new files and get their Asset objects (containing public_id)
+        const newAssets = (galleryFiles && galleryFiles.length > 0) 
             ? await uploadMultipleFiles(null, 'bulletins', galleryFiles) 
             : [];
         
-        const finalGallery = [...(values.galleryImages || []), ...newUrls];
+        // 2. Combine existing assets with new ones
+        const finalGallery = [...(values.galleryImages || []), ...newAssets];
 
         const postData = {
             title: values.title,
@@ -100,14 +100,14 @@ export function BulletinPostForm({ post, onClose }: BulletinPostFormProps) {
             });
         }
 
-        toast({ title: 'Success: Saved to Database' });
+        toast({ title: 'Success: Registry Updated' });
         onClose();
     } catch (error: any) {
         console.error('[BulletinForm] Sync Error:', error);
         toast({ 
             variant: 'destructive', 
             title: 'Sync Failed', 
-            description: 'Upload blocked by Browser/CORS. Check Console.' 
+            description: 'Could not commit assets to registry. Check your connection.' 
         });
     } finally {
         setIsSaving(false);

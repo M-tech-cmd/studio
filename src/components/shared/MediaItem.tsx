@@ -1,11 +1,13 @@
 'use client';
 
 import Image from 'next/image';
-import { X, Play, Video, Music, Mic } from 'lucide-react';
+import { X, Play, Video, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { resolveMediaUrl } from '@/lib/upload-utils';
+import type { CloudinaryAsset } from '@/lib/types';
 
 interface MediaItemProps {
-  url: string;
+  url: string | CloudinaryAsset;
   onRemove?: () => void;
   className?: string;
   showIconOverlay?: boolean;
@@ -16,16 +18,20 @@ interface MediaItemProps {
  * Renders Image, Video, or Audio based on URL detection.
  */
 export function MediaItem({ 
-  url, 
+  url: asset, 
   onRemove, 
   className,
   showIconOverlay = true
 }: MediaItemProps) {
 
+  const url = resolveMediaUrl(asset);
   if (!url || url === 'undefined' || url === 'null') return null;
 
-  const isVideo = url.toLowerCase().match(/\.(mp4|webm|mov|video)/) || url.startsWith('data:video');
-  const isAudio = url.toLowerCase().match(/\.(mp3|wav|ogg|audio)/) || url.startsWith('data:audio');
+  const isVideo = (typeof asset !== 'string' && asset.resource_type === 'video') || 
+                  (typeof asset === 'string' && url.toLowerCase().match(/\.(mp4|webm|mov|video)/)) || 
+                  (typeof asset === 'string' && url.startsWith('data:video'));
+
+  const isAudio = (typeof asset === 'string' && (url.toLowerCase().match(/\.(mp3|wav|ogg|audio)/) || url.startsWith('data:audio')));
 
   return (
     <div className={cn(
