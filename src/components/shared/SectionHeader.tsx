@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -19,7 +18,7 @@ interface SectionHeaderProps {
 
 /**
  * Enhanced Section Header with Fixed 450px Banner Image.
- * Eliminates bottom gaps and ensures perfect contact with the text box below.
+ * Fixed reactivity issue by using standard React inline styles instead of manual DOM injection.
  */
 export function SectionHeader({ 
   title, 
@@ -31,11 +30,8 @@ export function SectionHeader({
   isLoading,
   settings
 }: SectionHeaderProps) {
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const descRef = useRef<HTMLParagraphElement>(null);
-  const boxRef = useRef<HTMLDivElement>(null);
 
-  // Fallback Logic: Local Overide -> Global Text Color -> Default Navy
+  // Fallback Logic: Local Override -> Global Text Color -> Default Navy
   const finalTitleColor = (titleColor && titleColor.trim() !== '') 
     ? titleColor 
     : (settings?.globalTextColor && settings.globalTextColor.trim() !== '')
@@ -53,19 +49,6 @@ export function SectionHeader({
     ? boxColor 
     : 'transparent';
 
-  useEffect(() => {
-    // Injecting with !important to ensure dashboard choices take absolute precedence
-    if (titleRef.current) {
-      titleRef.current.style.setProperty('color', finalTitleColor, 'important');
-    }
-    if (descRef.current && finalDescColor) {
-      descRef.current.style.setProperty('color', finalDescColor, 'important');
-    }
-    if (boxRef.current) {
-        boxRef.current.style.setProperty('background-color', finalBoxColor, 'important');
-    }
-  }, [finalTitleColor, finalDescColor, finalBoxColor]);
-
   if (isLoading) {
     return (
       <div className="text-center mb-10 space-y-2">
@@ -78,7 +61,7 @@ export function SectionHeader({
   return (
     <div className="flex flex-col items-center mb-12 animate-fade-in isolate w-full">
       <div 
-        ref={boxRef}
+        style={{ backgroundColor: finalBoxColor }}
         className={cn(
             "max-w-4xl w-full rounded-2xl shadow-sm border border-border/50 text-center transition-all duration-300 overflow-hidden",
             finalBoxColor === 'transparent' ? "bg-transparent border-none shadow-none" : "shadow-md"
@@ -100,14 +83,14 @@ export function SectionHeader({
         
         <div className={cn("px-6 md:px-14 flex flex-col items-center", imageUrl ? "pt-8 pb-10 md:pb-14" : "pt-10 md:pt-14 pb-10 md:pb-14")}>
             <h2 
-              ref={titleRef}
+              style={{ color: finalTitleColor }}
               className="text-3xl md:text-5xl font-headline font-bold tracking-tight text-center"
             >
               {title}
             </h2>
             {description && (
                 <p 
-                    ref={descRef}
+                    style={{ color: finalDescColor }}
                     className="mt-6 max-w-2xl mx-auto text-base md:text-xl font-medium leading-relaxed opacity-90 text-center"
                 >
                     {description}
