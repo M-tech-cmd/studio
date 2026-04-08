@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -43,6 +42,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 
+const roleMapping: Record<string, string> = {
+    admin: "St. Martin De Porres Admin",
+    chairman: "St. Martin De Porres Chairman",
+    treasurer: "St. Martin De Porres Treasurer",
+    secretary: "St. Martin De Porres Secretary",
+    tech_dev: "St. Martin De Porres Tech Developer",
+};
 
 function DashboardContent() {
     const firestore = useFirestore();
@@ -148,6 +154,10 @@ function DashboardContent() {
         { title: 'Community Groups', value: communityGroups?.length || 0, icon: Church, href: '/admin/community', color: 'bg-purple-500' },
     ];
 
+    const displayIdentity = userData?.isAdmin 
+        ? (roleMapping[userData.role] || "St. Martin De Porres Admin")
+        : (userData?.name || "Member");
+
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -170,9 +180,9 @@ function DashboardContent() {
                                     <UserIcon className="h-8 w-8" />
                                 </div>
                                 <div>
-                                    <p className="font-black text-2xl tracking-tighter leading-none">{userData?.name}</p>
+                                    <p className="font-black text-2xl tracking-tighter leading-none">{displayIdentity}</p>
                                     <Badge variant={isAdmin ? "destructive" : "secondary"} className="mt-2 uppercase font-black text-[9px] tracking-widest">
-                                        {isAdmin ? 'System Administrator' : 'Staff User'}
+                                        {isAdmin ? (userData?.role || 'Administrator').toUpperCase() : 'Staff User'}
                                     </Badge>
                                 </div>
                             </div>

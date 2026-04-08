@@ -77,7 +77,7 @@ export default function EventDetailPage() {
     <div className="bg-transparent animate-in fade-in duration-700">
       <PageHeader title={event.title} subtitle={event.category + " Details"} />
       <section className="py-8">
-        <div className="container max-w-4xl mx-auto px-4">
+        <div className="container max-w-24xl mx-auto px-4">
             <Button asChild variant="ghost" className="mb-8 rounded-full hover:bg-primary/10 group">
                 <Link href="/events">
                     <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />

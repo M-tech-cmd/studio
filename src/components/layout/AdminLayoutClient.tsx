@@ -11,6 +11,14 @@ import { Logo } from "@/components/shared/Logo";
 import { doc } from "firebase/firestore";
 import Link from 'next/link';
 
+const roleMapping: Record<string, string> = {
+    admin: "St. Martin De Porres Admin",
+    chairman: "St. Martin De Porres Chairman",
+    treasurer: "St. Martin De Porres Treasurer",
+    secretary: "St. Martin De Porres Secretary",
+    tech_dev: "St. Martin De Porres Tech Developer",
+};
+
 /**
  * Admin Layout Client Wrapper
  * Handles auth redirection, presence, and navigation state.
@@ -76,6 +84,8 @@ export function AdminLayoutClient({
   const showPasskeyModal = user && !isAdmin && pathname !== '/admin';
 
   if (isAdmin) {
+    const displayRoleName = userProfile?.role ? (roleMapping[userProfile.role] || "St. Martin De Porres Admin") : "St. Martin De Porres Admin";
+
     if (pathname === '/admin') return null;
     return (
       <div className="flex flex-col min-h-screen bg-muted/40 animate-in fade-in duration-500 overflow-hidden isolate">
@@ -90,7 +100,7 @@ export function AdminLayoutClient({
                 <div className="flex items-center gap-4">
                     <div className="flex flex-col items-end">
                         <span className="text-[10px] font-black tracking-widest uppercase text-muted-foreground/60">Admin Portal</span>
-                        <span className="text-xs font-medium text-primary">{user?.email}</span>
+                        <span className="text-xs font-bold text-primary">{displayRoleName}</span>
                     </div>
                 </div>
             </div>

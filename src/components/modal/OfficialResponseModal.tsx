@@ -36,7 +36,7 @@ export function OfficialResponseModal({ isOpen, onClose, inquiry }: any) {
               <br/>
               <p>Blessings,<br/>
               Admin Team<br/>
-              <strong>St. Martin De Porres Parish</strong></p>
+              <strong>St. Martin De Porres Catholic Church Mugutha</strong></p>
             </div>
           `
         })

@@ -138,14 +138,7 @@ export default function AdminUsersPage() {
             <h1 className="text-3xl font-black tracking-tighter uppercase">Registered Accounts</h1>
             <p className="text-muted-foreground font-medium">Manage verification, status, and administrative roles.</p>
         </div>
-        <div className="flex gap-2">
-            <Button variant="outline" onClick={downloadCSV} className="font-bold border-2 gap-2">
-                <FileDown className="h-4 w-4" /> Export CSV
-            </Button>
-            <Button variant="outline" onClick={() => window.print()} className="font-bold border-2 gap-2 hidden sm:flex">
-                <Printer className="h-4 w-4" /> Print View
-            </Button>
-        </div>
+        
       </div>
 
       <Card className="border-none shadow-xl">

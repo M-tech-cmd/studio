@@ -63,7 +63,7 @@ export default function CommunityGroupDetailPage() {
     <div className="bg-transparent animate-in fade-in duration-700">
       <PageHeader title={group.name} subtitle={group.type} />
       <section className="py-8">
-        <div className="container max-w-4xl mx-auto px-4">
+        <div className="container max-w-24xl mx-auto px-4">
           <Button asChild variant="ghost" className="mb-8 rounded-full hover:bg-primary/10 group">
             <Link href="/community">
               <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
@@ -76,7 +76,7 @@ export default function CommunityGroupDetailPage() {
                   src={group.imageUrl}
                   alt={group.name}
                   fill
-                  className="object-contain p-8"
+                  className="object-contain p-18"
                   unoptimized
                 />
                 <div className="absolute top-4 left-4">

@@ -83,7 +83,7 @@ export default function BulletinPostPage() {
     <div className="bg-transparent pb-20 animate-in fade-in duration-700">
       <PageHeader title={post.title} subtitle={`Community Update`} />
       <section className="py-8">
-        <div className="container max-w-4xl mx-auto px-4 space-y-10">
+        <div className="container max-w-24xl mx-auto px-4 space-y-10">
             <Button asChild variant="ghost" className="hover:bg-primary/10 rounded-full group">
                 <Link href="/bulletin">
                     <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1"/> 

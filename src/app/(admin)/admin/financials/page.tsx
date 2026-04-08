@@ -222,86 +222,85 @@ export default function AdminFinancialsPage() {
                     Record Contribution
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] rounded-3xl">
-                <DialogHeader>
-                    <DialogTitle className="text-2xl font-black tracking-tighter">
-                        {selectedEntry ? 'Adjust Transaction' : 'Contribution Entry'}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {selectedEntry ? 'Modify the details of this recorded entry.' : 'Manually record funds received by the parish office.'}
-                    </DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 py-4">
-                        <FormField control={form.control} name="entryType" render={({ field }) => (
-                            <FormItem className="space-y-3">
-                                <FormLabel className="text-xs font-black uppercase opacity-60">Source Type</FormLabel>
-                                <FormControl>
-                                    <RadioGroup
-                                        onValueChange={field.onChange}
-                                        defaultValue={field.value}
-                                        className="flex gap-4"
-                                    >
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="Individual" id="r1" />
-                                            <Label htmlFor="r1">Member</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <RadioGroupItem value="General" id="r2" />
-                                            <Label htmlFor="r2">General Collection</Label>
-                                        </div>
-                                    </RadioGroup>
-                                </FormControl>
-                            </FormItem>
-                        )}/>
+            <DialogContent className="sm:max-w-[500px] rounded-3xl max-h-[90vh] flex flex-col">
+    <DialogHeader className="shrink-0">
+        <DialogTitle className="text-2xl font-black tracking-tighter">
+            {selectedEntry ? 'Adjust Transaction' : 'Contribution Entry'}
+        </DialogTitle>
+        <DialogDescription>
+            {selectedEntry ? 'Modify the details of this recorded entry.' : 'Manually record funds received by the parish office.'}
+        </DialogDescription>
+    </DialogHeader>
+    <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+            <div className="flex-1 overflow-y-auto space-y-6 py-4 pr-1">
+                {/* all your FormFields stay exactly the same here */}
+                <FormField control={form.control} name="entryType" render={({ field }) => (
+                    <FormItem className="space-y-3">
+                        <FormLabel className="text-xs font-black uppercase opacity-60">Source Type</FormLabel>
+                        <FormControl>
+                            <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="Individual" id="r1" />
+                                    <Label htmlFor="r1">Member</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="General" id="r2" />
+                                    <Label htmlFor="r2">General Collection</Label>
+                                </div>
+                            </RadioGroup>
+                        </FormControl>
+                    </FormItem>
+                )}/>
 
-                        {entryType === 'Individual' && (
-                            <FormField control={form.control} name="memberName" render={({ field }) => (
-                                <FormItem><FormLabel className="text-xs font-black uppercase">Member Name *</FormLabel><FormControl><Input placeholder="Search or type name..." {...field} className="h-12" /></FormControl><FormMessage /></FormItem>
-                            )}/>
-                        )}
+                {entryType === 'Individual' && (
+                    <FormField control={form.control} name="memberName" render={({ field }) => (
+                        <FormItem><FormLabel className="text-xs font-black uppercase">Member Name *</FormLabel><FormControl><Input placeholder="Search or type name..." {...field} className="h-12" /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                )}
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField control={form.control} name="amount" render={({ field }) => (
-                                <FormItem><FormLabel className="text-xs font-black uppercase">Amount (KES) *</FormLabel><FormControl><Input type="number" {...field} className="h-12 font-bold" /></FormControl><FormMessage /></FormItem>
-                            )}/>
-                            <FormField control={form.control} name="category" render={({ field }) => (
-                                <FormItem><FormLabel className="text-xs font-black uppercase">Category</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue /></SelectTrigger></FormControl><SelectContent>
-                                    <SelectItem value="Tithe">Tithe</SelectItem>
-                                    <SelectItem value="Offertory">Offertory</SelectItem>
-                                    <SelectItem value="Project">Project Fund</SelectItem>
-                                    <SelectItem value="Donation">General Donation</SelectItem>
-                                    <SelectItem value="Other">Other</SelectItem>
-                                </SelectContent></Select></FormItem>
-                            )}/>
-                        </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="amount" render={({ field }) => (
+                        <FormItem><FormLabel className="text-xs font-black uppercase">Amount (KES) *</FormLabel><FormControl><Input type="number" {...field} className="h-12 font-bold" /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={form.control} name="category" render={({ field }) => (
+                        <FormItem><FormLabel className="text-xs font-black uppercase">Category</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue /></SelectTrigger></FormControl><SelectContent>
+                            <SelectItem value="Tithe">Tithe</SelectItem>
+                            <SelectItem value="Offertory">Offertory</SelectItem>
+                            <SelectItem value="Project">Project Fund</SelectItem>
+                            <SelectItem value="Donation">General Donation</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent></Select></FormItem>
+                    )}/>
+                </div>
 
-                        {category === 'Project' && (
-                            <FormField control={form.control} name="projectId" render={({ field }) => (
-                                <FormItem><FormLabel className="text-xs font-black uppercase">Link to Specific Project</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue /></SelectTrigger></FormControl><SelectContent>
-                                    <SelectItem value="none">General Development Fund</SelectItem>
-                                    {projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>)}
-                                </SelectContent></Select></FormItem>
-                            )}/>
-                        )}
+                {category === 'Project' && (
+                    <FormField control={form.control} name="projectId" render={({ field }) => (
+                        <FormItem><FormLabel className="text-xs font-black uppercase">Link to Specific Project</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-12"><SelectValue /></SelectTrigger></FormControl><SelectContent>
+                            <SelectItem value="none">General Development Fund</SelectItem>
+                            {projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>)}
+                        </SelectContent></Select></FormItem>
+                    )}/>
+                )}
 
-                        <FormField control={form.control} name="date" render={({ field }) => (
-                            <FormItem><FormLabel className="text-xs font-black uppercase">Date Received</FormLabel><FormControl><Input type="date" {...field} className="h-12" /></FormControl><FormMessage /></FormItem>
-                        )}/>
-                        
-                        <FormField control={form.control} name="notes" render={({ field }) => (
-                            <FormItem><FormLabel className="text-xs font-black uppercase">Notes / Reference</FormLabel><FormControl><Input placeholder="e.g. M-Pesa ID, Cheque No." {...field} className="h-12" /></FormControl><FormMessage /></FormItem>
-                        )}/>
+                <FormField control={form.control} name="date" render={({ field }) => (
+                    <FormItem><FormLabel className="text-xs font-black uppercase">Date Received</FormLabel><FormControl><Input type="date" {...field} className="h-12" /></FormControl><FormMessage /></FormItem>
+                )}/>
 
-                        <DialogFooter>
-                            <Button type="submit" disabled={isSaving} className="w-full h-14 rounded-full font-black uppercase tracking-widest shadow-xl">
-                                {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <DollarSign className="mr-2 h-5 w-5" />}
-                                {selectedEntry ? 'Save Adjustments' : 'Commit to Ledger'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
-            </DialogContent>
+                <FormField control={form.control} name="notes" render={({ field }) => (
+                    <FormItem><FormLabel className="text-xs font-black uppercase">Notes / Reference</FormLabel><FormControl><Input placeholder="e.g. M-Pesa ID, Cheque No." {...field} className="h-12" /></FormControl><FormMessage /></FormItem>
+                )}/>
+            </div>
+
+            <DialogFooter className="shrink-0 pt-4 border-t mt-2">
+                <Button type="submit" disabled={isSaving} className="w-full h-14 rounded-full font-black uppercase tracking-widest shadow-xl">
+                    {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <DollarSign className="mr-2 h-5 w-5" />}
+                    {selectedEntry ? 'Save Adjustments' : 'Commit to Ledger'}
+                </Button>
+            </DialogFooter>
+        </form>
+    </Form>
+</DialogContent>
         </Dialog>
       </div>
 
