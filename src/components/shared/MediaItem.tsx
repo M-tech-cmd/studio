@@ -16,6 +16,7 @@ interface MediaItemProps {
 /**
  * Universal Media Item (Cloudinary Optimized).
  * Renders Image, Video, or Audio based on URL detection.
+ * Optimized for compact display in grids and lists.
  */
 export function MediaItem({ 
   url: asset, 
@@ -41,10 +42,10 @@ export function MediaItem({
       
       {isAudio ? (
         <div className="h-full w-full flex flex-col items-center justify-center bg-slate-100 gap-2">
-          <Mic className="h-10 w-10 text-primary/40" />
+          <Mic className="h-8 w-8 text-primary/40" />
           <span className="text-[8px] font-black uppercase tracking-widest text-primary/60">Voice/Audio</span>
           {showIconOverlay && (
-              <audio src={url} controls className="absolute bottom-2 scale-75 w-full opacity-0 group-hover:opacity-100 transition-opacity" />
+              <audio src={url} controls className="absolute bottom-2 scale-[0.65] w-full opacity-0 group-hover:opacity-100 transition-opacity" />
           )}
         </div>
       ) : isVideo ? (
@@ -52,8 +53,8 @@ export function MediaItem({
           <Video className="h-10 w-10 text-white/20" />
           {showIconOverlay && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-12 w-12 rounded-full bg-primary text-white flex items-center justify-center shadow-lg scale-90 group-hover:scale-100 transition-transform">
-                <Play className="h-6 w-6 fill-current ml-1" />
+              <div className="h-10 w-10 rounded-full bg-primary text-white flex items-center justify-center shadow-lg scale-90 group-hover:scale-100 transition-transform">
+                <Play className="h-5 w-5 fill-current ml-1" />
               </div>
             </div>
           )}
@@ -71,14 +72,14 @@ export function MediaItem({
       {onRemove && (
         <button
           type="button"
-          className="absolute top-2 left-2 h-8 w-8 rounded-full shadow-2xl z-[70] bg-black/60 backdrop-blur-md text-white hover:bg-black/80 hover:scale-110 active:scale-95 transition-all border border-white/20 flex items-center justify-center"
+          className="absolute top-2 left-2 h-7 w-7 rounded-full shadow-2xl z-[70] bg-black/60 backdrop-blur-md text-white hover:bg-black/80 hover:scale-110 active:scale-95 transition-all border border-white/20 flex items-center justify-center"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             onRemove();
           }}
         >
-          <X className="h-5 w-5 stroke-[3px]" />
+          <X className="h-4 w-4 stroke-[3px]" />
         </button>
       )}
     </div>

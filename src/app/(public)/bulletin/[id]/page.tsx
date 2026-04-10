@@ -46,6 +46,24 @@ const CommentSection = dynamic(
 );
 
 /**
+ * Extracts the first media source from HTML content.
+ */
+function extractFirstMedia(html: string): { type: 'image' | 'video' | 'audio', src: string } | null {
+  if (!html) return null;
+  
+  const imgMatch = html.match(/<img[^>]+src="([^">]+)"/i);
+  if (imgMatch) return { type: 'image', src: imgMatch[1] };
+  
+  const videoMatch = html.match(/<video[^>]+src="([^">]+)"/i);
+  if (videoMatch) return { type: 'video', src: videoMatch[1] };
+  
+  const audioMatch = html.match(/<audio[^>]+src="([^">]+)"/i);
+  if (audioMatch) return { type: 'audio', src: audioMatch[1] };
+  
+  return null;
+}
+
+/**
  * Bulletin Detail Page: Enhanced Identity Masking.
  * Strictly enforces role-based naming for administrators to maintain professional branding.
  */
@@ -125,6 +143,23 @@ export default function BulletinPostPage() {
             </Button>
             
             <Card className="border-none shadow-2xl bg-card overflow-hidden rounded-2xl">
+                {/* Dynamic Header Media Slot */}
+                {(() => {
+                    const media = extractFirstMedia(post.content);
+                    if (!media) return null;
+                    if (media.type === 'image') return (
+                        <img src={media.src} alt="" className="w-full h-[250px] object-cover" />
+                    );
+                    if (media.type === 'video') return (
+                        <video src={media.src} autoPlay muted loop playsInline className="w-full h-[250px] object-cover bg-black" />
+                    );
+                    if (media.type === 'audio') return (
+                        <div className="px-8 py-4 bg-muted/30 border-b">
+                            <audio controls src={media.src} className="w-full h-10" />
+                        </div>
+                    );
+                })()}
+
                 <CardHeader className="bg-muted/10 border-b p-8 md:p-12">
                     <Badge variant="secondary" className="w-fit mb-6 px-4 py-1 uppercase tracking-widest text-[10px] font-black">{post.category}</Badge>
                     <CardTitle className="text-4xl lg:text-6xl font-black tracking-tight !mt-0 leading-[1.1]">{post.title}</CardTitle>

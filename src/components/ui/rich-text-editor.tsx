@@ -31,7 +31,7 @@ const MediaNodeView = ({ node, deleteNode, extension }: any) => {
         {isImage && (
           <img 
             src={src} 
-            className="w-full h-auto object-contain block shadow-lg" 
+            className="w-full h-auto max-h-[500px] object-contain block shadow-lg" 
             alt="Content"
           />
         )}
@@ -39,12 +39,12 @@ const MediaNodeView = ({ node, deleteNode, extension }: any) => {
           <video 
             src={src} 
             controls 
-            className="w-full bg-black block shadow-lg" 
+            className="w-full max-h-[300px] bg-black block shadow-lg" 
           />
         )}
         {isAudio && (
-          <div className="bg-muted/30 p-4 rounded-xl">
-            <audio src={src} controls className="w-full" />
+          <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
+            <audio src={src} controls className="w-full h-10" />
           </div>
         )}
         
@@ -55,10 +55,10 @@ const MediaNodeView = ({ node, deleteNode, extension }: any) => {
             e.stopPropagation();
             deleteNode();
           }}
-          className="absolute top-3 right-3 h-10 w-10 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-50 hover:bg-destructive hover:scale-110 shadow-2xl backdrop-blur-md"
+          className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all z-50 hover:bg-destructive hover:scale-110 shadow-2xl backdrop-blur-md"
           title="Remove Media"
         >
-          <X className="h-5 w-5 stroke-[3px]" />
+          <X className="h-4 w-4 stroke-[3px]" />
         </button>
       </div>
     </NodeViewWrapper>
@@ -80,7 +80,7 @@ const Video = Node.create({
     return [{ tag: 'video' }];
   },
   renderHTML({ HTMLAttributes }) {
-    return ['video', mergeAttributes(HTMLAttributes, { controls: true, class: 'w-full rounded-xl' })];
+    return ['video', mergeAttributes(HTMLAttributes, { controls: true, class: 'w-full max-h-[300px] bg-black rounded-xl shadow-md' })];
   },
   addCommands(): any {
     return {
@@ -110,7 +110,7 @@ const Audio = Node.create({
     return [{ tag: 'audio' }];
   },
   renderHTML({ HTMLAttributes }) {
-    return ['audio', mergeAttributes(HTMLAttributes, { controls: true, class: 'w-full' })];
+    return ['div', { class: 'bg-muted/20 p-2 rounded-lg border my-4' }, ['audio', mergeAttributes(HTMLAttributes, { controls: true, class: 'w-full h-10' })]];
   },
   addCommands(): any {
     return {

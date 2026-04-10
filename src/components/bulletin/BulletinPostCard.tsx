@@ -55,7 +55,6 @@ export function BulletinPostCard({ post }: { post: BulletinPost }) {
         
         {/* Media Slot: Priority 1: First Gallery Image | Priority 2: Extracted from Tiptap */}
         {(() => {
-          // Resolve first gallery image if present
           let mediaUrl = '';
           let mediaType: 'image' | 'video' | 'audio' = 'image';
 
@@ -74,7 +73,7 @@ export function BulletinPostCard({ post }: { post: BulletinPost }) {
           if (!mediaUrl) return null;
           
           if (mediaType === 'image') return (
-            <img src={mediaUrl} alt="" className="w-full aspect-video object-cover rounded-t-xl" />
+            <img src={mediaUrl} alt="" className="w-full h-[200px] object-cover" />
           );
           
           if (mediaType === 'video') return (
@@ -84,13 +83,13 @@ export function BulletinPostCard({ post }: { post: BulletinPost }) {
               muted 
               loop 
               playsInline 
-              className="w-full aspect-video object-cover rounded-t-xl" 
+              className="w-full h-[200px] object-cover bg-black" 
             />
           );
           
           if (mediaType === 'audio') return (
             <div className="px-4 pt-4">
-              <audio controls src={mediaUrl} className="w-full h-8" />
+              <audio controls src={mediaUrl} className="w-full h-10" />
             </div>
           );
         })()}
