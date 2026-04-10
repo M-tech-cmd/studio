@@ -14,6 +14,9 @@ interface AuthorBadgeProps {
     className?: string;
 }
 
+/**
+ * Mapping of verification keys to their Lucide icon components.
+ */
 const IconMap: Record<VerificationIcon, React.ElementType> = {
     Shield: Shield,
     Gavel: Gavel,
@@ -23,16 +26,19 @@ const IconMap: Record<VerificationIcon, React.ElementType> = {
     Check: CheckCircle2
 };
 
+/**
+ * Role title mapping for administrative identities.
+ */
 const roleMapping: Record<string, string> = {
-    admin: "St. Martin De Porres Admin",
-    chairman: "St. Martin De Porres Chairman",
-    treasurer: "St. Martin De Porres Treasurer",
-    secretary: "St. Martin De Porres Secretary",
-    tech_dev: "St. Martin De Porres Tech Developer",
+    admin: "Admin",
+    chairman: "Chairman",
+    treasurer: "Treasurer",
+    secretary: "Secretary",
+    tech_dev: "Tech/Dev",
 };
 
 /**
- * A reusable component that dynamically fetches user details (Masked Name, Badges, Verification)
+ * A reusable component that dynamically fetches user details (Masked Name, Selected Badge, Verification)
  * based on a Firestore UID. Ensures real-time consistency across the site.
  */
 export function AuthorBadge({ userId, fallbackName, className }: AuthorBadgeProps) {
@@ -45,13 +51,22 @@ export function AuthorBadge({ userId, fallbackName, className }: AuthorBadgeProp
     const isAdmin = user?.isAdmin === true;
     const isVerified = user?.isVerified === true;
     
-    // Identity Logic: Admin identities are strictly role-based to maintain professional branding.
-    // Standard members display their personal name.
+    /**
+     * Identity Logic: 
+     * 1. If admin, resolve title: CustomTitle -> Role Map -> "Admin"
+     * 2. Non-admins show personal name or fallback.
+     */
+    const roleTitle = user?.customTitle || (user?.role ? roleMapping[user.role] : null) || 'Admin';
     const displayName = (isAdmin) 
-        ? (roleMapping[user?.role || ''] || `St. Martin De Porres ${user?.customTitle || 'Admin'}`)
+        ? `St. Martin De Porres ${roleTitle}`
         : (user?.name || fallbackName || 'Member');
 
-    const VerificationIconComp = user?.verificationIcon ? IconMap[user.verificationIcon] : CheckCircle2;
+    /**
+     * Badge Resolution:
+     * Uses the selected verificationIcon field from the registry.
+     */
+    const selectedIconKey = user?.verificationIcon || 'Check';
+    const VerificationIconComp = IconMap[selectedIconKey] || CheckCircle2;
 
     return (
         <div className={cn("inline-flex items-center gap-1.5", className)}>
@@ -66,18 +81,8 @@ export function AuthorBadge({ userId, fallbackName, className }: AuthorBadgeProp
                 {isVerified && (
                     <VerificationIconComp className={cn(
                         "h-3.5 w-3.5",
-                        user?.verificationIcon ? "text-primary" : "text-blue-500 fill-blue-500/10"
+                        isAdmin ? "text-primary" : "text-blue-500 fill-blue-500/10"
                     )} />
-                )}
-                
-                {user?.customTitle && !isAdmin && (
-                    <Badge variant="secondary" className="h-4 px-1.5 text-[9px] font-black tracking-tighter uppercase rounded-sm border-primary/20">
-                        {user.customTitle}
-                    </Badge>
-                )}
-
-                {isAdmin && (
-                    <Shield className="h-2.5 w-2.5 text-primary opacity-50" />
                 )}
             </div>
         </div>
