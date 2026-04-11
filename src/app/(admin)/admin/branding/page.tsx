@@ -1,10 +1,10 @@
-'use client';
+<'use client';
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { RotateCcw, Palette as PaletteIcon, Loader2, Save, AlertTriangle } from 'lucide-react';
+import { RotateCcw, Palette as PaletteIcon, Loader2, Save, Image as ImageIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
@@ -14,57 +14,34 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirestore, useMemoFirebase, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { doc, setDoc, deleteField } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ImageUpload } from '@/components/admin/ImageUpload';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 const brandingSchema = z.object({
   brandName: z.string().min(1, "Brand name is required"),
   logoUrl: z.any().optional(),
   parishDescription: z.string().min(10, "Description is required"),
   copyrightYear: z.coerce.number().min(2020),
-  heroTitle: z.string().optional(),
-  heroTitleColor: z.string().optional(),
-  heroDescriptionColor: z.string().optional(),
-  heroImageUrl: z.any().optional(),
   primaryColor: z.string().optional(),
   secondaryColor: z.string().optional(),
   globalTextColor: z.string().optional(),
-  globalButtonColor: z.string().optional(),
   
-  // Section text and colors
-  massTitle: z.string().optional(), massDescription: z.string().optional(), massTitleColor: z.string().optional(), massDescriptionColor: z.string().optional(), massBoxColor: z.string().optional(),
-  eventsTitle: z.string().optional(), eventsDescription: z.string().optional(), eventsTitleColor: z.string().optional(), eventsDescriptionColor: z.string().optional(), eventsBoxColor: z.string().optional(),
-  clergyTitle: z.string().optional(), clergyDescription: z.string().optional(), clergyTitleColor: z.string().optional(), clergyDescriptionColor: z.string().optional(), clergyBoxColor: z.string().optional(),
-  communityTitle: z.string().optional(), communityDescription: z.string().optional(), communityTitleColor: z.string().optional(), communityDescriptionColor: z.string().optional(), communityBoxColor: z.string().optional(),
-  bulletinTitle: z.string().optional(), bulletinDescription: z.string().optional(), bulletinTitleColor: z.string().optional(), bulletinDescriptionColor: z.string().optional(), bulletinBoxColor: z.string().optional(),
-  projectsTitle: z.string().optional(), projectsDescription: z.string().optional(), projectsTitleColor: z.string().optional(), projectsDescriptionColor: z.string().optional(), projectsBoxColor: z.string().optional(),
-  bibleReadingsTitle: z.string().optional(), bibleReadingsDescription: z.string().optional(), bibleReadingsTitleColor: z.string().optional(), bibleReadingsDescriptionColor: z.string().optional(), bibleReadingsBoxColor: z.string().optional(),
-  ministriesTitle: z.string().optional(), ministriesDescription: z.string().optional(), ministriesTitleColor: z.string().optional(), ministriesDescriptionColor: z.string().optional(), ministriesBoxColor: z.string().optional(),
-  documentsTitle: z.string().optional(), documentsDescription: z.string().optional(), documentsTitleColor: z.string().optional(), documentsDescriptionColor: z.string().optional(), documentsBoxColor: z.string().optional(),
-  paymentsTitle: z.string().optional(), paymentsDescription: z.string().optional(), paymentsTitleColor: z.string().optional(), paymentsDescriptionColor: z.string().optional(), paymentsBoxColor: z.string().optional(),
-  contactTitle: z.string().optional(), contactDescription: z.string().optional(), contactTitleColor: z.string().optional(), contactDescriptionColor: z.string().optional(), contactBoxColor: z.string().optional(),
-  aboutUsTitle: z.string().optional(), aboutUsDescription: z.string().optional(), aboutUsTitleColor: z.string().optional(), aboutUsDescriptionColor: z.string().optional(), aboutUsBoxColor: z.string().optional(),
+  // Section text, colors, and images
+  heroTitle: z.string().optional(), heroTitleColor: z.string().optional(), heroDescription: z.string().optional(), heroDescriptionColor: z.string().optional(), heroBoxColor: z.string().optional(), heroImageUrl: z.any().optional(),
+  massTitle: z.string().optional(), massDescription: z.string().optional(), massTitleColor: z.string().optional(), massDescriptionColor: z.string().optional(), massBoxColor: z.string().optional(), massImageUrl: z.any().optional(),
+  eventsTitle: z.string().optional(), eventsDescription: z.string().optional(), eventsTitleColor: z.string().optional(), eventsDescriptionColor: z.string().optional(), eventsBoxColor: z.string().optional(), eventsImageUrl: z.any().optional(),
+  clergyTitle: z.string().optional(), clergyDescription: z.string().optional(), clergyTitleColor: z.string().optional(), clergyDescriptionColor: z.string().optional(), clergyBoxColor: z.string().optional(), clergyImageUrl: z.any().optional(),
+  communityTitle: z.string().optional(), communityDescription: z.string().optional(), communityTitleColor: z.string().optional(), communityDescriptionColor: z.string().optional(), communityBoxColor: z.string().optional(), communityImageUrl: z.any().optional(),
+  bulletinTitle: z.string().optional(), bulletinDescription: z.string().optional(), bulletinTitleColor: z.string().optional(), bulletinDescriptionColor: z.string().optional(), bulletinBoxColor: z.string().optional(), bulletinImageUrl: z.any().optional(),
+  projectsTitle: z.string().optional(), projectsDescription: z.string().optional(), projectsTitleColor: z.string().optional(), projectsDescriptionColor: z.string().optional(), projectsBoxColor: z.string().optional(), projectsImageUrl: z.any().optional(),
 });
 
 const DEFAULT_BRANDING = {
     primaryColor: '#d4a574',
     secondaryColor: '#fdf2f2',
     globalTextColor: '#1e3a5f',
-    globalButtonColor: '#d4a574',
     heroTitle: 'St. Martin De Porres Catholic Church',
     heroTitleColor: '#ffffff',
     heroDescriptionColor: '#e5e7eb',
@@ -74,12 +51,6 @@ const DEFAULT_BRANDING = {
     communityTitle: 'Parish Communities',
     bulletinTitle: 'Latest Updates',
     projectsTitle: 'Parish Projects',
-    bibleReadingsTitle: 'Daily Bible Readings',
-    ministriesTitle: 'Our Ministries',
-    documentsTitle: 'Parish Documents',
-    paymentsTitle: 'Payments & Giving',
-    contactTitle: 'Contact Us',
-    aboutUsTitle: 'About St. Martin De Porres',
 };
 
 const SectionControls = ({ 
@@ -88,26 +59,22 @@ const SectionControls = ({
     label, 
     defaultTitle,
     defaultDesc,
-    isHero = false
 }: { 
     form: any, 
     prefix: string, 
     label: string,
     defaultTitle: string,
     defaultDesc: string,
-    isHero?: boolean
 }) => {
     const handleResetField = (field: string) => {
         form.setValue(field, '');
     };
 
     return (
-        <Card className="mb-8 border-l-4 border-l-primary shadow-md overflow-hidden animate-in fade-in slide-in-from-bottom-2">
-            <CardHeader className="py-4 bg-muted/10 flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle className="text-lg font-black uppercase tracking-tight">{label}</CardTitle>
-                    <CardDescription className="text-xs font-medium">Text and visual overrides for the {label} section.</CardDescription>
-                </div>
+        <Card className="mb-8 shadow-md overflow-hidden animate-in fade-in slide-in-from-bottom-2">
+            <CardHeader className="py-4 bg-muted/10 border-b">
+                <CardTitle className="text-lg font-bold uppercase tracking-tight">{label} Header & Style</CardTitle>
+                <CardDescription className="text-xs">Customize text, colors, and the banner image for this section.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
                 <div className="grid md:grid-cols-2 gap-6">
@@ -119,24 +86,11 @@ const SectionControls = ({
                     )} />
                     <FormField control={form.control} name={`${prefix}Description`} render={({field}) => (
                         <FormItem>
-                            <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60">Sub-Title / Description</FormLabel>
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60">Section Description</FormLabel>
                             <FormControl><Textarea {...field} value={field.value || ''} placeholder={defaultDesc} className="min-h-[40px] py-2" /></FormControl>
                         </FormItem>
                     )} />
                 </div>
-
-                {isHero && (
-                    <FormField control={form.control} name="heroImageUrl" render={({field}) => (
-                        <FormItem className="pt-4 border-t border-dashed">
-                            <ImageUpload 
-                                value={field.value} 
-                                file={null} 
-                                onChange={(val) => field.onChange(val)}
-                                label="Main Hero Background Image"
-                            />
-                        </FormItem>
-                    )} />
-                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-dashed">
                     {[
@@ -165,6 +119,17 @@ const SectionControls = ({
                         )} />
                     ))}
                 </div>
+
+                <FormField control={form.control} name={`${prefix}ImageUrl`} render={({field}) => (
+                    <FormItem className="pt-6 border-t border-dashed">
+                        <ImageUpload 
+                            value={field.value} 
+                            file={null} 
+                            onChange={(val) => field.onChange(val)}
+                            label="Section Banner Image"
+                        />
+                    </FormItem>
+                )} />
             </CardContent>
         </Card>
     );
@@ -201,37 +166,6 @@ export default function BrandingPage() {
         }
     }, [settings, form]);
 
-    const handleMasterReset = async () => {
-        if (!settingsRef) return;
-        setIsSaving(true);
-        toast({ title: 'Resetting Global Theme...', description: 'Restoring Cathedral standards.' });
-
-        try {
-            await setDoc(settingsRef, {
-                primaryColor: deleteField(),
-                secondaryColor: deleteField(),
-                globalTextColor: deleteField(),
-                globalButtonColor: deleteField(),
-                heroTitleColor: deleteField(),
-                heroDescriptionColor: deleteField(),
-                // Reset all section colors
-                ...['mass', 'events', 'clergy', 'community', 'bulletin', 'projects', 'bibleReadings', 'ministries', 'documents', 'payments', 'contact', 'aboutUs'].reduce((acc, p) => ({
-                    ...acc,
-                    [`${p}TitleColor`]: deleteField(),
-                    [`${p}DescriptionColor`]: deleteField(),
-                    [`${p}BoxColor`]: deleteField(),
-                }), {})
-            }, { merge: true });
-            
-            toast({ title: 'Visuals Restored' });
-            window.location.reload();
-        } catch (err) {
-            toast({ variant: 'destructive', title: 'Reset Failed' });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
     const onSubmitBranding = async (values: z.infer<typeof brandingSchema>) => {
         if (!settingsRef) return;
         setIsSaving(true);
@@ -256,132 +190,87 @@ export default function BrandingPage() {
 
     return (
         <div className="space-y-8 py-6 px-4 max-w-5xl mx-auto">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border-2 border-primary/20 shadow-inner">
-                        <PaletteIcon className="h-6 w-6" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-black tracking-tighter uppercase">Branding & Visuals</h1>
-                        <p className="text-muted-foreground font-medium text-sm">Control the digital aesthetics of St. Martin De Porres.</p>
-                    </div>
+            <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border-2 border-primary/20 shadow-inner">
+                    <PaletteIcon className="h-6 w-6" />
                 </div>
-                
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button variant="outline" className="rounded-full border-2 font-bold gap-2 text-destructive hover:bg-destructive/10">
-                            <RotateCcw className="h-4 w-4" /> Reset All Visuals
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
-                        <AlertDialogHeader>
-                            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2">
-                                <AlertTriangle className="h-6 w-6 text-destructive" />
-                                Master Reset
-                            </AlertDialogTitle>
-                            <AlertDialogDescription className="text-lg">
-                                This will purge all color overrides and restore the original <strong>Cathedral Palette</strong>. This action cannot be undone.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="gap-3">
-                            <AlertDialogCancel className="rounded-full h-12 px-8 font-bold">Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleMasterReset} className="bg-destructive text-white rounded-full h-12 px-8 font-black">Execute Reset</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                <div>
+                    <h1 className="text-3xl font-black tracking-tighter uppercase">Branding & Visuals</h1>
+                    <p className="text-muted-foreground font-medium text-sm">Control the digital aesthetics of St. Martin De Porres.</p>
+                </div>
             </div>
             
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmitBranding)} className="space-y-10 pb-32">
-                    <Tabs defaultValue="identity" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 h-14 p-1 rounded-2xl bg-muted/20 border-2">
-                            <TabsTrigger value="identity" className="rounded-xl font-bold uppercase tracking-widest text-xs">Identity & Global</TabsTrigger>
-                            <TabsTrigger value="sections" className="rounded-xl font-bold uppercase tracking-widest text-xs">Section Overrides</TabsTrigger>
-                        </TabsList>
-                        
-                        <TabsContent value="identity" className="space-y-8 pt-8">
-                            <Card className="shadow-lg border-2 rounded-3xl overflow-hidden bg-white/50 backdrop-blur-sm">
-                                <CardHeader className="bg-primary/5 border-b p-8">
-                                    <CardTitle className="text-xl font-black uppercase tracking-widest">Primary Brand Identity</CardTitle>
-                                    <CardDescription>Core naming and global palette settings.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-8 space-y-8">
-                                    <div className="grid md:grid-cols-2 gap-8">
-                                        <FormField control={form.control} name="brandName" render={({field}) => (
-                                            <FormItem><FormLabel className="font-bold">Parish Brand Name</FormLabel><FormControl><Input {...field} className="h-12 font-bold" /></FormControl></FormItem>
-                                        )} />
-                                        <FormField control={form.control} name="copyrightYear" render={({field}) => (
-                                            <FormItem><FormLabel className="font-bold">Copyright Year</FormLabel><FormControl><Input type="number" {...field} className="h-12 font-bold" /></FormControl></FormItem>
-                                        )} />
-                                    </div>
-                                    <FormField control={form.control} name="parishDescription" render={({field}) => (
-                                        <FormItem><FormLabel className="font-bold">Global Tagline (Footer/Meta)</FormLabel><FormControl><Textarea {...field} className="min-h-[80px]" /></FormControl></FormItem>
-                                    )} />
+                    {/* Section 1: Identity & Colors */}
+                    <Card className="shadow-lg border-2 rounded-3xl overflow-hidden bg-white/50 backdrop-blur-sm">
+                        <CardHeader className="bg-primary/5 border-b p-8">
+                            <CardTitle className="text-xl font-black uppercase tracking-widest">1. Identity & Colors</CardTitle>
+                            <CardDescription>Core naming and global palette settings.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-8 space-y-8">
+                            <div className="grid md:grid-cols-2 gap-8">
+                                <FormField control={form.control} name="brandName" render={({field}) => (
+                                    <FormItem><FormLabel className="font-bold">Parish Brand Name</FormLabel><FormControl><Input {...field} className="h-12 font-bold" /></FormControl></FormItem>
+                                )}/>
+                                <FormField control={form.control} name="copyrightYear" render={({field}) => (
+                                    <FormItem><FormLabel className="font-bold">Copyright Year</FormLabel><FormControl><Input type="number" {...field} className="h-12 font-bold" /></FormControl></FormItem>
+                                )}/>
+                            </div>
+                            <FormField control={form.control} name="parishDescription" render={({field}) => (
+                                <FormItem><FormLabel className="font-bold">Global Tagline (Footer/Meta)</FormLabel><FormControl><Textarea {...field} className="min-h-[80px]" /></FormControl></FormItem>
+                            )}/>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 pt-8 border-t border-dashed">
-                                        {[
-                                            { key: 'primaryColor', label: 'Primary Brand' },
-                                            { key: 'secondaryColor', label: 'Global Background' },
-                                            { key: 'globalTextColor', label: 'Global Text' },
-                                            { key: 'globalButtonColor', label: 'Button / Accent' }
-                                        ].map(color => (
-                                            <FormField key={color.key} control={form.control} name={color.key as any} render={({field}) => (
-                                                <FormItem>
-                                                    <FormLabel className="text-[10px] font-black uppercase opacity-60">{color.label}</FormLabel>
-                                                    <div className="flex items-center gap-2">
-                                                        <FormControl>
-                                                            <div className="relative h-12 w-full group">
-                                                                <Input type="color" {...field} className="absolute inset-0 opacity-0 cursor-pointer h-full w-full z-10" />
-                                                                <div className="h-full w-full rounded-xl border-2 flex items-center justify-center p-1" style={{ borderColor: field.value }}>
-                                                                    <div className="h-full w-full rounded-lg" style={{ backgroundColor: field.value }} />
-                                                                </div>
-                                                            </div>
-                                                        </FormControl>
-                                                        <Button type="button" variant="ghost" size="icon" onClick={() => form.setValue(color.key as any, '')}><RotateCcw className="h-3 w-3"/></Button>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8 border-t border-dashed">
+                                {[
+                                    { key: 'primaryColor', label: 'Primary Brand' },
+                                    { key: 'secondaryColor', label: 'Global Background' },
+                                    { key: 'globalTextColor', label: 'Global Text' }
+                                ].map(color => (
+                                    <FormField key={color.key} control={form.control} name={color.key as any} render={({field}) => (
+                                        <FormItem>
+                                            <FormLabel className="text-[10px] font-black uppercase opacity-60">{color.label}</FormLabel>
+                                            <div className="flex items-center gap-2">
+                                                <FormControl>
+                                                    <div className="relative h-12 w-full group">
+                                                        <Input type="color" {...field} className="absolute inset-0 opacity-0 cursor-pointer h-full w-full z-10" />
+                                                        <div className="h-full w-full rounded-xl border-2 flex items-center justify-center p-1" style={{ borderColor: field.value }}>
+                                                            <div className="h-full w-full rounded-lg" style={{ backgroundColor: field.value }} />
+                                                        </div>
                                                     </div>
-                                                </FormItem>
-                                            )} />
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <SectionControls 
-                                form={form} 
-                                prefix="hero" 
-                                label="Main Hero Banner" 
-                                defaultTitle={DEFAULT_BRANDING.heroTitle}
-                                defaultDesc="A vibrant community of faith, hope, and love..."
-                                isHero={true}
-                            />
-                        </TabsContent>
-
-                        <TabsContent value="sections" className="space-y-6 pt-8">
-                            <div className="grid gap-2">
-                                <h3 className="text-2xl font-black uppercase tracking-tighter">Content Sections</h3>
-                                <p className="text-sm text-muted-foreground mb-6 font-medium">Customize the wording and visual highlights for each homepage segment.</p>
+                                                </FormControl>
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => form.setValue(color.key as any, '')}><RotateCcw className="h-3 w-3"/></Button>
+                                            </div>
+                                        </FormItem>
+                                    ))} />
+                                ))}
                             </div>
 
-                            <div className="space-y-4">
-                                <SectionControls form={form} prefix="mass" label="Mass Schedule" defaultTitle="Weekly Mass Schedule" defaultDesc="Join us for worship and spiritual nourishment..." />
-                                <SectionControls form={form} prefix="events" label="Upcoming Events" defaultTitle="Upcoming Events" defaultDesc="Stay active in our community with these spiritual gatherings." />
-                                <SectionControls form={form} prefix="clergy" label="Meet Our Clergy" defaultTitle="Meet Our Clergy & Staff" defaultDesc="The dedicated team serving our vibrant parish family." />
-                                <SectionControls form={form} prefix="community" label="Parish Communities" defaultTitle="Parish Communities" defaultDesc="Find fellowship and grow in faith with our Small Christian Communities." />
-                                <SectionControls form={form} prefix="bulletin" label="Latest Updates" defaultTitle="Latest Updates" defaultDesc="Stay informed with the latest parish news and reflections." />
-                                <SectionControls form={form} prefix="projects" label="Parish Projects" defaultTitle="Parish Projects" defaultDesc="Supporting our mission and growth through critical infrastructure." />
-                                <SectionControls form={form} prefix="bibleReadings" label="Bible Readings" defaultTitle="Daily Bible Readings" defaultDesc="Nourish your soul with the Word of God each day." />
-                                <SectionControls form={form} prefix="ministries" label="Our Ministries" defaultTitle="Our Ministries" defaultDesc="Serving God and our community through action." />
-                                <SectionControls form={form} prefix="documents" label="Parish Documents" defaultTitle="Parish Documents" defaultDesc="Official bulletins, newsletters, and reports." />
-                                <SectionControls form={form} prefix="payments" label="Payments & Giving" defaultTitle="Payments & Giving" defaultDesc="Support our mission through secure digital contributions." />
-                                <SectionControls form={form} prefix="contact" label="Contact Us" defaultTitle="Contact Us" defaultDesc="We'd love to hear from you. Reach out for support or guidance." />
-                                <SectionControls form={form} prefix="aboutUs" label="About Us" defaultTitle="About Us" defaultDesc="Learn about our 60-year history and mission." />
-                            </div>
-                        </TabsContent>
-                    </Tabs>
+                            <FormField control={form.control} name="logoUrl" render={({field}) => (
+                                <FormItem className="pt-8 border-t border-dashed">
+                                    <ImageUpload 
+                                        value={field.value} 
+                                        file={null} 
+                                        onChange={(val) => field.onChange(val)}
+                                        label="Official Church Logo"
+                                    />
+                                </FormItem>
+                            )} />
+                        </CardContent>
+                    </Card>
+
+                    {/* Sections 2-8 */}
+                    <SectionControls form={form} prefix="hero" label="2. Main Hero Banner" defaultTitle={DEFAULT_BRANDING.heroTitle} defaultDesc="A vibrant community of faith..." />
+                    <SectionControls form={form} prefix="mass" label="3. Mass Schedule" defaultTitle={DEFAULT_BRANDING.massTitle} defaultDesc="Join us for worship..." />
+                    <SectionControls form={form} prefix="events" label="4. Upcoming Events" defaultTitle={DEFAULT_BRANDING.eventsTitle} defaultDesc="Stay active in our community..." />
+                    <SectionControls form={form} prefix="clergy" label="5. Meet Our Clergy & Staff" defaultTitle={DEFAULT_BRANDING.clergyTitle} defaultDesc="The dedicated team serving our parish..." />
+                    <SectionControls form={form} prefix="community" label="6. Parish Communities" defaultTitle={DEFAULT_BRANDING.communityTitle} defaultDesc="Find fellowship and grow in faith..." />
+                    <SectionControls form={form} prefix="bulletin" label="7. Latest Updates" defaultTitle={DEFAULT_BRANDING.bulletinTitle} defaultDesc="Stay informed with parish news..." />
+                    <SectionControls form={form} prefix="projects" label="8. Parish Projects" defaultTitle={DEFAULT_BRANDING.projectsTitle} defaultDesc="Supporting our mission and growth..." />
 
                     <div className="flex justify-end sticky bottom-6 z-50 gap-4 pt-10">
                         <Button type="button" variant="outline" size="lg" className="rounded-full px-8 h-16 text-lg font-bold border-2 bg-white/80 backdrop-blur-md shadow-lg" onClick={() => router.push('/admin/dashboard')} disabled={isSaving}>
-                            Cancel Changes
+                            Cancel
                         </Button>
                         <Button type="submit" size="lg" className="shadow-2xl rounded-full px-12 h-16 text-lg font-black uppercase tracking-widest gap-3" disabled={isSaving}>
                             {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
