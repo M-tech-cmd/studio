@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 /**
  * Bulletin Feed: Restructured to 4-column grid mirroring the Events page.
  * Provides a modern magazine-style layout for parish updates.
+ * Correctly resolves administrative identities via BulletinPostCard integration.
  */
 function BulletinFeed() {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');

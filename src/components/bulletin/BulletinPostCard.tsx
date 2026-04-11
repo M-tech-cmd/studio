@@ -11,6 +11,7 @@ import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { resolveMediaUrl } from '@/lib/upload-utils';
+import { AuthorDisplay } from '@/components/admin/AuthorDisplay';
 
 /**
  * Extracts the first media source from HTML content.
@@ -33,6 +34,7 @@ function extractFirstMedia(html: string): { type: 'image' | 'video' | 'audio', s
 /**
  * Modernized Bulletin Card: Vertical layout consistent with EventCard.
  * Features a top media slot extracted from rich text content or gallery.
+ * Updated to use AuthorDisplay for professional identity masking.
  */
 export function BulletinPostCard({ post }: { post: BulletinPost }) {
   const firestore = useFirestore();
@@ -46,7 +48,7 @@ export function BulletinPostCard({ post }: { post: BulletinPost }) {
   const contentSnippet = post.content.replace(/<[^>]+>/g, '').substring(0, 120) + '...';
 
   const formattedDate = post.createdAt 
-    ? format(post.createdAt.toDate(), 'MMMM d, yyyy').toUpperCase() 
+    ? format(post.createdAt.toDate(), 'MMM d, yyyy')
     : '';
 
   return (
@@ -113,13 +115,15 @@ export function BulletinPostCard({ post }: { post: BulletinPost }) {
             <div className="flex items-center gap-2">
               <Avatar className="h-6 w-6 border-2 border-white shadow-sm">
                 <AvatarImage src={author?.photoURL} />
-                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold uppercase">
+                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
                   {post.authorName.charAt(0)}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-tight truncate max-w-[80px]">
-                {post.authorName}
-              </span>
+              <AuthorDisplay 
+                authorId={post.authorId} 
+                fallbackName={post.authorName}
+                className="text-[10px] font-bold text-primary tracking-tight truncate max-w-[120px]"
+              />
             </div>
             
             <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
