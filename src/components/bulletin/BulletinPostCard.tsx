@@ -3,13 +3,10 @@
 import Link from 'next/link';
 import { Calendar, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import type { BulletinPost, RegisteredUser } from '@/lib/types';
+import type { BulletinPost } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { resolveMediaUrl } from '@/lib/upload-utils';
 import { AuthorDisplay } from '@/components/admin/AuthorDisplay';
 
@@ -33,18 +30,9 @@ function extractFirstMedia(html: string): { type: 'image' | 'video' | 'audio', s
 
 /**
  * Modernized Bulletin Card: Vertical layout consistent with EventCard.
- * Features a top media slot extracted from rich text content or gallery.
- * Updated to use AuthorDisplay for professional identity masking.
+ * Uses unified AuthorDisplay to handle role-based identity and "S" initial avatars.
  */
 export function BulletinPostCard({ post }: { post: BulletinPost }) {
-  const firestore = useFirestore();
-  
-  const authorRef = useMemoFirebase(() => 
-    post.authorId ? doc(firestore, 'users', post.authorId) : null, 
-    [firestore, post.authorId]
-  );
-  const { data: author } = useDoc<RegisteredUser>(authorRef);
-
   const contentSnippet = post.content.replace(/<[^>]+>/g, '').substring(0, 120) + '...';
 
   const formattedDate = post.createdAt 
@@ -55,7 +43,7 @@ export function BulletinPostCard({ post }: { post: BulletinPost }) {
     <Link href={`/bulletin/${post.id}`} className="block h-full group">
       <Card className="flex flex-col w-full h-full overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white border-none rounded-xl relative">
         
-        {/* Media Slot: Priority 1: First Gallery Image | Priority 2: Extracted from Tiptap */}
+        {/* Media Slot: Priority 1: First Gallery Image | Priority 2: Extracted from Content */}
         {(() => {
           let mediaUrl = '';
           let mediaType: 'image' | 'video' | 'audio' = 'image';
@@ -90,7 +78,7 @@ export function BulletinPostCard({ post }: { post: BulletinPost }) {
           );
           
           if (mediaType === 'audio') return (
-            <div className="px-4 pt-4">
+            <div className="px-4 pt-4 h-[200px] flex items-center bg-muted/10">
               <audio controls src={mediaUrl} className="w-full h-10" />
             </div>
           );
@@ -112,19 +100,13 @@ export function BulletinPostCard({ post }: { post: BulletinPost }) {
           </p>
           
           <div className="flex items-center justify-between pt-4 border-t border-dashed">
-            <div className="flex items-center gap-2">
-              <Avatar className="h-6 w-6 border-2 border-white shadow-sm">
-                <AvatarImage src={author?.photoURL} />
-                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
-                  {post.authorName.charAt(0)}
-                </AvatarFallback>
-              </Avatar>
-              <AuthorDisplay 
+            {/* Role-based Avatar ("S") and Name handled by AuthorDisplay */}
+            <AuthorDisplay 
                 authorId={post.authorId} 
                 fallbackName={post.authorName}
+                showAvatar={true}
                 className="text-[10px] font-bold text-primary tracking-tight truncate max-w-[120px]"
-              />
-            </div>
+            />
             
             <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
               <Calendar className="h-3 w-3 text-primary" />
