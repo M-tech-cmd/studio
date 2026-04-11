@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { RotateCcw, Palette as PaletteIcon, Loader2 } from 'lucide-react';
+import { RotateCcw, Palette as PaletteIcon, Loader2, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
@@ -28,13 +28,20 @@ const brandingSchema = z.object({
   logoUrl: z.string().optional(),
   parishDescription: z.string().min(10, "Description is required"),
   copyrightYear: z.coerce.number().min(2020),
+  primaryColor: z.string().optional(),
+  secondaryColor: z.string().optional(),
+  globalTextColor: z.string().optional(),
+  globalButtonColor: z.string().optional(),
+  
+  identityTitleColor: z.string().optional(),
+  identityDescriptionColor: z.string().optional(),
+  identityBoxColor: z.string().optional(),
+
   heroTitle: z.string().optional(),
   heroTitleColor: z.string().optional(),
   heroDescriptionColor: z.string().optional(),
   heroImageUrl: z.string().optional(),
-  primaryColor: z.string().optional(),
-  secondaryColor: z.string().optional(),
-  globalTextColor: z.string().optional(),
+  heroBoxColor: z.string().optional(),
   
   massTitle: z.string().optional(), massDescription: z.string().optional(), massTitleColor: z.string().optional(), massDescriptionColor: z.string().optional(), massBoxColor: z.string().optional(), massImageUrl: z.string().optional(),
   eventsTitle: z.string().optional(), eventsDescription: z.string().optional(), eventsTitleColor: z.string().optional(), eventsDescriptionColor: z.string().optional(), eventsBoxColor: z.string().optional(), eventsImageUrl: z.string().optional(),
@@ -42,6 +49,12 @@ const brandingSchema = z.object({
   communityTitle: z.string().optional(), communityDescription: z.string().optional(), communityTitleColor: z.string().optional(), communityDescriptionColor: z.string().optional(), communityBoxColor: z.string().optional(), communityImageUrl: z.string().optional(),
   bulletinTitle: z.string().optional(), bulletinDescription: z.string().optional(), bulletinTitleColor: z.string().optional(), bulletinDescriptionColor: z.string().optional(), bulletinBoxColor: z.string().optional(), bulletinImageUrl: z.string().optional(),
   projectsTitle: z.string().optional(), projectsDescription: z.string().optional(), projectsTitleColor: z.string().optional(), projectsDescriptionColor: z.string().optional(), projectsBoxColor: z.string().optional(), projectsImageUrl: z.string().optional(),
+  
+  bibleReadingsTitle: z.string().optional(), bibleReadingsDescription: z.string().optional(), bibleReadingsTitleColor: z.string().optional(), bibleReadingsDescriptionColor: z.string().optional(), bibleReadingsBoxColor: z.string().optional(),
+  ministriesTitle: z.string().optional(), ministriesDescription: z.string().optional(), ministriesTitleColor: z.string().optional(), ministriesDescriptionColor: z.string().optional(), ministriesBoxColor: z.string().optional(),
+  documentsTitle: z.string().optional(), documentsDescription: z.string().optional(), documentsTitleColor: z.string().optional(), documentsDescriptionColor: z.string().optional(), documentsBoxColor: z.string().optional(),
+  paymentsTitle: z.string().optional(), paymentsDescription: z.string().optional(), paymentsTitleColor: z.string().optional(), paymentsDescriptionColor: z.string().optional(), paymentsBoxColor: z.string().optional(),
+  contactTitle: z.string().optional(), contactDescription: z.string().optional(), contactTitleColor: z.string().optional(), contactDescriptionColor: z.string().optional(), contactBoxColor: z.string().optional(),
 });
 
 const contentSchema = z.object({
@@ -56,18 +69,20 @@ const SectionControls = ({
     label, 
     onReset, 
     file, 
-    onFileChange 
+    onFileChange,
+    showImage = true
 }: { 
     form: any, 
     prefix: string, 
     label: string, 
     onReset: (p: string) => void,
-    file: File | null,
-    onFileChange: (file: File | null) => void
+    file?: File | null,
+    onFileChange?: (file: File | null) => void,
+    showImage?: boolean
 }) => {
     return (
-        <Card className="mb-6 border-l-4 border-l-primary shadow-sm">
-            <CardHeader className="py-4 flex flex-row items-center justify-between bg-muted/10">
+        <Card className="mb-6 border-l-4 border-l-primary shadow-sm overflow-hidden">
+            <CardHeader className="py-4 flex flex-row items-center justify-between bg-muted/10 border-b">
                 <CardTitle className="text-lg font-bold">{label} Header & Style</CardTitle>
                 <Button type="button" variant="outline" size="sm" onClick={() => onReset(prefix)}>
                     <RotateCcw className="h-3 w-3 mr-2" /> Reset Section
@@ -79,20 +94,22 @@ const SectionControls = ({
                     <FormField control={form.control} name={`${prefix}Description`} render={({field}) => <FormItem><FormLabel>Section Description</FormLabel><FormControl><Textarea {...field} value={field.value || ''} placeholder="Add a short subtitle for this section..." /></FormControl></FormItem>} />
                 </div>
                 
-                <FormField control={form.control} name={`${prefix}ImageUrl`} render={({field}) => (
-                    <FormItem>
-                        <ImageUpload 
-                          value={field.value || ''} 
-                          file={file}
-                          onChange={(url, newFile) => {
-                              field.onChange(url);
-                              onFileChange(newFile);
-                          }}
-                          folder="banners" 
-                          label="Section Banner Image" 
-                        />
-                    </FormItem>
-                )} />
+                {showImage && onFileChange && (
+                    <FormField control={form.control} name={`${prefix}ImageUrl`} render={({field}) => (
+                        <FormItem>
+                            <ImageUpload 
+                              value={field.value || ''} 
+                              file={file || null}
+                              onChange={(url, newFile) => {
+                                  field.onChange(url);
+                                  onFileChange(newFile);
+                              }}
+                              folder="banners" 
+                              label="Section Banner Image" 
+                            />
+                        </FormItem>
+                    )} />
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-dashed">
                     <FormField control={form.control} name={`${prefix}TitleColor`} render={({field}) => (
@@ -153,13 +170,18 @@ export default function BrandingPage() {
             logoUrl: '',
             parishDescription: 'A community of faith, hope, and love serving the heart of Nakuru.',
             copyrightYear: new Date().getFullYear(),
+            primaryColor: '#d4a574',
+            secondaryColor: '#fdf2f2',
+            globalTextColor: '#1e3a5f',
+            globalButtonColor: '#d4a574',
+            identityTitleColor: '#1e3a5f',
+            identityDescriptionColor: '#4b5563',
+            identityBoxColor: '#ffffff',
             heroTitle: 'St. Martin De Porres Catholic Church',
             heroTitleColor: '#ffffff',
             heroDescriptionColor: '#e5e7eb',
             heroImageUrl: '',
-            primaryColor: '#d4a574',
-            secondaryColor: '#fdf2f2',
-            globalTextColor: '#1e3a5f',
+            heroBoxColor: 'transparent',
         }
     });
 
@@ -176,13 +198,18 @@ export default function BrandingPage() {
                 logoUrl: settings.logoUrl ?? '',
                 parishDescription: settings.parishDescription ?? 'A community of faith, hope, and love serving the heart of Nakuru.',
                 copyrightYear: settings.copyrightYear ?? new Date().getFullYear(),
+                primaryColor: settings.primaryColor ?? '#d4a574',
+                secondaryColor: settings.secondaryColor ?? '#fdf2f2',
+                globalTextColor: settings.globalTextColor ?? '#1e3a5f',
+                globalButtonColor: settings.globalButtonColor ?? '#d4a574',
+                identityTitleColor: settings.identityTitleColor ?? '#1e3a5f',
+                identityDescriptionColor: settings.identityDescriptionColor ?? '#4b5563',
+                identityBoxColor: settings.identityBoxColor ?? '#ffffff',
                 heroTitle: settings.heroTitle ?? 'St. Martin De Porres Catholic Church',
                 heroTitleColor: settings.heroTitleColor ?? '#ffffff',
                 heroDescriptionColor: settings.heroDescriptionColor ?? '#e5e7eb',
                 heroImageUrl: settings.heroImageUrl ?? '',
-                primaryColor: settings.primaryColor ?? '#d4a574',
-                secondaryColor: settings.secondaryColor ?? '#fdf2f2',
-                globalTextColor: settings.globalTextColor ?? '#1e3a5f',
+                heroBoxColor: settings.heroBoxColor ?? 'transparent',
             });
         }
     }, [settings, form]);
@@ -204,6 +231,41 @@ export default function BrandingPage() {
         }
     }, [selectedContent, contentForm]);
 
+    const handleMasterReset = async () => {
+        if (!settingsRef) return;
+        if (!confirm("This will reset ALL colors and text overrides to default. Are you sure?")) return;
+        
+        setIsSaving(true);
+        toast({ title: 'Purging Overrides...' });
+
+        const defaults = {
+            primaryColor: '#d4a574', secondaryColor: '#fdf2f2', globalTextColor: '#1e3a5f', globalButtonColor: '#d4a574',
+            identityTitleColor: '#1e3a5f', identityDescriptionColor: '#4b5563', identityBoxColor: '#ffffff',
+            heroTitleColor: '#ffffff', heroDescriptionColor: '#e5e7eb', heroBoxColor: 'transparent',
+            massTitleColor: '', massDescriptionColor: '', massBoxColor: '',
+            eventsTitleColor: '', eventsDescriptionColor: '', eventsBoxColor: '',
+            clergyTitleColor: '', clergyDescriptionColor: '', clergyBoxColor: '',
+            communityTitleColor: '', communityDescriptionColor: '', communityBoxColor: '',
+            bulletinTitleColor: '', bulletinDescriptionColor: '', bulletinBoxColor: '',
+            projectsTitleColor: '', projectsDescriptionColor: '', projectsBoxColor: '',
+            bibleReadingsTitleColor: '', bibleReadingsDescriptionColor: '', bibleReadingsBoxColor: '',
+            ministriesTitleColor: '', ministriesDescriptionColor: '', ministriesBoxColor: '',
+            documentsTitleColor: '', documentsDescriptionColor: '', documentsBoxColor: '',
+            paymentsTitleColor: '', paymentsDescriptionColor: '', paymentsBoxColor: '',
+            contactTitleColor: '', contactDescriptionColor: '', contactBoxColor: '',
+        };
+
+        try {
+            await setDoc(settingsRef, defaults, { merge: true });
+            form.reset({ ...form.getValues(), ...defaults });
+            toast({ title: 'Visuals Purged' });
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handleSectionReset = async (prefix: string) => {
         if (!settingsRef) return;
         const defaults: Record<string, { title: string, desc: string, img: string }> = {
@@ -214,6 +276,11 @@ export default function BrandingPage() {
             bulletin: { title: 'Latest Updates', desc: 'Stay informed with the latest news.', img: '' },
             projects: { title: 'Parish Projects', desc: 'Supporting our mission and growth.', img: '' },
             community: { title: 'Parish Communities', desc: 'Connect with our Small Christian Communities and groups.', img: '' },
+            bibleReadings: { title: 'Daily Bible Readings', desc: 'Nourish your soul with the Word of God each day.', img: '' },
+            ministries: { title: 'Our Ministries', desc: 'Serving God and our community through action.', img: '' },
+            documents: { title: 'Parish Documents', desc: 'Stay informed with our latest bulletins and newsletters.', img: '' },
+            payments: { title: 'Payments & Giving', desc: 'Support our parish mission through secure digital payments.', img: '' },
+            contact: { title: 'Contact Us', desc: "We'd love to hear from you. Get in touch for any inquiries.", img: '' },
         };
         const d = defaults[prefix] || { title: '', desc: '', img: '' };
         const resetData = { [`${prefix}Title`]: d.title, [`${prefix}Description`]: d.desc, [`${prefix}TitleColor`]: '', [`${prefix}DescriptionColor`]: '', [`${prefix}BoxColor`]: '', [`${prefix}ImageUrl`]: d.img };
@@ -223,7 +290,7 @@ export default function BrandingPage() {
         updateDoc(settingsRef, resetData).then(() => {
             form.setValue(`${prefix}Title` as any, d.title);
             form.setValue(`${prefix}Description` as any, d.desc);
-            form.setValue(`${prefix}ImageUrl` as any, d.img);
+            if (prefix !== 'hero') form.setValue(`${prefix}ImageUrl` as any, d.img);
             setBrandingFiles(prev => ({ ...prev, [prefix]: null }));
         });
     };
@@ -234,14 +301,14 @@ export default function BrandingPage() {
         toast({ title: 'Syncing Identity...', description: 'Please wait while we upload assets.' });
 
         const finalValues = { ...values };
-        const prefixes = ['hero', 'mass', 'events', 'clergy', 'community', 'bulletin', 'projects'];
+        const imagePrefixes = ['hero', 'mass', 'events', 'clergy', 'community', 'bulletin', 'projects'];
 
         try {
             if (brandingFiles.logo) {
                 finalValues.logoUrl = await uploadSingleFile(null, 'branding', brandingFiles.logo);
             }
 
-            for (const p of prefixes) {
+            for (const p of imagePrefixes) {
                 if (brandingFiles[p]) {
                     const fieldKey = `${p}ImageUrl`;
                     (finalValues as any)[fieldKey] = await uploadSingleFile(null, 'banners', brandingFiles[p]);
@@ -307,14 +374,40 @@ export default function BrandingPage() {
                 <TabsContent value="identity" className="space-y-8 pt-6">
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmitBranding)} className="space-y-8 pb-20">
+                            
+                            <Card className="border-2 border-primary/20 shadow-xl overflow-hidden rounded-2xl isolate">
+                                <CardHeader className="bg-primary/5 border-b py-4 flex flex-row items-center justify-between">
+                                    <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                                        <Zap className="h-4 w-4 text-primary" />
+                                        Global Visual Engine
+                                    </CardTitle>
+                                    <Button type="button" variant="destructive" size="sm" className="h-8 rounded-full font-bold" onClick={handleMasterReset}>
+                                        <RotateCcw className="h-3 w-3 mr-2" /> Reset All Visuals
+                                    </Button>
+                                </CardHeader>
+                                <CardContent className="pt-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <FormField control={form.control} name="globalButtonColor" render={({field}) => (
+                                            <FormItem>
+                                                <FormLabel className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Global Button Color</FormLabel>
+                                                <div className="flex gap-2">
+                                                    <FormControl><Input type="color" {...field} value={field.value || '#d4a574'} className="w-12 h-10 p-1 cursor-pointer"/></FormControl>
+                                                    <Button type="button" variant="ghost" size="icon" className="h-10 w-10" onClick={() => form.setValue('globalButtonColor', '')}><RotateCcw className="h-4 w-4"/></Button>
+                                                </div>
+                                                <p className="text-[10px] text-muted-foreground mt-1">Updates all site buttons and primary accents.</p>
+                                            </FormItem>
+                                        )} />
+                                    </div>
+                                </CardContent>
+                            </Card>
+
                             <Card className="shadow-md">
-                                <CardHeader className="bg-primary/5"><CardTitle>Primary Identity</CardTitle></CardHeader>
+                                <CardHeader className="bg-primary/5 border-b"><CardTitle>Primary Identity</CardTitle></CardHeader>
                                 <CardContent className="space-y-6 pt-6">
                                     <div className="grid md:grid-cols-2 gap-6">
                                         <FormField control={form.control} name="brandName" render={({field}) => <FormItem><FormLabel>Parish Brand Name</FormLabel><FormControl><Input {...field} value={field.value || ''} autoComplete="off" /></FormControl></FormItem>} />
-                                        <FormField control={form.control} name="heroTitle" render={({field}) => <FormItem><FormLabel>Hero Welcome Title</FormLabel><FormControl><Input {...field} value={field.value || ''} autoComplete="off" /></FormControl></FormItem>} />
+                                        <FormField control={form.control} name="parishDescription" render={({field}) => <FormItem><FormLabel>Parish Tagline</FormLabel><FormControl><Textarea {...field} value={field.value || ''} /></FormControl></FormItem>} />
                                     </div>
-                                    <FormField control={form.control} name="parishDescription" render={({field}) => <FormItem><FormLabel>Parish Tagline</FormLabel><FormControl><Textarea {...field} value={field.value || ''} /></FormControl></FormItem>} />
                                     
                                     <FormField control={form.control} name="logoUrl" render={({field}) => (
                                         <FormItem>
@@ -330,6 +423,24 @@ export default function BrandingPage() {
                                             />
                                         </FormItem>
                                     )} />
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-dashed">
+                                        {[
+                                            { key: 'identityTitleColor', label: 'Title Color' },
+                                            { key: 'identityDescriptionColor', label: 'Tagline Color' },
+                                            { key: 'identityBoxColor', label: 'Background Color' },
+                                        ].map((color) => (
+                                            <FormField key={color.key} control={form.control} name={color.key as any} render={({field}) => (
+                                                <FormItem>
+                                                    <FormLabel className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{color.label}</FormLabel>
+                                                    <div className="flex gap-2">
+                                                        <FormControl><Input type="color" {...field} value={field.value || ''} className="w-12 h-10 p-1 cursor-pointer"/></FormControl>
+                                                        <Button type="button" variant="ghost" size="icon" className="h-10 w-10" onClick={() => form.setValue(color.key as any, '')}><RotateCcw className="h-4 w-4"/></Button>
+                                                    </div>
+                                                </FormItem>
+                                            )} />
+                                        ))}
+                                    </div>
                                 </CardContent>
                             </Card>
 
@@ -344,58 +455,45 @@ export default function BrandingPage() {
                             
                             <div className="space-y-6">
                                 <div className="border-b pb-4"><h3 className="text-2xl font-bold">Section-Specific Styling</h3></div>
+                                
                                 <SectionControls 
-                                    form={form} 
-                                    prefix="mass" 
-                                    label="Mass Schedule" 
-                                    onReset={handleSectionReset} 
-                                    file={brandingFiles.mass}
-                                    onFileChange={(f) => setBrandingFiles(prev => ({...prev, mass: f}))}
+                                    form={form} prefix="mass" label="Mass Schedule" onReset={handleSectionReset} 
+                                    file={brandingFiles.mass} onFileChange={(f) => setBrandingFiles(prev => ({...prev, mass: f}))}
                                 />
                                 <SectionControls 
-                                    form={form} 
-                                    prefix="events" 
-                                    label="Upcoming Events" 
-                                    onReset={handleSectionReset} 
-                                    file={brandingFiles.events}
-                                    onFileChange={(f) => setBrandingFiles(prev => ({...prev, events: f}))}
+                                    form={form} prefix="events" label="Upcoming Events" onReset={handleSectionReset} 
+                                    file={brandingFiles.events} onFileChange={(f) => setBrandingFiles(prev => ({...prev, events: f}))}
                                 />
                                 <SectionControls 
-                                    form={form} 
-                                    prefix="clergy" 
-                                    label="Meet Our Clergy" 
-                                    onReset={handleSectionReset} 
-                                    file={brandingFiles.clergy}
-                                    onFileChange={(f) => setBrandingFiles(prev => ({...prev, clergy: f}))}
+                                    form={form} prefix="clergy" label="Meet Our Clergy" onReset={handleSectionReset} 
+                                    file={brandingFiles.clergy} onFileChange={(f) => setBrandingFiles(prev => ({...prev, clergy: f}))}
                                 />
                                 <SectionControls 
-                                    form={form} 
-                                    prefix="community" 
-                                    label="Parish Communities" 
-                                    onReset={handleSectionReset} 
-                                    file={brandingFiles.community}
-                                    onFileChange={(f) => setBrandingFiles(prev => ({...prev, community: f}))}
+                                    form={form} prefix="community" label="Parish Communities" onReset={handleSectionReset} 
+                                    file={brandingFiles.community} onFileChange={(f) => setBrandingFiles(prev => ({...prev, community: f}))}
                                 />
                                 <SectionControls 
-                                    form={form} 
-                                    prefix="bulletin" 
-                                    label="Latest Updates" 
-                                    onReset={handleSectionReset} 
-                                    file={brandingFiles.bulletin}
-                                    onFileChange={(f) => setBrandingFiles(prev => ({...prev, bulletin: f}))}
+                                    form={form} prefix="bulletin" label="Latest Updates" onReset={handleSectionReset} 
+                                    file={brandingFiles.bulletin} onFileChange={(f) => setBrandingFiles(prev => ({...prev, bulletin: f}))}
                                 />
                                 <SectionControls 
-                                    form={form} 
-                                    prefix="projects" 
-                                    label="Parish Projects" 
-                                    onReset={handleSectionReset} 
-                                    file={brandingFiles.projects}
-                                    onFileChange={(f) => setBrandingFiles(prev => ({...prev, projects: f}))}
+                                    form={form} prefix="projects" label="Parish Projects" onReset={handleSectionReset} 
+                                    file={brandingFiles.projects} onFileChange={(f) => setBrandingFiles(prev => ({...prev, projects: f}))}
                                 />
+
+                                <div className="pt-10 border-t-4 border-primary/10">
+                                    <div className="mb-6"><h3 className="text-xl font-black uppercase tracking-tighter text-primary">New Site Sections</h3></div>
+                                    
+                                    <SectionControls form={form} prefix="bibleReadings" label="Bible Readings" onReset={handleSectionReset} showImage={false} />
+                                    <SectionControls form={form} prefix="ministries" label="Ministries" onReset={handleSectionReset} showImage={false} />
+                                    <SectionControls form={form} prefix="documents" label="Documents" onReset={handleSectionReset} showImage={false} />
+                                    <SectionControls form={form} prefix="payments" label="Payments" onReset={handleSectionReset} showImage={false} />
+                                    <SectionControls form={form} prefix="contact" label="Contact" onReset={handleSectionReset} showImage={false} />
+                                </div>
                             </div>
 
                             <div className="flex justify-end sticky bottom-6 z-50 gap-4">
-                                <Button type="button" variant="outline" size="lg" className="rounded-full px-8 h-16 text-lg font-bold" onClick={() => router.push('/admin/dashboard')} disabled={isSaving}>
+                                <Button type="button" variant="outline" size="lg" className="rounded-full px-8 h-16 text-lg font-bold bg-white" onClick={() => router.push('/admin/dashboard')} disabled={isSaving}>
                                     Cancel Changes
                                 </Button>
                                 <Button type="submit" size="lg" className="shadow-2xl rounded-full px-12 h-16 text-lg font-bold" disabled={isSaving}>
@@ -409,7 +507,7 @@ export default function BrandingPage() {
 
                 <TabsContent value="pages" className="space-y-6 pt-6">
                     <Card className="shadow-md">
-                        <CardHeader className="bg-primary/5"><CardTitle>Static Page Management</CardTitle></CardHeader>
+                        <CardHeader className="bg-primary/5 border-b"><CardTitle>Static Page Management</CardTitle></CardHeader>
                         <CardContent className="pt-6">
                             <Form {...contentForm}>
                                 <form onSubmit={contentForm.handleSubmit(onSubmitContent)} key={selectedContentId} className="space-y-6">

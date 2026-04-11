@@ -231,6 +231,11 @@ export type SiteSettings = {
   
   paymentMethods?: PaymentMethod[];
 
+  // Identity Colors
+  identityTitleColor?: string;
+  identityDescriptionColor?: string;
+  identityBoxColor?: string;
+
   // Map settings
   googleMapsEmbedUrl?: string;
 };
