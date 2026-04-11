@@ -1,4 +1,3 @@
-
 'use client';
 
 import Image from 'next/image';
@@ -39,11 +38,10 @@ function PaymentCard({ method }: { method: PaymentMethod }) {
 
     return (
         <Card className="flex flex-col w-full h-full overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white border-none rounded-xl">
-            {/* 1. Header Image (The Poster) */}
             <div className="relative w-full aspect-video bg-muted/5">
                 {method.imageUrl ? (
                     <Image 
-                        src={method.imageUrl} 
+                        src={typeof method.imageUrl === 'string' ? method.imageUrl : `https://res.cloudinary.com/dojrqgd3l/image/upload/f_auto,q_auto/${method.imageUrl?.public_id}`} 
                         alt={method.title} 
                         fill 
                         className="object-contain p-4" 
@@ -57,12 +55,10 @@ function PaymentCard({ method }: { method: PaymentMethod }) {
             </div>
 
             <CardContent className="p-6 flex-grow space-y-4">
-                {/* 2. Payment Title (The Goal) */}
                 <h3 className="text-xl font-bold text-gray-900 leading-tight">
                     {method.title}
                 </h3>
 
-                {/* 3. Payment Method (The Way) with Icon */}
                 <div className="flex items-center gap-2">
                     <PaymentIcon type={method.iconType} className="h-5 w-5 text-primary" />
                     <p className="text-sm font-semibold text-primary uppercase tracking-wider">
@@ -70,7 +66,6 @@ function PaymentCard({ method }: { method: PaymentMethod }) {
                     </p>
                 </div>
 
-                {/* 4. The Rest (Details) */}
                 <div className="space-y-3 pt-2">
                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
                         <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1.5 text-center">Account / PayBill Details</p>
@@ -90,7 +85,6 @@ function PaymentCard({ method }: { method: PaymentMethod }) {
                 </div>
             </CardContent>
 
-            {/* 5. CTA Button */}
             <CardFooter className="p-6 pt-0 mt-auto">
                 <Button 
                     onClick={handleCopy}

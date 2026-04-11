@@ -34,7 +34,9 @@ export function ClientThemeWrapper({ children }: { children: React.ReactNode }) 
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
   const { data: settings } = useDoc<SiteSettings>(settingsRef);
 
-  const primaryHsl = settings?.primaryColor ? hexToHsl(settings.primaryColor) : null;
+  // Button Color prioritizes local setting, then fallback to primaryColor
+  const effectivePrimaryHex = settings?.globalButtonColor || settings?.primaryColor || '#d4a574';
+  const primaryHsl = hexToHsl(effectivePrimaryHex);
   const textHsl = settings?.globalTextColor ? hexToHsl(settings.globalTextColor) : null;
 
   return (

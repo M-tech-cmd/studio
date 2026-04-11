@@ -84,10 +84,10 @@ export default function ContactPage() {
   return (
     <div className="bg-transparent">
       <PageHeader
-        title="Contact Us"
-        subtitle="We'd love to hear from you. Get in touch with us for any inquiries or support."
-        titleColor={settings?.findUsTitleColor}
-        subtitleColor={settings?.findUsDescriptionColor}
+        title={settings?.contactTitle || "Contact Us"}
+        subtitle={settings?.contactDescription || "We'd love to hear from you. Get in touch with us for any inquiries or support."}
+        titleColor={settings?.contactTitleColor}
+        subtitleColor={settings?.contactDescriptionColor}
       />
 
       <section className="py-10 bg-transparent">

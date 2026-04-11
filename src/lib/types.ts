@@ -203,6 +203,7 @@ export type SiteSettings = {
   primaryColor?: string;
   secondaryColor?: string;
   globalTextColor?: string;
+  globalButtonColor?: string;
 
   heroTitle?: string;
   heroTitleColor?: string;
@@ -226,6 +227,7 @@ export type SiteSettings = {
   documentsTitle?: string; documentsDescription?: string; documentsTitleColor?: string; documentsDescriptionColor?: string; documentsBoxColor?: string; documentsImageUrl?: string | CloudinaryAsset;
   findUsTitle?: string; findUsDescription?: string; findUsTitleColor?: string; findUsDescriptionColor?: string; findUsBoxColor?: string; findUsImageUrl?: string | CloudinaryAsset;
   paymentsTitle?: string; paymentsDescription?: string; paymentsTitleColor?: string; paymentsDescriptionColor?: string; paymentsBoxColor?: string; paymentsImageUrl?: string | CloudinaryAsset;
+  aboutUsTitle?: string; aboutUsDescription?: string; aboutUsTitleColor?: string; aboutUsDescriptionColor?: string; aboutUsBoxColor?: string;
   
   paymentMethods?: PaymentMethod[];
 

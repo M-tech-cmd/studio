@@ -46,9 +46,8 @@ function MinistriesList() {
                     <CardHeader className="p-4">
                         <div className="relative h-48 w-full mb-4 rounded-md overflow-hidden">
                         <Image
-                            src={ministry.imageUrl}
+                            src={typeof ministry.imageUrl === 'string' ? ministry.imageUrl : `https://res.cloudinary.com/dojrqgd3l/image/upload/f_auto,q_auto/${ministry.imageUrl?.public_id}`}
                             alt={ministry.name}
-                            data-ai-hint={ministry.imageHint}
                             fill
                             className="object-cover"
                             unoptimized
