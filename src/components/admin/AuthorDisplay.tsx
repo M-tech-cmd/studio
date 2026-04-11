@@ -20,7 +20,8 @@ const roleMapping: Record<string, string> = {
 };
 
 /**
- * AuthorDisplay: Fetches user role from Firestore and returns the official display name.
+ * AuthorDisplay: Strictly enforces role-based naming for administrators.
+ * Never displays personal names for users with the isAdmin flag.
  */
 export function AuthorDisplay({ authorId, fallbackName, className }: AuthorDisplayProps) {
     const firestore = useFirestore();
@@ -29,14 +30,16 @@ export function AuthorDisplay({ authorId, fallbackName, className }: AuthorDispl
 
     if (isLoading) return <Skeleton className="h-4 w-24 rounded" />;
 
-    if (!user) return <span className={className}>{fallbackName || 'Parish Member'}</span>;
+    // If no user found, return fallback or generic admin
+    if (!user) return <span className={className}>{fallbackName || 'St. Martin De Porres Admin'}</span>;
 
     const isAdmin = user.isAdmin === true || user.role !== 'user';
     
-    // If admin, map role. Otherwise use personal name.
-    const displayName = isAdmin 
-        ? (roleMapping[user.role] || "St. Martin De Porres Admin")
-        : (user.name || fallbackName || 'Member');
+    // STRICT MASKING: If admin, ONLY show role title. Never personal name.
+    if (isAdmin) {
+        return <span className={className}>{roleMapping[user.role] || "St. Martin De Porres Admin"}</span>;
+    }
 
-    return <span className={className}>{displayName}</span>;
+    // Standard members show their provided name
+    return <span className={className}>{user.name || fallbackName || 'Parish Member'}</span>;
 }

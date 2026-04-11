@@ -116,7 +116,6 @@ export default function AdminBulletinPage() {
                     <TableCell className="hidden md:table-cell">
                         <AuthorDisplay 
                             authorId={post.authorId} 
-                            fallbackName={post.authorName} 
                             className="font-bold text-primary"
                         />
                     </TableCell>

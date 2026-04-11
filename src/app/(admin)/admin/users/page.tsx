@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -13,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { useCollection, useFirestore, useMemoFirebase, useUser, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, doc, updateDoc, deleteDoc } from 'firebase/firestore';
@@ -21,10 +20,9 @@ import { UserStatusIndicator } from '@/components/admin/UserStatusIndicator';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, ShieldAlert, CheckCircle2, Shield, Gavel, Code, Star, Award, User as UserIcon, FileDown, Printer } from 'lucide-react';
+import { Trash2, ShieldAlert, CheckCircle2, Shield, Gavel, Code, Star, Award, User as UserIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useRouter } from 'next/navigation';
 import {
   Select,
   SelectContent,
@@ -53,11 +51,18 @@ const icons: { value: VerificationIcon; label: string; icon: any }[] = [
     { value: 'Award', label: 'Honored/Award', icon: Award },
 ];
 
+const roleMapping: Record<string, string> = {
+    admin: "St. Martin De Porres Admin",
+    chairman: "St. Martin De Porres Chairman",
+    tech_dev: "St. Martin De Porres Tech/Dev",
+    treasurer: "St. Martin De Porres Treasurer",
+    secretary: "St. Martin De Porres Secretary",
+};
+
 export default function AdminUsersPage() {
   const firestore = useFirestore();
   const { user: currentUser } = useUser();
   const { toast } = useToast();
-  const router = useRouter();
 
   const usersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -76,36 +81,6 @@ export default function AdminUsersPage() {
     }
   };
 
-  const downloadCSV = () => {
-    if (!users || users.length === 0) return;
-    
-    const headers = ['Name', 'Email', 'Role', 'Status', 'Date Joined', 'Custom Title', 'Verified'];
-    const rows = users.map(u => [
-        u.name || 'N/A',
-        u.email || 'N/A',
-        u.role,
-        u.status || 'Offline',
-        u.dateJoined ? formatDate(u.dateJoined) : 'N/A',
-        u.customTitle || '',
-        u.isVerified ? 'Yes' : 'No'
-    ]);
-
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `st_martin_users_${format(new Date(), 'yyyy-MM-dd')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast({ title: "CSV Generated", description: "Your member spreadsheet is ready." });
-  };
-  
-  const getUserInitial = (user: RegisteredUser) => {
-    return (user.name || user.email || 'U').charAt(0).toUpperCase();
-  }
-  
   const handleUpdateUser = (user: RegisteredUser, data: Partial<RegisteredUser>) => {
     if (!firestore || !currentUser) return;
     const userDocRef = doc(firestore, 'users', user.id);
@@ -133,13 +108,10 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-       <div className="flex justify-between items-end">
-        <div>
+       <div>
             <h1 className="text-3xl font-black tracking-tighter uppercase">Registered Accounts</h1>
             <p className="text-muted-foreground font-medium">Manage verification, status, and administrative roles.</p>
         </div>
-        
-      </div>
 
       <Card className="border-none shadow-xl">
         <CardHeader>
@@ -163,16 +135,23 @@ export default function AdminUsersPage() {
                  (users || []).map((user) => {
                     const isAdmin = user.isAdmin === true;
                     const isCurrentUser = currentUser?.uid === user.id;
+                    
+                    // Apply Identity Masking for Display
+                    const displayIdentityName = isAdmin 
+                        ? (roleMapping[user.role] || "St. Martin De Porres Admin")
+                        : (user.name || 'N/A');
+
                     return (
                         <TableRow key={user.id} className="hover:bg-muted/30">
                             <TableCell>
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-10 w-10 border-2 border-primary/10">
-                                        <AvatarFallback className="bg-primary/5 text-primary font-bold">{getUserInitial(user)}</AvatarFallback>
+                                        <AvatarImage src={user.photoURL} />
+                                        <AvatarFallback className="bg-primary/5 text-primary font-bold">{displayIdentityName.charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     <div className="flex flex-col min-w-0">
                                         <div className="flex items-center gap-1.5 font-bold truncate">
-                                            {user.hideRealName && isAdmin ? `Official Office ${user.customTitle || 'Admin'}` : (user.name || 'N/A')}
+                                            {displayIdentityName}
                                             {user.isVerified && <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" />}
                                         </div>
                                         <span className="text-xs text-muted-foreground truncate opacity-70">{user.email}</span>

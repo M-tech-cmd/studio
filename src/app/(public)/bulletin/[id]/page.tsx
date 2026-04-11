@@ -44,16 +44,6 @@ const CommentSection = dynamic(
   }
 );
 
-/**
- * Extracts the first image from HTML content.
- * Disabled video/audio extraction for headers to prevent broken/dark tags.
- */
-function extractFirstImage(html: string): string | null {
-  if (!html) return null;
-  const imgMatch = html.match(/<img[^>]+src="([^">]+)"/i);
-  return imgMatch ? imgMatch[1] : null;
-}
-
 export default function BulletinPostPage() {
   const params = useParams();
   const id = params?.id as string;
@@ -74,16 +64,19 @@ export default function BulletinPostPage() {
 
   const { data: author, isLoading: authorLoading } = useDoc<RegisteredUser>(authorRef);
 
+  /**
+   * Title Case Role Mapping
+   */
   const displayAuthorTitle = useMemo(() => {
     if (authorLoading) return "Loading...";
-    if (!author) return post?.authorName || "Parish Member";
+    if (!author) return "St. Martin De Porres Admin";
     
     const isAdmin = author.isAdmin === true || author.role !== 'user';
     if (isAdmin) {
-        return (roleMapping[author.role] || "St. Martin De Porres Admin").toUpperCase();
+        return roleMapping[author.role] || "St. Martin De Porres Admin";
     }
-    return (author.name || post?.authorName || "Parish Member").toUpperCase();
-  }, [author, authorLoading, post]);
+    return author.name || "Parish Member";
+  }, [author, authorLoading]);
 
   if (isLoading) {
     return (
@@ -113,8 +106,6 @@ export default function BulletinPostPage() {
 
   if (!post) return null;
 
-  const headerImage = extractFirstImage(post.content);
-
   return (
     <div className="bg-transparent pb-20 animate-in fade-in duration-700">
       <PageHeader title={post.title} subtitle={`Community Update`} />
@@ -128,21 +119,18 @@ export default function BulletinPostPage() {
             </Button>
             
             <Card className="border-none shadow-2xl bg-card overflow-hidden rounded-2xl">
-                {headerImage && (
-                    <img src={headerImage} alt="" className="w-full h-[250px] object-cover" />
-                )}
-
                 <CardHeader className="bg-muted/10 border-b p-8 md:p-12">
                     <Badge variant="secondary" className="w-fit mb-6 px-4 py-1 uppercase tracking-widest text-[10px] font-black">{post.category}</Badge>
                     <CardTitle className="text-4xl lg:text-6xl font-black tracking-tight !mt-0 leading-[1.1]">{post.title}</CardTitle>
                     <div className="flex flex-wrap items-center gap-6 mt-10">
+                        {/* Refined Official Author Display */}
                         <div className="flex items-center gap-3 bg-white/50 px-4 py-2 rounded-full border border-primary/10 shadow-sm transition-all hover:bg-white hover:shadow-md">
                             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
                                 <ShieldCheck className="h-5 w-5" />
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground leading-none mb-1">Official Author</span>
-                                <span className="font-black text-xs sm:text-sm text-primary leading-none tracking-tighter">
+                                <span className="font-bold text-sm text-primary leading-none tracking-tight">
                                     {displayAuthorTitle}
                                 </span>
                             </div>
@@ -155,6 +143,7 @@ export default function BulletinPostPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-8 md:p-12">
+                    {/* Content Area - Images embedded here will be the only ones shown */}
                     <div 
                         className="prose prose-lg md:prose-xl dark:prose-invert max-w-none text-foreground/90 leading-relaxed" 
                         dangerouslySetInnerHTML={{ __html: post.content }} 
