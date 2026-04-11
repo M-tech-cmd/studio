@@ -19,7 +19,6 @@ import { useFirestore, useMemoFirebase, useDoc, errorEmitter, FirestorePermissio
 import { doc, setDoc, deleteField } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ImageUpload } from '@/components/admin/ImageUpload';
-import { uploadSingleFile } from '@/lib/upload-utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -131,7 +130,7 @@ const SectionControls = ({
                         <FormItem className="pt-4 border-t border-dashed">
                             <ImageUpload 
                                 value={field.value} 
-                                file={null} // Handled by manual file state in parent if needed, but hero is usually URL or Asset
+                                file={null} 
                                 onChange={(val) => field.onChange(val)}
                                 label="Main Hero Background Image"
                             />
@@ -341,7 +340,7 @@ export default function BrandingPage() {
                                                         <Button type="button" variant="ghost" size="icon" onClick={() => form.setValue(color.key as any, '')}><RotateCcw className="h-3 w-3"/></Button>
                                                     </div>
                                                 </FormItem>
-                                            ))} />
+                                            )} />
                                         ))}
                                     </div>
                                 </CardContent>
