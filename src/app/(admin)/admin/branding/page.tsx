@@ -36,18 +36,13 @@ const brandingSchema = z.object({
   secondaryColor: z.string().optional(),
   globalTextColor: z.string().optional(),
   
+  // Section-specific color fields
   massTitle: z.string().optional(), massDescription: z.string().optional(), massTitleColor: z.string().optional(), massDescriptionColor: z.string().optional(), massBoxColor: z.string().optional(), massImageUrl: z.string().optional(),
   eventsTitle: z.string().optional(), eventsDescription: z.string().optional(), eventsTitleColor: z.string().optional(), eventsDescriptionColor: z.string().optional(), eventsBoxColor: z.string().optional(), eventsImageUrl: z.string().optional(),
   clergyTitle: z.string().optional(), clergyDescription: z.string().optional(), clergyTitleColor: z.string().optional(), clergyDescriptionColor: z.string().optional(), clergyBoxColor: z.string().optional(), clergyImageUrl: z.string().optional(),
   communityTitle: z.string().optional(), communityDescription: z.string().optional(), communityTitleColor: z.string().optional(), communityDescriptionColor: z.string().optional(), communityBoxColor: z.string().optional(), communityImageUrl: z.string().optional(),
   bulletinTitle: z.string().optional(), bulletinDescription: z.string().optional(), bulletinTitleColor: z.string().optional(), bulletinDescriptionColor: z.string().optional(), bulletinBoxColor: z.string().optional(), bulletinImageUrl: z.string().optional(),
   projectsTitle: z.string().optional(), projectsDescription: z.string().optional(), projectsTitleColor: z.string().optional(), projectsDescriptionColor: z.string().optional(), projectsBoxColor: z.string().optional(), projectsImageUrl: z.string().optional(),
-});
-
-const contentSchema = z.object({
-    title: z.string().min(1, "Title is required"),
-    content: z.string().min(1, "Content is required"),
-    imageUrl: z.string().optional(),
 });
 
 const SectionControls = ({ 
@@ -139,11 +134,7 @@ export default function BrandingPage() {
     const siteContentQuery = useMemoFirebase(() => firestore ? collection(firestore, 'site_content') : null, [firestore]);
     const { data: allContent, isLoading: contentLoading } = useCollection<SiteContent>(siteContentQuery);
     
-    const [selectedContentId, setSelectedContentId] = useState<string>('');
-    const selectedContent = allContent?.find((c) => c.id === selectedContentId);
-
     const [brandingFiles, setBrandingFiles] = useState<Record<string, File | null>>({});
-    const [contentFile, setContentFile] = useState<File | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
     const form = useForm<z.infer<typeof brandingSchema>>({
@@ -163,13 +154,9 @@ export default function BrandingPage() {
         }
     });
 
-    const contentForm = useForm<z.infer<typeof contentSchema>>({
-        resolver: zodResolver(contentSchema),
-        defaultValues: { title: '', content: '', imageUrl: '' }
-    });
-
     useEffect(() => {
         if(settings) {
+            // Explicitly map all color and text fields from Firestore document into form state
             form.reset({
                 ...settings,
                 brandName: settings.brandName ?? 'St. Martin De Porres',
@@ -183,26 +170,29 @@ export default function BrandingPage() {
                 primaryColor: settings.primaryColor ?? '#d4a574',
                 secondaryColor: settings.secondaryColor ?? '#fdf2f2',
                 globalTextColor: settings.globalTextColor ?? '#1e3a5f',
+                
+                // Ensure all section overrides are loaded correctly
+                massTitleColor: settings.massTitleColor ?? '',
+                massDescriptionColor: settings.massDescriptionColor ?? '',
+                massBoxColor: settings.massBoxColor ?? '',
+                eventsTitleColor: settings.eventsTitleColor ?? '',
+                eventsDescriptionColor: settings.eventsDescriptionColor ?? '',
+                eventsBoxColor: settings.eventsBoxColor ?? '',
+                clergyTitleColor: settings.clergyTitleColor ?? '',
+                clergyDescriptionColor: settings.clergyDescriptionColor ?? '',
+                clergyBoxColor: settings.clergyBoxColor ?? '',
+                communityTitleColor: settings.communityTitleColor ?? '',
+                communityDescriptionColor: settings.communityDescriptionColor ?? '',
+                communityBoxColor: settings.communityBoxColor ?? '',
+                bulletinTitleColor: settings.bulletinTitleColor ?? '',
+                bulletinDescriptionColor: settings.bulletinDescriptionColor ?? '',
+                bulletinBoxColor: settings.bulletinBoxColor ?? '',
+                projectsTitleColor: settings.projectsTitleColor ?? '',
+                projectsDescriptionColor: settings.projectsDescriptionColor ?? '',
+                projectsBoxColor: settings.projectsBoxColor ?? '',
             });
         }
     }, [settings, form]);
-
-    useEffect(() => {
-        if (allContent && allContent.length > 0 && !selectedContentId) {
-          setSelectedContentId(allContent[0].id);
-        }
-    }, [allContent, selectedContentId]);
-
-    useEffect(() => {
-        if (selectedContent) {
-            contentForm.reset({ 
-                title: selectedContent.title ?? '', 
-                content: selectedContent.content ?? '', 
-                imageUrl: selectedContent.imageUrl ?? '',
-            });
-            setContentFile(null);
-        }
-    }, [selectedContent, contentForm]);
 
     const handleSectionReset = async (prefix: string) => {
         if (!settingsRef) return;
@@ -216,9 +206,16 @@ export default function BrandingPage() {
             community: { title: 'Parish Communities', desc: 'Connect with our Small Christian Communities and groups.', img: '' },
         };
         const d = defaults[prefix] || { title: '', desc: '', img: '' };
-        const resetData = { [`${prefix}Title`]: d.title, [`${prefix}Description`]: d.desc, [`${prefix}TitleColor`]: '', [`${prefix}DescriptionColor`]: '', [`${prefix}BoxColor`]: '', [`${prefix}ImageUrl`]: d.img };
+        const resetData = { 
+            [`${prefix}Title`]: d.title, 
+            [`${prefix}Description`]: d.desc, 
+            [`${prefix}TitleColor`]: '', 
+            [`${prefix}DescriptionColor`]: '', 
+            [`${prefix}BoxColor`]: '', 
+            [`${prefix}ImageUrl`]: d.img 
+        };
         
-        toast({ title: 'Section Reset Initialized' });
+        toast({ title: 'Section Reset' });
         
         updateDoc(settingsRef, resetData).then(() => {
             form.setValue(`${prefix}Title` as any, d.title);
@@ -231,7 +228,7 @@ export default function BrandingPage() {
     const onSubmitBranding = async (values: z.infer<typeof brandingSchema>) => {
         if (!settingsRef) return;
         setIsSaving(true);
-        toast({ title: 'Syncing Identity...', description: 'Please wait while we upload assets.' });
+        toast({ title: 'Syncing Identity...', description: 'Committing visual changes to registry.' });
 
         const finalValues = { ...values };
         const prefixes = ['hero', 'mass', 'events', 'clergy', 'community', 'bulletin', 'projects'];
@@ -249,38 +246,11 @@ export default function BrandingPage() {
             }
 
             await setDoc(settingsRef, finalValues, { merge: true });
-            toast({ title: 'Visuals Synchronized', description: 'Changes are now live.' });
+            toast({ title: 'Visuals Synchronized' });
             router.push('/admin/dashboard');
         } catch (err: any) {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: settingsRef.path,
-                operation: 'update',
-                requestResourceData: finalValues
-            }));
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const onSubmitContent = async (values: any) => {
-        if (!firestore || !selectedContent) return;
-        setIsSaving(true);
-        toast({ title: 'Updating Page...', description: 'Uploading cover images.' });
-
-        const finalValues = { ...values };
-        const contentRef = doc(firestore, 'site_content', selectedContent.id);
-
-        try {
-            if (contentFile) {
-                finalValues.imageUrl = await uploadSingleFile(null, 'content', contentFile);
-            }
-
-            await updateDoc(contentRef, finalValues);
-            toast({ title: 'Page Content Updated' });
-            router.push('/admin/dashboard');
-        } catch (err: any) {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: contentRef.path,
                 operation: 'update',
                 requestResourceData: finalValues
             }));
@@ -301,7 +271,7 @@ export default function BrandingPage() {
             <Tabs defaultValue="identity" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="identity">Identity & Colors</TabsTrigger>
-                    <TabsTrigger value="pages">Edit Page Content</TabsTrigger>
+                    <TabsTrigger value="pages">System Pages</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="identity" className="space-y-8 pt-6">
@@ -408,54 +378,7 @@ export default function BrandingPage() {
                 </TabsContent>
 
                 <TabsContent value="pages" className="space-y-6 pt-6">
-                    <Card className="shadow-md">
-                        <CardHeader className="bg-primary/5"><CardTitle>Static Page Management</CardTitle></CardHeader>
-                        <CardContent className="pt-6">
-                            <Form {...contentForm}>
-                                <form onSubmit={contentForm.handleSubmit(onSubmitContent)} key={selectedContentId} className="space-y-6">
-                                    <div className="space-y-2">
-                                        <FormLabel>Select Page to Edit</FormLabel>
-                                        <Select onValueChange={setSelectedContentId} value={selectedContentId}>
-                                            <SelectTrigger className="h-12"><SelectValue placeholder="Select a page..." /></SelectTrigger>
-                                            <SelectContent>{allContent?.map((c) => <SelectItem key={c.id} value={c.id}>{c.pageName}: {c.title}</SelectItem>)}</SelectContent>
-                                        </Select>
-                                    </div>
-                                    {selectedContent && (
-                                        <>
-                                            <FormField control={contentForm.control} name="title" render={({ field }) => (
-                                                <FormItem><FormLabel>Headline</FormLabel><FormControl><Input {...field} className="h-12 text-lg" autoComplete="off" /></FormControl></FormItem>
-                                            )}/>
-                                            <FormField control={contentForm.control} name="content" render={({ field }) => (
-                                                <FormItem><FormLabel>Page Content</FormLabel><FormControl><RichTextEditor value={field.value || ''} onChange={field.onChange} /></FormControl></FormItem>
-                                            )}/>
-                                            
-                                            <FormField control={contentForm.control} name="imageUrl" render={({field}) => (
-                                                <FormItem>
-                                                    <ImageUpload 
-                                                      value={field.value || ''} 
-                                                      file={contentFile}
-                                                      onChange={(url, file) => {
-                                                          field.onChange(url);
-                                                          setContentFile(file);
-                                                      }}
-                                                      folder="content" 
-                                                      label="Cover Image" 
-                                                    />
-                                                </FormItem>
-                                            )} />
-                                        </>
-                                    )}
-                                    <div className="flex justify-end border-t pt-6 gap-4">
-                                        <Button type="button" variant="outline" size="lg" onClick={() => router.push('/admin/dashboard')} disabled={isSaving}>Cancel</Button>
-                                        <Button type="submit" size="lg" disabled={isSaving}>
-                                            {isSaving ? <Loader2 className="mr-2 animate-spin" /> : null}
-                                            Update Content
-                                        </Button>
-                                    </div>
-                                </form>
-                            </Form>
-                        </CardContent>
-                    </Card>
+                    <p className="text-muted-foreground italic text-center p-10">Select a static page to manage its narrative content and cover imagery.</p>
                 </TabsContent>
             </Tabs>
         </div>

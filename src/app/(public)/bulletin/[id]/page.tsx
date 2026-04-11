@@ -15,7 +15,6 @@ import { ArrowLeft, Calendar, Info, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 
-// Mapping for professional role titles consistent with the registry requirements
 const roleMapping: Record<string, string> = {
     admin: "St. Martin De Porres Admin",
     chairman: "St. Martin De Porres Chairman",
@@ -46,33 +45,20 @@ const CommentSection = dynamic(
 );
 
 /**
- * Extracts the first media source from HTML content.
+ * Extracts the first image from HTML content.
+ * Disabled video/audio extraction for headers to prevent broken/dark tags.
  */
-function extractFirstMedia(html: string): { type: 'image' | 'video' | 'audio', src: string } | null {
+function extractFirstImage(html: string): string | null {
   if (!html) return null;
-  
   const imgMatch = html.match(/<img[^>]+src="([^">]+)"/i);
-  if (imgMatch) return { type: 'image', src: imgMatch[1] };
-  
-  const videoMatch = html.match(/<video[^>]+src="([^">]+)"/i);
-  if (videoMatch) return { type: 'video', src: videoMatch[1] };
-  
-  const audioMatch = html.match(/<audio[^>]+src="([^">]+)"/i);
-  if (audioMatch) return { type: 'audio', src: audioMatch[1] };
-  
-  return null;
+  return imgMatch ? imgMatch[1] : null;
 }
 
-/**
- * Bulletin Detail Page: Enhanced Identity Masking.
- * Strictly enforces role-based naming for administrators to maintain professional branding.
- */
 export default function BulletinPostPage() {
   const params = useParams();
   const id = params?.id as string;
   const firestore = useFirestore();
   
-  // 1. Fetch Bulletin Post Data
   const postRef = useMemoFirebase(() => {
     if (!firestore || !id) return null;
     return doc(firestore, 'bulletins', id);
@@ -80,26 +66,24 @@ export default function BulletinPostPage() {
 
   const { data: post, isLoading } = useDoc<BulletinPost>(postRef);
 
-  // 2. Fetch Author Profile to identify Administrative Roles
+  // Fetch Author Profile to resolve official role
   const authorRef = useMemoFirebase(() => {
     if (!firestore || !post?.authorId) return null;
     return doc(firestore, 'users', post.authorId);
   }, [firestore, post?.authorId]);
 
-  const { data: author } = useDoc<RegisteredUser>(authorRef);
+  const { data: author, isLoading: authorLoading } = useDoc<RegisteredUser>(authorRef);
 
-  // 3. Identity Resolution Logic
-  const displayAuthorName = useMemo(() => {
-    if (!post) return 'Member';
+  const displayAuthorTitle = useMemo(() => {
+    if (authorLoading) return "Loading...";
+    if (!author) return post?.authorName || "Parish Member";
     
-    // If author document is loaded and has an admin role, use the mapping
-    if (author && (author.isAdmin || author.role !== 'user')) {
-        return roleMapping[author.role] || `St. Martin De Porres ${author.customTitle || 'Admin'}`;
+    const isAdmin = author.isAdmin === true || author.role !== 'user';
+    if (isAdmin) {
+        return (roleMapping[author.role] || "St. Martin De Porres Admin").toUpperCase();
     }
-
-    // Default to the author name saved in the post for standard parishioners or if profile not found
-    return author?.name || post.authorName || 'Parish Member';
-  }, [post, author]);
+    return (author.name || post?.authorName || "Parish Member").toUpperCase();
+  }, [author, authorLoading, post]);
 
   if (isLoading) {
     return (
@@ -119,8 +103,7 @@ export default function BulletinPostPage() {
     return (
         <div className="bg-transparent min-h-screen flex flex-col items-center justify-center p-4">
             <Info className="h-16 w-16 text-muted-foreground opacity-20 mb-4" />
-            <h1 className="text-2xl font-black">ANNOUNCEMENT NOT FOUND</h1>
-            <p className="text-muted-foreground mt-2 text-center max-w-xs">This post may have been removed or updated by an administrator.</p>
+            <h1 className="text-2xl font-black uppercase">Post Not Found</h1>
             <Button asChild variant="outline" className="mt-8 rounded-full">
                 <Link href="/bulletin">Return to Feed</Link>
             </Button>
@@ -129,6 +112,8 @@ export default function BulletinPostPage() {
   }
 
   if (!post) return null;
+
+  const headerImage = extractFirstImage(post.content);
 
   return (
     <div className="bg-transparent pb-20 animate-in fade-in duration-700">
@@ -143,35 +128,23 @@ export default function BulletinPostPage() {
             </Button>
             
             <Card className="border-none shadow-2xl bg-card overflow-hidden rounded-2xl">
-                {/* Dynamic Header Media Slot */}
-                {(() => {
-                    const media = extractFirstMedia(post.content);
-                    if (!media) return null;
-                    if (media.type === 'image') return (
-                        <img src={media.src} alt="" className="w-full h-[250px] object-cover" />
-                    );
-                    if (media.type === 'video') return (
-                        <video src={media.src} autoPlay muted loop playsInline className="w-full h-[250px] object-cover bg-black" />
-                    );
-                    if (media.type === 'audio') return (
-                        <div className="px-8 py-4 bg-muted/30 border-b">
-                            <audio controls src={media.src} className="w-full h-10" />
-                        </div>
-                    );
-                })()}
+                {headerImage && (
+                    <img src={headerImage} alt="" className="w-full h-[250px] object-cover" />
+                )}
 
                 <CardHeader className="bg-muted/10 border-b p-8 md:p-12">
                     <Badge variant="secondary" className="w-fit mb-6 px-4 py-1 uppercase tracking-widest text-[10px] font-black">{post.category}</Badge>
                     <CardTitle className="text-4xl lg:text-6xl font-black tracking-tight !mt-0 leading-[1.1]">{post.title}</CardTitle>
                     <div className="flex flex-wrap items-center gap-6 mt-10">
-                        {/* Verified Admin/Author Slot with Role Mapping */}
                         <div className="flex items-center gap-3 bg-white/50 px-4 py-2 rounded-full border border-primary/10 shadow-sm transition-all hover:bg-white hover:shadow-md">
                             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
                                 <ShieldCheck className="h-5 w-5" />
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground leading-none mb-1">Official Author</span>
-                                <span className="font-bold text-xs sm:text-sm text-primary leading-none uppercase tracking-tighter">{displayAuthorName}</span>
+                                <span className="font-black text-xs sm:text-sm text-primary leading-none tracking-tighter">
+                                    {displayAuthorTitle}
+                                </span>
                             </div>
                         </div>
 
@@ -183,7 +156,7 @@ export default function BulletinPostPage() {
                 </CardHeader>
                 <CardContent className="p-8 md:p-12">
                     <div 
-                        className="prose prose-lg md:prose-xl dark:prose-invert max-w-none text-foreground/90 leading-relaxed first-letter:text-5xl first-letter:font-black first-letter:text-primary first-letter:mr-2" 
+                        className="prose prose-lg md:prose-xl dark:prose-invert max-w-none text-foreground/90 leading-relaxed" 
                         dangerouslySetInnerHTML={{ __html: post.content }} 
                     />
                     
@@ -191,11 +164,9 @@ export default function BulletinPostPage() {
                         <PhotoGallery photos={post.galleryImages} title={post.title} />
                     </div>
                 </CardContent>
-                <CardFooter className="p-8 md:p-12 bg-muted/5 border-t flex flex-col gap-10">   
-                   <div className="pt-10 border-t border-dashed w-full">
-                        <div className="flex items-center justify-between mb-8">
-                            <h3 className="text-2xl font-black tracking-tighter uppercase">Reflections</h3>
-                        </div>
+                <CardFooter className="p-8 md:p-12 bg-muted/5 border-t">   
+                   <div className="w-full">
+                        <h3 className="text-2xl font-black tracking-tighter uppercase mb-8">Reflections</h3>
                         <CommentSection postId={id} />
                    </div>
                 </CardFooter>
