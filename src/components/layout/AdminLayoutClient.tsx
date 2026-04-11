@@ -8,7 +8,7 @@ import type { RegisteredUser, SiteSettings } from "@/lib/types";
 import { PasskeyModal } from "@/components/admin/PasskeyModal";
 import { PresenceManager } from "@/components/shared/PresenceManager";
 import { Logo } from "@/components/shared/Logo";
-import { doc } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
 import Link from 'next/link';
 
 const roleMapping: Record<string, string> = {
@@ -18,6 +18,8 @@ const roleMapping: Record<string, string> = {
     secretary: "St. Martin De Porres Secretary",
     tech_dev: "St. Martin De Porres Tech Developer",
 };
+
+const SUPER_ADMIN_UID = 'BKSmmIdohYQHlao5V9eZ9JQyaEV2';
 
 /**
  * Admin Layout Client Wrapper
@@ -44,11 +46,22 @@ export function AdminLayoutClient({
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
   const { data: settings } = useDoc<SiteSettings>(settingsRef);
 
-  const isSuperAdmin = user?.email === 'kimaniemma20@gmail.com' || user?.uid === 'BKSmmIdohYQHlao5V9eZ9JQyaEV2';
+  const isSuperAdmin = user?.uid === SUPER_ADMIN_UID || user?.email === 'kimaniemma20@gmail.com';
   const isAdmin = userProfile?.isAdmin === true || isSuperAdmin;
   
   const isVerifying = isUserLoading || isRedirecting || (user && isProfileLoading);
   
+  // Super Admin Auto-Provisioning: Ensure the Firestore document matches the rules expectations
+  useEffect(() => {
+    if (user?.uid === SUPER_ADMIN_UID && firestore && userProfile && !userProfile.isAdmin) {
+        console.log('[Identity] Auto-provisioning Super Admin status...');
+        updateDoc(doc(firestore, 'users', user.uid), {
+            isAdmin: true,
+            role: 'admin'
+        }).catch(err => console.error('[Identity] Provisioning failed:', err));
+    }
+  }, [user, userProfile, firestore]);
+
   useEffect(() => {
     if (!isVerifying && !user) {
       router.replace('/login');

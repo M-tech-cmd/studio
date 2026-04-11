@@ -4,11 +4,7 @@ service cloud.firestore {
 
     function isSuperAdmin() {
       return request.auth != null && 
-        (
-          request.auth.uid == 'BKSmmIdohYQHlao5V9eZ9JQyaEV2' ||
-          request.auth.uid == 'sxiZRGIEshOkSROfqOFb3UcvP6g1' ||
-          request.auth.token.email == 'kimaniemma20@gmail.com'
-        );
+        request.auth.uid == 'BKSmmIdohYQHlao5V9eZ9JQyaEV2';
     }
 
     function isAdmin() {
