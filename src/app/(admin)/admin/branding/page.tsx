@@ -1,10 +1,10 @@
-<'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { RotateCcw, Palette as PaletteIcon, Loader2, Save, Image as ImageIcon } from 'lucide-react';
+import { RotateCcw, Palette as PaletteIcon, Loader2, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
@@ -202,7 +202,6 @@ export default function BrandingPage() {
             
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmitBranding)} className="space-y-10 pb-32">
-                    {/* Section 1: Identity & Colors */}
                     <Card className="shadow-lg border-2 rounded-3xl overflow-hidden bg-white/50 backdrop-blur-sm">
                         <CardHeader className="bg-primary/5 border-b p-8">
                             <CardTitle className="text-xl font-black uppercase tracking-widest">1. Identity & Colors</CardTitle>
@@ -242,7 +241,7 @@ export default function BrandingPage() {
                                                 <Button type="button" variant="ghost" size="icon" onClick={() => form.setValue(color.key as any, '')}><RotateCcw className="h-3 w-3"/></Button>
                                             </div>
                                         </FormItem>
-                                    ))} />
+                                    )} />
                                 ))}
                             </div>
 
@@ -259,7 +258,7 @@ export default function BrandingPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Sections 2-8 */}
+                    {/* Original Sections 2-8 Restoration */}
                     <SectionControls form={form} prefix="hero" label="2. Main Hero Banner" defaultTitle={DEFAULT_BRANDING.heroTitle} defaultDesc="A vibrant community of faith..." />
                     <SectionControls form={form} prefix="mass" label="3. Mass Schedule" defaultTitle={DEFAULT_BRANDING.massTitle} defaultDesc="Join us for worship..." />
                     <SectionControls form={form} prefix="events" label="4. Upcoming Events" defaultTitle={DEFAULT_BRANDING.eventsTitle} defaultDesc="Stay active in our community..." />
