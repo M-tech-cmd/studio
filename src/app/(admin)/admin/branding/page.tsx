@@ -8,7 +8,6 @@ import { RotateCcw, Palette as PaletteIcon, Loader2, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
-import { getAuth } from 'firebase/auth';
 
 import type { SiteContent, SiteSettings } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -17,8 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { useFirestore, useMemoFirebase, useDoc, useCollection, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, doc, setDoc } from 'firebase/firestore';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ImageUpload } from '@/components/admin/ImageUpload';
@@ -271,19 +270,16 @@ export default function BrandingPage() {
         };
 
         try {
-            const auth = getAuth();
-            const token = await auth.currentUser?.getIdToken();
-            const response = await fetch('/api/admin/branding', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(defaults),
-            });
-            if (!response.ok) throw new Error('Reset failed');
+            await setDoc(settingsRef, defaults, { merge: true });
             form.reset({ ...form.getValues(), ...defaults });
             toast({ title: 'Visuals Purged' });
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            toast({ title: 'Error', description: 'Could not purge overrides', variant: 'destructive' });
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: settingsRef.path,
+                operation: 'update',
+                requestResourceData: defaults
+            }));
         } finally {
             setIsSaving(false);
         }
@@ -311,25 +307,23 @@ export default function BrandingPage() {
         toast({ title: 'Section Reset Initialized' });
         
         try {
-            const auth = getAuth();
-            const token = await auth.currentUser?.getIdToken();
-            const response = await fetch('/api/admin/branding', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(resetData),
-            });
-            if (!response.ok) throw new Error('Section reset failed');
+            await setDoc(settingsRef, resetData, { merge: true });
             form.setValue(`${prefix}Title` as any, d.title);
             form.setValue(`${prefix}Description` as any, d.desc);
             if (prefix !== 'hero') form.setValue(`${prefix}ImageUrl` as any, d.img);
             setBrandingFiles(prev => ({ ...prev, [prefix]: null }));
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            toast({ title: 'Error', description: 'Could not reset section', variant: 'destructive' });
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: settingsRef.path,
+                operation: 'update',
+                requestResourceData: resetData
+            }));
         }
     };
 
     const onSubmitBranding = async (values: z.infer<typeof brandingSchema>) => {
+        if (!settingsRef) return;
         setIsSaving(true);
         toast({ title: 'Syncing Identity...', description: 'Please wait while we upload assets.' });
 
@@ -348,25 +342,7 @@ export default function BrandingPage() {
                 }
             }
 
-            const auth = getAuth();
-            const currentUser = auth.currentUser;
-            if (!currentUser) throw new Error('Not authenticated');
-
-            const token = await currentUser.getIdToken();
-
-            const response = await fetch('/api/admin/branding', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
-                body: JSON.stringify(finalValues),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to update branding');
-            }
+            await setDoc(settingsRef, finalValues, { merge: true });
 
             toast({ title: 'Visuals Synchronized', description: 'Changes are now live.' });
             router.push('/admin/dashboard');
@@ -377,6 +353,11 @@ export default function BrandingPage() {
                 variant: 'destructive'
             });
             console.error('Branding error:', err);
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: settingsRef.path,
+                operation: 'update',
+                requestResourceData: finalValues
+            }));
         } finally {
             setIsSaving(false);
         }
@@ -395,25 +376,17 @@ export default function BrandingPage() {
                 finalValues.imageUrl = await uploadSingleFile(null, 'content', contentFile);
             }
 
-            // Page content currently uses direct Firestore write as it usually has separate permissions
-            // or can be moved to API if needed. Keeping simple for now as per specific instruction.
-            const auth = getAuth();
-            const token = await auth.currentUser?.getIdToken();
-            
-            // For Page content specifically, we'll keep the direct write OR use a separate API.
-            // Following instructions, ONLY change branding page save.
-            const response = await fetch('/api/admin/branding', { // Reusing API for settings if needed
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ pages: { [selectedContent.id]: finalValues } }), // Example structure
-            });
-            // Actually, instruction only specified the branding onSubmit. 
-            // Reverting to direct for content unless instructed.
+            await setDoc(contentRef, finalValues, { merge: true });
             
             toast({ title: 'Page Content Updated' });
             router.push('/admin/dashboard');
         } catch (err: any) {
             console.error(err);
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: contentRef.path,
+                operation: 'update',
+                requestResourceData: finalValues
+            }));
         } finally {
             setIsSaving(false);
         }
