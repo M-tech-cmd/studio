@@ -194,7 +194,7 @@ export default function BrandingPage() {
         defaultValues: {
             brandName: 'St. Martin De Porres',
             logoUrl: '',
-            parishDescription: 'A community of faith, hope, and love serving the heart of Nakuru.',
+            parishDescription: 'A stony, grand cathedral that feels out of place among low-rise, cluttered streets. At night, it appears as a dark silhouette, a silent monument in the urban landscape.',
             copyrightYear: new Date().getFullYear(),
             primaryColor: '#d4a574',
             secondaryColor: '#fdf2f2',
@@ -232,7 +232,7 @@ export default function BrandingPage() {
                 ...settings,
                 brandName: settings.brandName ?? 'St. Martin De Porres',
                 logoUrl: (settings.logoUrl as any)?.secure_url || settings.logoUrl || '',
-                parishDescription: settings.parishDescription ?? 'A community of faith, hope, and love serving the heart of Nakuru.',
+                parishDescription: settings.parishDescription ?? 'A stony, grand cathedral that feels out of place among low-rise, cluttered streets. At night, it appears as a dark silhouette, a silent monument in the urban landscape.',
                 copyrightYear: settings.copyrightYear ?? new Date().getFullYear(),
                 primaryColor: settings.primaryColor ?? '#d4a574',
                 secondaryColor: settings.secondaryColor ?? '#fdf2f2',
@@ -321,7 +321,7 @@ export default function BrandingPage() {
     const handleSectionReset = async (prefix: string) => {
         if (!settingsRef) return;
         const defaults: Record<string, { title: string, desc: string, img: string }> = {
-            hero: { title: 'St. Martin De Porres Catholic Church', desc: 'A community of faith, hope, and love serving the heart of Nakuru.', img: '' },
+            hero: { title: 'St. Martin De Porres Catholic Church', desc: 'A stony, grand cathedral that feels out of place among low-rise, cluttered streets. At night, it appears as a dark silhouette, a silent monument in the urban landscape.', img: '' },
             mass: { title: 'Weekly Mass Schedule', desc: 'Join us for worship throughout the week.', img: '' },
             events: { title: 'Upcoming Events', desc: 'Join us for worship, fellowship, and service.', img: '' },
             clergy: { title: 'Meet Our Clergy & Staff', desc: 'The dedicated team serving our parish family.', img: '' },
@@ -381,7 +381,7 @@ export default function BrandingPage() {
             await setDoc(settingsRef, cleanedValues, { merge: true });
 
             toast({ title: 'Visuals Synchronized', description: 'Changes are now live.' });
-            router.push('/admin/dashboard');
+            // Stay on page as requested
         } catch (err: any) {
             toast({ 
                 title: 'Error', 
@@ -417,7 +417,7 @@ export default function BrandingPage() {
             await setDoc(contentRef, cleanedValues, { merge: true });
             
             toast({ title: 'Page Content Updated' });
-            router.push('/admin/dashboard');
+            // Stay on page as requested
         } catch (err: any) {
             console.error(err);
             errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -581,7 +581,7 @@ export default function BrandingPage() {
 
                             <div className="flex justify-end sticky bottom-6 z-50 gap-4">
                                 <Button type="button" variant="outline" size="lg" className="rounded-full px-8 h-16 text-lg font-bold bg-white" onClick={() => router.push('/admin/dashboard')} disabled={isSaving}>
-                                    Cancel Changes
+                                    Return to Dashboard
                                 </Button>
                                 <Button type="submit" size="lg" className="shadow-2xl rounded-full px-12 h-16 text-lg font-bold" disabled={isSaving}>
                                     {isSaving ? <Loader2 className="mr-2 animate-spin" /> : null}
@@ -631,7 +631,7 @@ export default function BrandingPage() {
                                         </>
                                     )}
                                     <div className="flex justify-end border-t pt-6 gap-4">
-                                        <Button type="button" variant="outline" size="lg" onClick={() => router.push('/admin/dashboard')} disabled={isSaving}>Cancel</Button>
+                                        <Button type="button" variant="outline" size="lg" onClick={() => router.push('/admin/dashboard')} disabled={isSaving}>Return to Dashboard</Button>
                                         <Button type="submit" size="lg" disabled={isSaving}>
                                             {isSaving ? <Loader2 className="mr-2 animate-spin" /> : null}
                                             Update Content

@@ -46,10 +46,11 @@ function HeroSection() {
             
             <div className="container relative z-20 max-w-5xl mx-auto px-4 text-center">
                 <h1 className="text-4xl md:text-7xl font-black tracking-tighter text-white mb-6 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                    <span className="block text-xl md:text-3xl font-medium text-white/80 tracking-normal mb-2">Welcome To</span>
                     {settings?.heroTitle || 'St. Martin De Porres Catholic Church'}
                 </h1>
                 <p className="text-lg md:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed font-medium mb-10 animate-in fade-in slide-in-from-bottom-6 duration-1000 delay-200">
-                    {settings?.parishDescription || 'A vibrant community of faith, hope, and love serving the heart of Nakuru.'}
+                    {settings?.parishDescription || 'A stony, grand cathedral that feels out of place among low-rise, cluttered streets. At night, it appears as a dark silhouette, a silent monument in the urban landscape.'}
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
                     <Button asChild size="lg" className="h-14 px-10 rounded-full font-bold text-lg shadow-2xl hover:scale-105 transition-all">
