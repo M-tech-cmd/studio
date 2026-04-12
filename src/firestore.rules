@@ -10,7 +10,7 @@ service cloud.firestore {
               request.auth.uid == 'sxiZRGIEshOkSROfqOFb3UcvP6g1');
     }
 
-    // Simple admin check - just super admin
+    // Simplified admin check - rely on super admin identity
     function isAdmin() {
       return isSuperAdmin();
     }

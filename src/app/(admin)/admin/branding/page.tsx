@@ -23,6 +23,25 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ImageUpload } from '@/components/admin/ImageUpload';
 import { uploadSingleFile } from '@/lib/upload-utils';
 
+/**
+ * Utility to strip undefined values before Firestore writes.
+ * Firestore will crash if an object contains undefined fields.
+ */
+function stripUndefined(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(v => stripUndefined(v));
+  } else if (obj !== null && typeof obj === 'object') {
+    return Object.keys(obj).reduce((acc: any, key) => {
+      const value = stripUndefined(obj[key]);
+      if (value !== undefined) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {});
+  }
+  return obj;
+}
+
 const brandingSchema = z.object({
   brandName: z.string().min(1, "Brand name is required"),
   logoUrl: z.string().optional(),
@@ -61,6 +80,7 @@ const brandingSchema = z.object({
   documentsTitle: z.string().optional(), documentsDescription: z.string().optional(), documentsTitleColor: z.string().optional(), documentsDescriptionColor: z.string().optional(), documentsBoxColor: z.string().optional(),
   paymentsTitle: z.string().optional(), paymentsDescription: z.string().optional(), paymentsTitleColor: z.string().optional(), paymentsDescriptionColor: z.string().optional(), paymentsBoxColor: z.string().optional(),
   contactTitle: z.string().optional(), contactDescription: z.string().optional(), contactTitleColor: z.string().optional(), contactDescriptionColor: z.string().optional(), contactBoxColor: z.string().optional(),
+  aboutUsTitle: z.string().optional(), aboutUsDescription: z.string().optional(), aboutUsTitleColor: z.string().optional(), aboutUsDescriptionColor: z.string().optional(), aboutUsBoxColor: z.string().optional(),
 });
 
 const contentSchema = z.object({
@@ -192,6 +212,12 @@ export default function BrandingPage() {
             heroDescriptionColor: '#e5e7eb',
             heroImageUrl: '',
             heroBoxColor: 'transparent',
+            bibleReadingsBoxColor: '',
+            ministriesBoxColor: '',
+            documentsBoxColor: '',
+            paymentsBoxColor: '',
+            contactBoxColor: '',
+            aboutUsBoxColor: '',
         }
     });
 
@@ -224,6 +250,12 @@ export default function BrandingPage() {
                 heroDescriptionColor: settings.heroDescriptionColor ?? '#e5e7eb',
                 heroImageUrl: (settings.heroImageUrl as any)?.secure_url || settings.heroImageUrl || '',
                 heroBoxColor: settings.heroBoxColor ?? 'transparent',
+                bibleReadingsBoxColor: settings.bibleReadingsBoxColor || '',
+                ministriesBoxColor: settings.ministriesBoxColor || '',
+                documentsBoxColor: settings.documentsBoxColor || '',
+                paymentsBoxColor: settings.paymentsBoxColor || '',
+                contactBoxColor: settings.contactBoxColor || '',
+                aboutUsBoxColor: settings.aboutUsBoxColor || '',
             });
         }
     }, [settings, form]);
@@ -267,6 +299,7 @@ export default function BrandingPage() {
             documentsTitleColor: '', documentsDescriptionColor: '', documentsBoxColor: '',
             paymentsTitleColor: '', paymentsDescriptionColor: '', paymentsBoxColor: '',
             contactTitleColor: '', contactDescriptionColor: '', contactBoxColor: '',
+            aboutUsTitleColor: '', aboutUsDescriptionColor: '', aboutUsBoxColor: '',
         };
 
         try {
@@ -300,6 +333,7 @@ export default function BrandingPage() {
             documents: { title: 'Parish Documents', desc: 'Stay informed with our latest bulletins and newsletters.', img: '' },
             payments: { title: 'Payments & Giving', desc: 'Support our parish mission through secure digital payments.', img: '' },
             contact: { title: 'Contact Us', desc: "We'd love to hear from you. Get in touch for any inquiries.", img: '' },
+            aboutUs: { title: 'About Our Parish', desc: "The history and vision of St. Martin De Porres.", img: '' },
         };
         const d = defaults[prefix] || { title: '', desc: '', img: '' };
         const resetData = { [`${prefix}Title`]: d.title, [`${prefix}Description`]: d.desc, [`${prefix}TitleColor`]: '', [`${prefix}DescriptionColor`]: '', [`${prefix}BoxColor`]: '', [`${prefix}ImageUrl`]: d.img };
@@ -342,7 +376,9 @@ export default function BrandingPage() {
                 }
             }
 
-            await setDoc(settingsRef, finalValues, { merge: true });
+            // CRITICAL: Strip undefined values to prevent Firestore crash
+            const cleanedValues = stripUndefined(finalValues);
+            await setDoc(settingsRef, cleanedValues, { merge: true });
 
             toast({ title: 'Visuals Synchronized', description: 'Changes are now live.' });
             router.push('/admin/dashboard');
@@ -376,7 +412,9 @@ export default function BrandingPage() {
                 finalValues.imageUrl = await uploadSingleFile(null, 'content', contentFile);
             }
 
-            await setDoc(contentRef, finalValues, { merge: true });
+            // Strip undefined here too
+            const cleanedValues = stripUndefined(finalValues);
+            await setDoc(contentRef, cleanedValues, { merge: true });
             
             toast({ title: 'Page Content Updated' });
             router.push('/admin/dashboard');
@@ -537,6 +575,7 @@ export default function BrandingPage() {
                                     <SectionControls form={form} prefix="documents" label="Documents" onReset={handleSectionReset} showImage={false} />
                                     <SectionControls form={form} prefix="payments" label="Payments" onReset={handleSectionReset} showImage={false} />
                                     <SectionControls form={form} prefix="contact" label="Contact" onReset={handleSectionReset} showImage={false} />
+                                    <SectionControls form={form} prefix="aboutUs" label="About Us" onReset={handleSectionReset} showImage={false} />
                                 </div>
                             </div>
 
