@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -20,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDistanceToNow } from 'date-fns';
+import { resolveMediaUrl } from '@/lib/upload-utils';
 
 function HeroSection() {
     const firestore = useFirestore();
@@ -33,7 +33,7 @@ function HeroSection() {
             ) : (
                 <>
                     <Image 
-                        src={settings?.heroImageUrl || 'https://picsum.photos/seed/church-hero/1920/1080'} 
+                        src={resolveMediaUrl(settings?.heroImageUrl) || 'https://picsum.photos/seed/church-hero/1920/1080'} 
                         alt="Church Hero" 
                         fill 
                         priority
@@ -93,7 +93,7 @@ function MassScheduleSection({ settings, isLoading }: { settings?: SiteSettings,
                     titleColor={settings?.massTitleColor}
                     descColor={settings?.massDescriptionColor}
                     boxColor={settings?.massBoxColor}
-                    imageUrl={settings?.massImageUrl}
+                    imageUrl={resolveMediaUrl(settings?.massImageUrl)}
                     isLoading={isLoading} 
                     settings={settings}
                 />
@@ -143,7 +143,7 @@ function UpcomingEvents({ settings, isLoading }: { settings?: SiteSettings, isLo
                     titleColor={settings?.eventsTitleColor}
                     descColor={settings?.eventsDescriptionColor}
                     boxColor={settings?.eventsBoxColor}
-                    imageUrl={settings?.eventsImageUrl}
+                    imageUrl={resolveMediaUrl(settings?.eventsImageUrl)}
                     isLoading={isLoading} 
                     settings={settings}
                 />
@@ -155,7 +155,7 @@ function UpcomingEvents({ settings, isLoading }: { settings?: SiteSettings, isLo
                             <Link key={event.id} href={`/events/${event.id}`}>
                                 <Card className="h-full bg-card border-none shadow-md rounded-2xl overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all">
                                     <div className="relative h-48 w-full">
-                                        <Image src={event.imageUrl} alt={event.title} fill className="object-cover" unoptimized />
+                                        <Image src={resolveMediaUrl(event.imageUrl)} alt={event.title} fill className="object-cover" unoptimized />
                                         <Badge className="absolute top-3 right-3 bg-primary text-white uppercase font-black text-[9px] tracking-widest">{event.category}</Badge>
                                     </div>
                                     <CardHeader className="p-5 pb-2">
@@ -195,7 +195,7 @@ function ParishCommunities({ settings, isLoading }: { settings?: SiteSettings, i
                     titleColor={settings?.communityTitleColor}
                     descColor={settings?.communityDescriptionColor}
                     boxColor={settings?.communityBoxColor}
-                    imageUrl={settings?.communityImageUrl}
+                    imageUrl={resolveMediaUrl(settings?.communityImageUrl)}
                     isLoading={isLoading} 
                     settings={settings}
                 />
@@ -207,7 +207,7 @@ function ParishCommunities({ settings, isLoading }: { settings?: SiteSettings, i
                             <Link key={group.id} href={`/community/${group.id}`}>
                                 <Card className="h-full bg-card border-none shadow-md rounded-2xl overflow-hidden hover:shadow-xl transition-all text-center">
                                     <div className="relative h-40 w-full bg-muted/10 p-6 flex items-center justify-center">
-                                        <Image src={group.imageUrl} alt={group.name} fill className="object-contain p-4" unoptimized />
+                                        <Image src={resolveMediaUrl(group.imageUrl)} alt={group.name} fill className="object-contain p-4" unoptimized />
                                     </div>
                                     <CardHeader className="p-6 pb-2">
                                         <CardTitle className="text-xl font-bold text-[#1e3a5f]">{group.name}</CardTitle>
@@ -242,7 +242,7 @@ function MeetOurClergy({ settings, isLoading }: { settings?: SiteSettings, isLoa
                     titleColor={settings?.clergyTitleColor}
                     descColor={settings?.clergyDescriptionColor}
                     boxColor={settings?.clergyBoxColor}
-                    imageUrl={settings?.clergyImageUrl}
+                    imageUrl={resolveMediaUrl(settings?.clergyImageUrl)}
                     isLoading={isLoading} 
                     settings={settings}
                 />
@@ -254,7 +254,7 @@ function MeetOurClergy({ settings, isLoading }: { settings?: SiteSettings, isLoa
                             <Link key={person.id} href={`/clergy/${person.id}`}>
                                 <div className="group text-center space-y-4 cursor-pointer">
                                     <div className="relative aspect-square w-full rounded-full overflow-hidden border-4 border-white shadow-xl group-hover:scale-105 transition-transform duration-500">
-                                        <Image src={person.imageUrl} alt={person.name} fill className="object-cover" unoptimized />
+                                        <Image src={resolveMediaUrl(person.imageUrl)} alt={person.name} fill className="object-cover" unoptimized />
                                     </div>
                                     <div>
                                         <h3 className="font-black text-xl text-[#1e3a5f] group-hover:text-primary transition-colors">{person.name}</h3>
@@ -284,7 +284,7 @@ function LatestBulletins({ settings, isLoading }: { settings?: SiteSettings, isL
                     titleColor={settings?.bulletinTitleColor}
                     descColor={settings?.bulletinDescriptionColor}
                     boxColor={settings?.bulletinBoxColor}
-                    imageUrl={settings?.bulletinImageUrl}
+                    imageUrl={resolveMediaUrl(settings?.bulletinImageUrl)}
                     isLoading={isLoading} 
                     settings={settings}
                 />
@@ -331,7 +331,7 @@ function ParishProjects({ settings, isLoading }: { settings?: SiteSettings, isLo
                     titleColor={settings?.projectsTitleColor}
                     descColor={settings?.projectsDescriptionColor}
                     boxColor={settings?.projectsBoxColor}
-                    imageUrl={settings?.projectsImageUrl}
+                    imageUrl={resolveMediaUrl(settings?.projectsImageUrl)}
                     isLoading={isLoading} 
                     settings={settings}
                 />
@@ -383,16 +383,18 @@ export default function HomePage() {
             <section className="py-24 bg-white relative isolate overflow-hidden">
                 <div className="container max-w-4xl mx-auto px-4 text-center">
                     <div className="bg-primary/5 p-12 rounded-[3rem] border-2 border-primary/10 shadow-2xl">
-                        <h2 className="text-3xl md:text-5xl font-black tracking-tighter text-[#1e3a5f]">Join Our Parish Family</h2>
+                        <h2 className="text-3xl md:text-5xl font-black tracking-tighter text-[#1e3a5f]">
+                            {settings?.parishCtaTitle || 'Join Our Parish Family'}
+                        </h2>
                         <p className="mt-8 text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-medium italic">
-                            Whether you're a lifelong Catholic or exploring faith for the first time, you have a spiritual home here at St. Martin De Porres.
+                            {settings?.parishCtaDescription || "Whether you're a lifelong Catholic or exploring faith for the first time, you have a spiritual home here at St. Martin De Porres."}
                         </p>
                         <div className="mt-12 flex flex-col sm:flex-row justify-center gap-6">
                             <Button asChild size="lg" className="rounded-full px-12 h-16 text-lg font-black shadow-2xl hover:scale-105 transition-all">
-                                <Link href="/signup">Become a Member</Link>
+                                <Link href="/signup">{settings?.parishCtaButton1 || 'Become a Member'}</Link>
                             </Button>
                             <Button asChild size="lg" variant="outline" className="rounded-full px-12 h-16 text-lg font-black border-2 hover:bg-muted transition-all">
-                                <Link href="/payments">Support Our Mission</Link>
+                                <Link href="/payments">{settings?.parishCtaButton2 || 'Support Our Mission'}</Link>
                             </Button>
                         </div>
                     </div>

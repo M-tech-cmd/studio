@@ -229,6 +229,12 @@ export type SiteSettings = {
   paymentsTitle?: string; paymentsDescription?: string; paymentsTitleColor?: string; paymentsDescriptionColor?: string; paymentsBoxColor?: string; paymentsImageUrl?: string | CloudinaryAsset;
   aboutUsTitle?: string; aboutUsDescription?: string; aboutUsTitleColor?: string; aboutUsDescriptionColor?: string; aboutUsBoxColor?: string;
   
+  // Parish CTA
+  parishCtaTitle?: string;
+  parishCtaDescription?: string;
+  parishCtaButton1?: string;
+  parishCtaButton2?: string;
+
   paymentMethods?: PaymentMethod[];
 
   // Identity Colors

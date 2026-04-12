@@ -31,7 +31,10 @@ export function resolveMediaUrl(asset?: string | CloudinaryAsset): string {
     return generateCloudinaryUrl(asset.public_id, asset.resource_type);
 }
 
-export async function uploadSingleFile(storage: any, folder: string, file: File): Promise<CloudinaryAsset> {
+/**
+ * Uploads a single file and returns the secure URL string.
+ */
+export async function uploadSingleFile(storage: any, folder: string, file: File): Promise<string> {
   if (!file) throw new Error('No file provided');
 
   // 1. Detect Resource Type
@@ -63,12 +66,8 @@ export async function uploadSingleFile(storage: any, folder: string, file: File)
 
     const data = await response.json();
     
-    // Return the specific asset identifiers
-    return {
-        public_id: data.public_id,
-        resource_type: data.resource_type || resourceType,
-        secure_url: data.secure_url
-    };
+    // Return the secure URL string directly as requested
+    return data.secure_url;
   } catch (error: any) {
     console.error(`[Cloudinary] Sync error for ${file.name}:`, error);
     throw error;
@@ -76,10 +75,38 @@ export async function uploadSingleFile(storage: any, folder: string, file: File)
 }
 
 /**
- * Uploads multiple files concurrently.
+ * Uploads multiple files concurrently and returns an array of CloudinaryAsset objects.
  */
 export async function uploadMultipleFiles(storage: any, folder: string, files: File[]): Promise<CloudinaryAsset[]> {
   if (!files || files.length === 0) return [];
-  const uploadPromises = files.map(file => uploadSingleFile(null, folder, file));
+  
+  const uploadPromises = files.map(async (file) => {
+      let resourceType = 'auto';
+      if (file.type.startsWith('video/') || file.type.startsWith('audio/')) {
+        resourceType = 'video'; 
+      } else if (file.type.startsWith('image/')) {
+        resourceType = 'image';
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', CLOUDINARY_PRESET);
+      formData.append('folder', `st_martin/${folder}`);
+      formData.append('resource_type', resourceType);
+
+      const response = await fetch(`${CLOUDINARY_UPLOAD_URL_BASE}/${resourceType}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Bulk upload failed');
+      const data = await response.json();
+      return {
+          public_id: data.public_id,
+          resource_type: data.resource_type || resourceType,
+          secure_url: data.secure_url
+      };
+  });
+
   return Promise.all(uploadPromises);
 }

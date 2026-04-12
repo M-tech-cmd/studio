@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { RotateCcw, Palette as PaletteIcon, Loader2, Zap } from 'lucide-react';
+import { RotateCcw, Palette as PaletteIcon, Loader2, Zap, Expand } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
 
 import type { SiteContent, SiteSettings } from '@/lib/types';
@@ -36,6 +36,12 @@ const brandingSchema = z.object({
   identityTitleColor: z.string().optional(),
   identityDescriptionColor: z.string().optional(),
   identityBoxColor: z.string().optional(),
+
+  // Parish CTA
+  parishCtaTitle: z.string().optional(),
+  parishCtaDescription: z.string().optional(),
+  parishCtaButton1: z.string().optional(),
+  parishCtaButton2: z.string().optional(),
 
   heroTitle: z.string().optional(),
   heroTitleColor: z.string().optional(),
@@ -177,6 +183,10 @@ export default function BrandingPage() {
             identityTitleColor: '#1e3a5f',
             identityDescriptionColor: '#4b5563',
             identityBoxColor: '#ffffff',
+            parishCtaTitle: 'Join Our Parish Family',
+            parishCtaDescription: "Whether you're a lifelong Catholic or exploring faith for the first time, you have a spiritual home here at St. Martin De Porres.",
+            parishCtaButton1: 'Become a Member',
+            parishCtaButton2: 'Support Our Mission',
             heroTitle: 'St. Martin De Porres Catholic Church',
             heroTitleColor: '#ffffff',
             heroDescriptionColor: '#e5e7eb',
@@ -195,7 +205,7 @@ export default function BrandingPage() {
             form.reset({
                 ...settings,
                 brandName: settings.brandName ?? 'St. Martin De Porres',
-                logoUrl: settings.logoUrl ?? '',
+                logoUrl: (settings.logoUrl as any)?.secure_url || settings.logoUrl || '',
                 parishDescription: settings.parishDescription ?? 'A community of faith, hope, and love serving the heart of Nakuru.',
                 copyrightYear: settings.copyrightYear ?? new Date().getFullYear(),
                 primaryColor: settings.primaryColor ?? '#d4a574',
@@ -205,10 +215,14 @@ export default function BrandingPage() {
                 identityTitleColor: settings.identityTitleColor ?? '#1e3a5f',
                 identityDescriptionColor: settings.identityDescriptionColor ?? '#4b5563',
                 identityBoxColor: settings.identityBoxColor ?? '#ffffff',
+                parishCtaTitle: settings.parishCtaTitle ?? 'Join Our Parish Family',
+                parishCtaDescription: settings.parishCtaDescription ?? "Whether you're a lifelong Catholic or exploring faith for the first time, you have a spiritual home here at St. Martin De Porres.",
+                parishCtaButton1: settings.parishCtaButton1 ?? 'Become a Member',
+                parishCtaButton2: settings.parishCtaButton2 ?? 'Support Our Mission',
                 heroTitle: settings.heroTitle ?? 'St. Martin De Porres Catholic Church',
                 heroTitleColor: settings.heroTitleColor ?? '#ffffff',
                 heroDescriptionColor: settings.heroDescriptionColor ?? '#e5e7eb',
-                heroImageUrl: settings.heroImageUrl ?? '',
+                heroImageUrl: (settings.heroImageUrl as any)?.secure_url || settings.heroImageUrl || '',
                 heroBoxColor: settings.heroBoxColor ?? 'transparent',
             });
         }
@@ -225,7 +239,7 @@ export default function BrandingPage() {
             contentForm.reset({ 
                 title: selectedContent.title ?? '', 
                 content: selectedContent.content ?? '', 
-                imageUrl: selectedContent.imageUrl ?? '',
+                imageUrl: (selectedContent.imageUrl as any)?.secure_url || selectedContent.imageUrl || '',
             });
             setContentFile(null);
         }
@@ -415,7 +429,7 @@ export default function BrandingPage() {
                                               value={field.value || ''} 
                                               file={brandingFiles.logo}
                                               onChange={(url, file) => {
-                                                  field.onChange(url);
+                                                  field.onChange(typeof url === 'string' ? url : url.secure_url || '');
                                                   setBrandingFiles(prev => ({...prev, logo: file}));
                                               }}
                                               folder="branding" 
@@ -440,6 +454,18 @@ export default function BrandingPage() {
                                                 </FormItem>
                                             )} />
                                         ))}
+                                    </div>
+
+                                    <div className="pt-10 border-t-4 border-primary/10 space-y-6">
+                                        <div className="mb-4"><h3 className="text-xl font-black uppercase tracking-tighter text-primary">Parish CTA Section</h3></div>
+                                        <div className="grid md:grid-cols-2 gap-6">
+                                            <FormField control={form.control} name="parishCtaTitle" render={({field}) => <FormItem><FormLabel>CTA Heading</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Join Our Parish Family" /></FormControl></FormItem>} />
+                                            <FormField control={form.control} name="parishCtaDescription" render={({field}) => <FormItem><FormLabel>CTA Description</FormLabel><FormControl><Textarea {...field} value={field.value || ''} placeholder="Whether you're a lifelong Catholic..." /></FormControl></FormItem>} />
+                                        </div>
+                                        <div className="grid md:grid-cols-2 gap-6">
+                                            <FormField control={form.control} name="parishCtaButton1" render={({field}) => <FormItem><FormLabel>Button 1 Label</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Become a Member" /></FormControl></FormItem>} />
+                                            <FormField control={form.control} name="parishCtaButton2" render={({field}) => <FormItem><FormLabel>Button 2 Label</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Support Our Mission" /></FormControl></FormItem>} />
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -533,7 +559,7 @@ export default function BrandingPage() {
                                                       value={field.value || ''} 
                                                       file={contentFile}
                                                       onChange={(url, file) => {
-                                                          field.onChange(url);
+                                                          field.onChange(typeof url === 'string' ? url : url.secure_url || '');
                                                           setContentFile(file);
                                                       }}
                                                       folder="content" 
