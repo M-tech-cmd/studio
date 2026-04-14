@@ -44,7 +44,7 @@ export function PasswordRecoveryForm() {
         handleCodeInApp: true,
       });
 
-      // DO NOT REDIRECT. Set local state to show success screen.
+      // Show success screen locally
       setEmailSent(true);
       
       toast({
@@ -91,7 +91,7 @@ export function PasswordRecoveryForm() {
                 <CheckCircle2 className="h-10 w-10" />
               </div>
             </div>
-            <CardTitle className="text-3xl font-black uppercase tracking-tighter text-green-900">Email Dispatched</CardTitle>
+            <CardTitle className="text-3xl font-black uppercase tracking-tighter text-green-900">Reset Email Sent!</CardTitle>
             <CardDescription className="mt-4 text-base font-medium">
               We've sent a secure recovery link to <br/>
               <span className="font-bold text-green-700 block mt-1">{email}</span>
@@ -99,7 +99,7 @@ export function PasswordRecoveryForm() {
           </CardHeader>
           <CardContent className="p-8 space-y-6">
             <p className="text-sm text-muted-foreground leading-relaxed">
-              The reset link will expire in 1 hour. If you don't see the email within a few minutes, please check your spam or junk folder.
+              Check your inbox for password reset instructions. The reset link will expire in 1 hour. If you don't see it, check your spam folder.
             </p>
             <div className="space-y-3">
               <Button 

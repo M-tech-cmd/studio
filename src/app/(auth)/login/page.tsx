@@ -138,7 +138,7 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-black uppercase tracking-widest opacity-60">Email</FormLabel>
+                    <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60">Email</FormLabel>
                     <FormControl>
                         <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -155,7 +155,7 @@ export default function LoginPage() {
                 render={({ field }) => (
                   <FormItem>
                     <div className="flex justify-between items-center">
-                        <FormLabel className="text-xs font-black uppercase tracking-widest opacity-60">Password</FormLabel>
+                        <FormLabel className="text-[10px] font-black uppercase tracking-widest opacity-60">Password</FormLabel>
                         <Link href="/recover-password" className="text-xs font-bold text-primary hover:underline">Forgot password?</Link>
                     </div>
                     <FormControl>
