@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -19,8 +18,6 @@ import { useRouter } from 'next/navigation';
 import { useUser, useFirestore } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 
-const ADMIN_PASSKEY = "12345";
-
 export function PasskeyModal() {
   const [passkey, setPasskey] = useState('');
   const [error, setError] = useState('');
@@ -28,6 +25,9 @@ export function PasskeyModal() {
   const router = useRouter();
   const { user } = useUser();
   const firestore = useFirestore();
+
+  // Get passkey from environment variable
+  const ADMIN_PASSKEY = process.env.NEXT_PUBLIC_ADMIN_PASSKEY;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +38,6 @@ export function PasskeyModal() {
           const userDocRef = doc(firestore, 'users', user.uid);
           await updateDoc(userDocRef, { isAdmin: true, role: 'admin' });
           toast({ title: "Admin Role Granted", description: "Your role has been updated to Administrator." });
-          // No need to call a success handler, the layout will update automatically
         } catch (err: any) {
           console.error("Error granting admin role:", err);
           toast({ variant: 'destructive', title: 'Error Updating Role', description: 'Could not update your role to admin.'});

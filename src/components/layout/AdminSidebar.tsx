@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Calendar, Users, FileText, Church, Briefcase, BookOpen, LogOut, Menu, CreditCard, UserCheck, Newspaper, Clock, MapPin, Palette, DollarSign, MessageSquare, Mail } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, FileText, Church, Briefcase, BookOpen, LogOut, Menu, CreditCard, UserCheck, Newspaper, Clock, MapPin, Palette, DollarSign, MessageSquare, Mail, Share2 } from 'lucide-react';
 import { useState } from 'react';
 import { useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
@@ -27,6 +27,7 @@ const adminNavLinks = [
   { href: '/admin/bible-readings', label: 'Bible Readings', icon: BookOpen },
   { href: '/admin/masses', label: 'Mass Schedule', icon: Clock },
   { href: '/admin/users', label: 'App Users', icon: Users },
+  { href: '/admin/social-links', label: 'Social Links', icon: Share2 },
   { href: '/admin/payments', label: 'Payment Settings', icon: CreditCard },
   { href: '/admin/branding', label: 'Site Branding', icon: Palette },
   { href: '/admin/contact', label: 'Contact Info', icon: MapPin },
@@ -54,7 +55,7 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void; }) {
             <Button variant="outline" size="icon">
               <Menu className="h-6 w-6" />
             </Button>
-          </SheetTrigger>  {/* ✅ was </Trigger> */}
+          </SheetTrigger>
           <SheetContent side="left" className="p-0 w-72 sm:max-w-xs">
             <SheetHeader className="p-4 border-b">
                 <SheetTitle className="sr-only">Admin Menu</SheetTitle>

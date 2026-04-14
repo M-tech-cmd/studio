@@ -27,7 +27,7 @@ function HeroSection() {
     const { data: settings, isLoading } = useDoc<SiteSettings>(settingsRef);
 
     return (
-        <section className="relative w-full min-h-[85vh] flex items-center justify-center overflow-hidden isolate">
+        <section className="relative w-full min-h-[90vh] flex items-center justify-center overflow-hidden isolate">
             {isLoading ? (
                 <Skeleton className="absolute inset-0 z-0" />
             ) : (
@@ -56,7 +56,7 @@ function HeroSection() {
                     <Button asChild size="lg" className="h-14 px-10 rounded-full font-bold text-lg shadow-2xl hover:scale-105 transition-all">
                         <Link href="/about">Discover Our History</Link>
                     </Button>
-                    <Button asChild size="lg" variant="outline" className="h-14 px-10 rounded-full font-bold text-lg border-2 text-white border-white hover:bg-white/10 backdrop-blur-sm transition-all">
+                    <Button asChild size="lg" variant="outline" className="h-14 px-10 rounded-full font-bold text-lg border-2  hover:bg-white/10 backdrop-blur-sm transition-all">
                         <Link href="/events">Upcoming Events</Link>
                     </Button>
                 </div>

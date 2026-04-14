@@ -134,8 +134,12 @@ export type OfficeHours = {
 export type SocialPlatform = 'Facebook' | 'Twitter' | 'YouTube' | 'Instagram' | 'LinkedIn';
 
 export type SocialLink = {
-  platform: SocialPlatform;
+  id: string;
+  platform: string;
   url: string;
+  icon_name?: string;
+  sort_order: number;
+  is_active: boolean;
 };
 
 export type IconType = 'Bank' | 'Mobile' | 'Cash' | 'CreditCard';
