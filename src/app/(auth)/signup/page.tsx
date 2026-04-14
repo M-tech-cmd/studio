@@ -124,7 +124,7 @@ export default function SignupPage() {
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to login
             </Link>
         </Button>
-        <CardTitle className="text-3xl font-black tracking-tight uppercase pt-12">St. Martin De Porres Portal</CardTitle>
+        <CardTitle className="text-3xl font-black tracking-tight lowercase">St. Martin De Porres Portal</CardTitle>
         <CardDescription>Create your member account</CardDescription>
       </CardHeader>
       <CardContent>

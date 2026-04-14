@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { Phone, Mail, MapPin, Facebook, Twitter, Youtube, Instagram, Linkedin, Clock, Globe } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
-import { useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, query, where, orderBy } from 'firebase/firestore';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc, collection, getDocs } from 'firebase/firestore';
 import type { SiteSettings, SocialLink } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 import { OfficeHoursStatus } from '../shared/OfficeHoursStatus';
@@ -27,17 +27,35 @@ function FooterContent() {
   const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
   const { data: settings, isLoading } = useDoc<SiteSettings>(settingsRef);
   
-  // Dynamic Social Links from Firestore Registry
-  const socialLinksQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(
-        collection(firestore, 'social_links'), 
-        where('is_active', '==', true),
-        orderBy('sort_order', 'asc')
-    );
+  // Dynamic Social Links from Firestore Registry - NO COMPOSITE INDEX
+  const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
+  const [linksLoading, setLinksLoading] = useState(true);
+
+  useEffect(() => {
+    if (!firestore) return;
+
+    const fetchSocialLinks = async () => {
+      setLinksLoading(true);
+      try {
+        // Fetch ALL documents (no where/orderBy needed)
+        const snapshot = await getDocs(collection(firestore, 'social_links'));
+        
+        // Filter to active only and sort in JavaScript
+        const links = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as SocialLink))
+          .filter(link => link.is_active === true)
+          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+        setSocialLinks(links);
+      } catch (error) {
+        console.error('Error fetching social links:', error);
+      } finally {
+        setLinksLoading(false);
+      }
+    };
+
+    fetchSocialLinks();
   }, [firestore]);
-  
-  const { data: socialLinks, isLoading: linksLoading } = useCollection<SocialLink>(socialLinksQuery);
 
   const [currentYear, setCurrentYear] = useState<number | null>(null);
 
@@ -72,24 +90,28 @@ function FooterContent() {
               {linksLoading ? (
                   Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-5 w-5 rounded-full" />)
               ) : (
-                  socialLinks?.map((link) => {
-                    // Match icon by name (ignoring case)
-                    const platformKey = Object.keys(socialIcons).find(k => k.toLowerCase() === link.platform.toLowerCase());
-                    const Icon = platformKey ? socialIcons[platformKey] : Globe;
-                    
-                    return (
-                      <Link 
-                        key={link.id} 
-                        href={link.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-muted-foreground hover:text-primary transition-all hover:scale-110"
-                        title={link.platform}
-                      >
-                        <Icon className="h-5 w-5" />
-                      </Link>
-                    );
-                  })
+                  socialLinks && socialLinks.length > 0 ? (
+                    socialLinks.map((link) => {
+                      // Match icon by name (ignoring case)
+                      const platformKey = Object.keys(socialIcons).find(k => k.toLowerCase() === link.platform.toLowerCase());
+                      const Icon = platformKey ? socialIcons[platformKey] : Globe;
+                      
+                      return (
+                        <Link 
+                          key={link.id} 
+                          href={link.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-muted-foreground hover:text-primary transition-all hover:scale-110"
+                          title={link.platform}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </Link>
+                      );
+                    })
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No social links available</p>
+                  )
               )}
             </div>
           </div>

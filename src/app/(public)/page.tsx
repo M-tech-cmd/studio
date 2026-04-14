@@ -404,3 +404,69 @@ export default function HomePage() {
         </div>
     );
 }
+
+
+
+// Add this section before the closing </div> at the end of HomePage
+
+function SocialLinksSection() {
+    const firestore = useFirestore();
+    const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
+    const [loading, setLoading] = useState(true);
+  
+    useEffect(() => {
+      if (!firestore) return;
+  
+      const fetchLinks = async () => {
+        try {
+          const snapshot = await getDocs(collection(firestore, 'social_links'));
+          const links = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as SocialLink))
+            .filter(link => link.is_active === true)
+            .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+          setSocialLinks(links);
+        } catch (error) {
+          console.error('Error fetching social links:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+  
+      fetchLinks();
+    }, [firestore]);
+  
+    if (!socialLinks.length || loading) return null;
+  
+    const socialIcons: Record<string, React.ElementType> = {
+      'Facebook': Facebook,
+      'Twitter': Twitter,
+      'YouTube': Youtube,
+      'Youtube': Youtube,
+      'Instagram': Instagram,
+      'LinkedIn': Linkedin,
+    };
+  
+    return (
+      <section className="py-12 bg-muted/30">
+        <div className="container max-w-7xl mx-auto px-4">
+          <div className="flex justify-center items-center gap-6">
+            {socialLinks.map(link => {
+              const platformKey = Object.keys(socialIcons).find(k => k.toLowerCase() === link.platform.toLowerCase());
+              const Icon = platformKey ? socialIcons[platformKey] : Globe;
+              return (
+                <Link 
+                  key={link.id}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-primary transition-all hover:scale-110"
+                >
+                  <Icon className="h-8 w-8" />
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+    );
+  }

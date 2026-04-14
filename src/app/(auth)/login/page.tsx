@@ -96,11 +96,11 @@ export default function LoginPage() {
 
   return (
     <Card className="mx-auto max-w-md w-full shadow-2xl border-none rounded-3xl overflow-hidden">
-      <CardHeader className="text-center space-y-4 p-8 bg-primary/5 border-b border-primary/10">
+      <CardHeader className="text-center space-y-4 p-1 bg-primary/5 border-b border-primary/10">
         <div className="flex justify-center">
             <Logo url={settings?.logoUrl} className="h-20 w-20" />
         </div>
-        <CardTitle className="text-3xl font-black tracking-tight uppercase">St. Martin De Porres</CardTitle>
+        <CardTitle className="text-3xl font-black tracking-tight lowercase">St. Martin De Porres</CardTitle>
         <CardDescription className="font-medium">Sign in to your member account</CardDescription>
       </CardHeader>
       <CardContent className="p-8">

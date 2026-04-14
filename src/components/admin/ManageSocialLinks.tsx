@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -47,12 +47,35 @@ export function ManageSocialLinks() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const socialLinksQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'social_links'), orderBy('sort_order', 'asc'));
-  }, [firestore]);
+  const [links, setLinks] = React.useState<SocialLink[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
 
-  const { data: links, isLoading } = useCollection<SocialLink>(socialLinksQuery);
+  // Fetch all social links WITHOUT composite index
+  React.useEffect(() => {
+    if (!firestore) return;
+
+    const fetchLinks = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch ALL documents (no where/orderBy - no index needed)
+        const snapshot = await getDocs(collection(firestore, 'social_links'));
+        
+        // Filter and sort in JavaScript
+        const fetchedLinks = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as SocialLink))
+          .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+        setLinks(fetchedLinks);
+      } catch (error) {
+        console.error('Error fetching social links:', error);
+        toast({ variant: 'destructive', title: 'Error loading social links' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLinks();
+  }, [firestore]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selected, setSelected] = useState<SocialLink | null>(null);
@@ -107,6 +130,13 @@ export function ManageSocialLinks() {
         toast({ title: 'New Platform Added', description: `${form.platform} is now in the registry.` });
       }
       setDialogOpen(false);
+
+      // Refresh list
+      const snapshot = await getDocs(collection(firestore, 'social_links'));
+      const fetchedLinks = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() } as SocialLink))
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      setLinks(fetchedLinks);
     } catch (error: any) {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: 'social_links',
@@ -124,6 +154,13 @@ export function ManageSocialLinks() {
     try {
       await deleteDoc(doc(firestore, 'social_links', id));
       toast({ title: 'Link Removed', description: `Platform has been deleted from registry.` });
+
+      // Refresh list
+      const snapshot = await getDocs(collection(firestore, 'social_links'));
+      const fetchedLinks = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() } as SocialLink))
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      setLinks(fetchedLinks);
     } catch (error: any) {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: `social_links/${id}`,
@@ -139,6 +176,13 @@ export function ManageSocialLinks() {
     try {
       await updateDoc(doc(firestore, 'social_links', item.id), updatedData);
       toast({ title: updatedData.is_active ? 'Platform Online' : 'Platform Hidden' });
+
+      // Refresh list
+      const snapshot = await getDocs(collection(firestore, 'social_links'));
+      const fetchedLinks = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() } as SocialLink))
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      setLinks(fetchedLinks);
     } catch (error: any) {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: `social_links/${item.id}`,
