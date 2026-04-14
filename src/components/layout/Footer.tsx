@@ -10,10 +10,14 @@ import { Skeleton } from '../ui/skeleton';
 import { OfficeHoursStatus } from '../shared/OfficeHoursStatus';
 import { useState, useEffect } from 'react';
 
+/**
+ * Mapping of Lucide icons for social platforms.
+ */
 const socialIcons: Record<string, React.ElementType> = {
   'Facebook': Facebook,
   'Twitter': Twitter,
   'YouTube': Youtube,
+  'Youtube': Youtube,
   'Instagram': Instagram,
   'LinkedIn': Linkedin,
 };
@@ -28,7 +32,7 @@ function FooterContent() {
     if (!firestore) return null;
     return query(
         collection(firestore, 'social_links'), 
-        where('is_active', '!=', false),
+        where('is_active', '==', true),
         orderBy('sort_order', 'asc')
     );
   }, [firestore]);
@@ -69,7 +73,10 @@ function FooterContent() {
                   Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-5 w-5 rounded-full" />)
               ) : (
                   socialLinks?.map((link) => {
-                    const Icon = socialIcons[link.platform] || Globe;
+                    // Match icon by name (ignoring case)
+                    const platformKey = Object.keys(socialIcons).find(k => k.toLowerCase() === link.platform.toLowerCase());
+                    const Icon = platformKey ? socialIcons[platformKey] : Globe;
+                    
                     return (
                       <Link 
                         key={link.id} 

@@ -33,6 +33,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import type { SocialLink } from '@/lib/types';
@@ -54,7 +55,6 @@ export function ManageSocialLinks() {
   const { data: links, isLoading } = useCollection<SocialLink>(socialLinksQuery);
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
   const [selected, setSelected] = useState<SocialLink | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -119,15 +119,14 @@ export function ManageSocialLinks() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!firestore || !selected) return;
+  const handleDelete = async (id: string) => {
+    if (!firestore) return;
     try {
-      await deleteDoc(doc(firestore, 'social_links', selected.id));
-      toast({ title: 'Link Removed', description: `${selected.platform} has been deleted from registry.` });
-      setDeleteOpen(false);
+      await deleteDoc(doc(firestore, 'social_links', id));
+      toast({ title: 'Link Removed', description: `Platform has been deleted from registry.` });
     } catch (error: any) {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
-        path: `social_links/${selected.id}`,
+        path: `social_links/${id}`,
         operation: 'delete',
       }));
       toast({ variant: 'destructive', title: 'Deletion Blocked' });
@@ -247,15 +246,17 @@ export function ManageSocialLinks() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
+                      
                       <AlertDialog>
-                        <Button 
-                            asChild
-                            variant="outline" 
-                            size="icon" 
-                            className="rounded-full h-10 w-10 border-2 text-destructive hover:bg-destructive hover:text-white hover:border-destructive transition-all"
-                        >
-                            <button onClick={() => setSelected(item)}><Trash2 className="h-4 w-4" /></button>
-                        </Button>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="rounded-full h-10 w-10 border-2 text-destructive hover:bg-destructive hover:text-white hover:border-destructive transition-all"
+                          >
+                              <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
                         <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl">
                           <AlertDialogHeader>
                             <AlertDialogTitle className="text-2xl font-black uppercase tracking-tighter">Remove platform?</AlertDialogTitle>
@@ -266,7 +267,7 @@ export function ManageSocialLinks() {
                           <AlertDialogFooter>
                             <AlertDialogCancel className="rounded-full">Abort</AlertDialogCancel>
                             <AlertDialogAction 
-                              onClick={handleDelete} 
+                              onClick={() => handleDelete(item.id)} 
                               className="bg-destructive text-white rounded-full font-black uppercase tracking-widest"
                             >
                               Execute Purge
