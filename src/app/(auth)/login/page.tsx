@@ -9,7 +9,6 @@ import Link from 'next/link';
 import { useAuth, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import {
   signInWithEmailAndPassword,
-  sendPasswordResetEmail,
   setPersistence,
   browserLocalPersistence
 } from 'firebase/auth';
@@ -21,7 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 
 const loginSchema = z.object({
@@ -29,16 +28,9 @@ const loginSchema = z.object({
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
 });
 
-const resetSchema = z.object({
-  email: z.string().email({ message: 'Please enter a valid email.' }),
-});
-
-type View = 'login' | 'reset';
-
 export default function LoginPage() {
   const [formLoading, setFormLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [view, setView] = useState<View>('login');
   const router = useRouter();
   
   const { 
@@ -85,28 +77,6 @@ export default function LoginPage() {
     }
   }
 
-  async function onResetSubmit(values: z.infer<typeof resetSchema>) {
-    if (!auth) return;
-    setFormLoading(true);
-    try {
-        await sendPasswordResetEmail(auth, values.email);
-        toast({
-            title: 'Reset Email Sent',
-            description: 'Check your inbox for instructions.',
-        });
-        setView('login');
-        resetForm.reset();
-    } catch (error: any) {
-        toast({
-            variant: 'destructive',
-            title: 'Reset Failed',
-            description: error.message || 'Could not send reset email.',
-        });
-    } finally {
-        setFormLoading(false);
-    }
-  }
-
   const handleGoogleSignIn = async () => {
     await startGoogleSignIn();
   };
@@ -116,11 +86,6 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '' },
   });
 
-  const resetForm = useForm<z.infer<typeof resetSchema>>({
-    resolver: zodResolver(resetSchema),
-    defaultValues: { email: '' },
-  });
-  
   if (isUserLoading || (user && !user.isAnonymous)) {
     return (
         <div className="fixed inset-0 flex items-center justify-center bg-background z-50">
@@ -129,67 +94,20 @@ export default function LoginPage() {
     );
   }
 
-  if (view === 'reset') {
-    return (
-        <Card className="mx-auto max-w-md w-full shadow-2xl">
-            <CardHeader className="text-center space-y-4">
-                <div className="flex justify-center">
-                    <Logo url={settings?.logoUrl} className="h-20 w-20" />
-                </div>
-                <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
-                <CardDescription>Enter your email to receive a reset link</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Form {...resetForm}>
-                    <form onSubmit={resetForm.handleSubmit(onResetSubmit)} className="space-y-4">
-                        <FormField
-                            control={resetForm.control}
-                            name="email"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Email</FormLabel>
-                                <FormControl>
-                                    <div className="relative">
-                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <input 
-                                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-10" 
-                                          placeholder="you@example.com" 
-                                          {...field} 
-                                        />
-                                    </div>
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                        <Button type="submit" className="w-full" disabled={formLoading}>
-                            {formLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Send Reset Link
-                        </Button>
-                    </form>
-                </Form>
-                 <Button variant="link" onClick={() => setView('login')} className="mt-4 w-full">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Login
-                </Button>
-            </CardContent>
-        </Card>
-    )
-  }
-
   return (
-    <Card className="mx-auto max-w-md w-full shadow-2xl">
-      <CardHeader className="text-center space-y-4">
+    <Card className="mx-auto max-w-md w-full shadow-2xl border-none rounded-3xl overflow-hidden">
+      <CardHeader className="text-center space-y-4 p-8 bg-primary/5 border-b border-primary/10">
         <div className="flex justify-center">
             <Logo url={settings?.logoUrl} className="h-20 w-20" />
         </div>
-        <CardTitle className="text-3xl font-black tracking-tight uppercase">St. Martin De Porres Portal</CardTitle>
-        <CardDescription>Sign in to your member account</CardDescription>
+        <CardTitle className="text-3xl font-black tracking-tight uppercase">St. Martin De Porres</CardTitle>
+        <CardDescription className="font-medium">Sign in to your member account</CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="p-8">
+        <div className="space-y-6">
           <Button 
             variant="outline" 
-            className="w-full h-12 font-bold" 
+            className="w-full h-12 font-bold rounded-xl border-2 hover:bg-muted/50" 
             onClick={handleGoogleSignIn} 
             disabled={formLoading || isSigningIn}
           >
@@ -208,7 +126,10 @@ export default function LoginPage() {
             Continue with Google
           </Button>
 
-          <div className="relative"><div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">OR</span></div></div>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-muted-foreground font-black tracking-widest">OR</span></div>
+          </div>
 
           <Form {...loginForm}>
             <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
@@ -217,11 +138,11 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel className="text-xs font-black uppercase tracking-widest opacity-60">Email</FormLabel>
                     <FormControl>
                         <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="you@example.com" {...field} className="pl-10 h-12" />
+                            <Input placeholder="you@example.com" {...field} className="pl-10 h-12 rounded-xl border-2" />
                         </div>
                     </FormControl>
                     <FormMessage />
@@ -233,11 +154,14 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <div className="flex justify-between items-center">
+                        <FormLabel className="text-xs font-black uppercase tracking-widest opacity-60">Password</FormLabel>
+                        <Link href="/recover-password" className="text-xs font-bold text-primary hover:underline">Forgot password?</Link>
+                    </div>
                     <FormControl>
                         <div className="relative">
                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                           <Input type={showPassword ? 'text' : 'password'} placeholder="••••••••" {...field} className="pl-10 pr-10 h-12"/>
+                           <Input type={showPassword ? 'text' : 'password'} placeholder="••••••••" {...field} className="pl-10 pr-10 h-12 rounded-xl border-2"/>
                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground">
                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                            </button>
@@ -247,7 +171,7 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full h-12 font-bold" disabled={formLoading || isSigningIn}>
+              <Button type="submit" className="w-full h-14 font-black uppercase tracking-widest rounded-full shadow-xl transition-all active:scale-95" disabled={formLoading || isSigningIn}>
                 {signingInMethod === 'email' ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
@@ -257,9 +181,11 @@ export default function LoginPage() {
             </form>
           </Form>
 
-           <div className="mt-6 text-center text-sm flex justify-between">
-            <Button variant="link" className="p-0 h-auto" onClick={() => setView('reset')}>Forgot password?</Button>
-            <Button variant="link" asChild className="p-0 h-auto font-bold"><Link href="/signup">Create Account</Link></Button>
+           <div className="mt-6 text-center text-sm border-t pt-6">
+            <p className="text-muted-foreground">Don't have an account?</p>
+            <Button variant="link" asChild className="p-0 h-auto font-black uppercase tracking-widest text-primary mt-1">
+                <Link href="/signup">Create Member Account</Link>
+            </Button>
         </div>
         </div>
       </CardContent>

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Pencil, Trash2, ExternalLink, Globe, Loader2 } from 'lucide-react';
+import { PlusCircle, Pencil, Trash2, ExternalLink, Globe, Loader2, Eye, EyeOff } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -38,6 +38,10 @@ import { useToast } from '@/hooks/use-toast';
 import type { SocialLink } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
+/**
+ * ManageSocialLinks: Registry-driven Social Media Management.
+ * Synchronized with the 'social_links' collection for public site display.
+ */
 export function ManageSocialLinks() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -97,10 +101,10 @@ export function ManageSocialLinks() {
       if (selected) {
         const linkDoc = doc(firestore, 'social_links', selected.id);
         await updateDoc(linkDoc, form);
-        toast({ title: 'Social link updated' });
+        toast({ title: 'Registry Synchronized', description: `${form.platform} link updated.` });
       } else {
         await addDoc(collection(firestore, 'social_links'), form);
-        toast({ title: 'Social link added' });
+        toast({ title: 'New Platform Added', description: `${form.platform} is now in the registry.` });
       }
       setDialogOpen(false);
     } catch (error: any) {
@@ -109,7 +113,7 @@ export function ManageSocialLinks() {
         operation: selected ? 'update' : 'create',
         requestResourceData: form
       }));
-      toast({ variant: 'destructive', title: 'Failed to save', description: error.message });
+      toast({ variant: 'destructive', title: 'Registry Sync Error', description: error.message });
     } finally {
       setSaving(false);
     }
@@ -119,14 +123,14 @@ export function ManageSocialLinks() {
     if (!firestore || !selected) return;
     try {
       await deleteDoc(doc(firestore, 'social_links', selected.id));
-      toast({ title: 'Link deleted' });
+      toast({ title: 'Link Removed', description: `${selected.platform} has been deleted from registry.` });
       setDeleteOpen(false);
     } catch (error: any) {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: `social_links/${selected.id}`,
         operation: 'delete',
       }));
-      toast({ variant: 'destructive', title: 'Failed to delete' });
+      toast({ variant: 'destructive', title: 'Deletion Blocked' });
     }
   };
 
@@ -135,7 +139,7 @@ export function ManageSocialLinks() {
     const updatedData = { is_active: !item.is_active };
     try {
       await updateDoc(doc(firestore, 'social_links', item.id), updatedData);
-      toast({ title: updatedData.is_active ? 'Link enabled' : 'Link hidden' });
+      toast({ title: updatedData.is_active ? 'Platform Online' : 'Platform Hidden' });
     } catch (error: any) {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: `social_links/${item.id}`,
@@ -146,54 +150,57 @@ export function ManageSocialLinks() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black uppercase tracking-tighter">Social Media Links</h1>
-          <p className="text-muted-foreground font-medium">Manage icons and platform links for the church website.</p>
+          <h1 className="text-3xl font-black uppercase tracking-tighter">Social Media Registry</h1>
+          <p className="text-muted-foreground font-medium">Manage icons and platform links displayed across the public site.</p>
         </div>
-        <Button onClick={openNew} className="rounded-full font-bold h-12 px-6 shadow-lg">
+        <Button onClick={openNew} className="rounded-full font-black h-12 px-8 shadow-lg transition-all active:scale-95">
           <PlusCircle className="mr-2 h-5 w-5" />
-          Add Social Link
+          Add Platform
         </Button>
       </div>
 
-      <div className="bg-card border-none shadow-xl rounded-3xl overflow-hidden">
+      <div className="bg-card border-none shadow-xl rounded-[2rem] overflow-hidden">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="font-black uppercase text-[10px] p-6">Platform</TableHead>
-              <TableHead className="font-black uppercase text-[10px] p-6">URL</TableHead>
-              <TableHead className="font-black uppercase text-[10px] p-6">Order</TableHead>
-              <TableHead className="font-black uppercase text-[10px] p-6">Status</TableHead>
-              <TableHead className="text-right font-black uppercase text-[10px] p-6">Actions</TableHead>
+              <TableHead className="font-black uppercase text-[10px] p-6 tracking-widest opacity-60">Platform</TableHead>
+              <TableHead className="font-black uppercase text-[10px] p-6 tracking-widest opacity-60">Destination URL</TableHead>
+              <TableHead className="font-black uppercase text-[10px] p-6 tracking-widest opacity-60">Order</TableHead>
+              <TableHead className="font-black uppercase text-[10px] p-6 tracking-widest opacity-60">Status</TableHead>
+              <TableHead className="text-right font-black uppercase text-[10px] p-6 tracking-widest opacity-60">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-20">
-                  <div className="flex flex-col items-center gap-2 animate-pulse">
-                    <Globe className="h-8 w-8 text-primary/20" />
-                    <span className="font-black uppercase text-[10px] tracking-widest text-muted-foreground">Synchronizing Archive...</span>
+                <TableCell colSpan={5} className="text-center py-24">
+                  <div className="flex flex-col items-center gap-4 animate-pulse">
+                    <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                    <span className="font-black uppercase text-[10px] tracking-widest text-muted-foreground opacity-50">Syncing Registry...</span>
                   </div>
                 </TableCell>
               </TableRow>
             ) : !links || links.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-20 text-muted-foreground italic">
-                  No social links registered in the registry.
+                <TableCell colSpan={5} className="text-center py-24 text-muted-foreground italic">
+                  <div className="flex flex-col items-center gap-4">
+                    <Globe className="h-12 w-12 opacity-10" />
+                    <p className="font-medium">No social platforms have been registered yet.</p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
               links.map((item) => (
-                <TableRow key={item.id} className="group hover:bg-muted/30">
+                <TableRow key={item.id} className="group hover:bg-primary/5 transition-colors">
                   <TableCell className="p-6">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/5">
-                        <Globe className="h-5 w-5" />
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/5 shadow-inner transition-transform group-hover:scale-110">
+                        <Globe className="h-6 w-6" />
                       </div>
-                      <span className="font-black text-lg tracking-tight">{item.platform}</span>
+                      <span className="font-black text-xl tracking-tighter">{item.platform}</span>
                     </div>
                   </TableCell>
                   <TableCell className="p-6">
@@ -201,49 +208,72 @@ export function ManageSocialLinks() {
                       href={item.url} 
                       target="_blank" 
                       rel="noopener noreferrer" 
-                      className="text-sm text-blue-600 hover:underline flex items-center gap-1 font-medium"
+                      className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-2 font-bold group/link"
                     >
-                      {item.url}
-                      <ExternalLink className="h-3 w-3" />
+                      <span className="truncate max-w-[200px]">{item.url}</span>
+                      <ExternalLink className="h-3 w-3 opacity-0 group-hover/link:opacity-100 transition-opacity" />
                     </a>
                   </TableCell>
                   <TableCell className="p-6">
-                    <Badge variant="outline" className="font-mono">{item.sort_order}</Badge>
+                    <Badge variant="outline" className="font-mono text-xs font-black border-2">{item.sort_order}</Badge>
                   </TableCell>
                   <TableCell className="p-6">
                     <button 
                       onClick={() => handleToggleActive(item)}
-                      className="transition-transform active:scale-95"
+                      className="transition-transform active:scale-90"
                     >
                       <Badge 
                         variant="secondary" 
                         className={cn(
-                          "font-black text-[10px] uppercase px-3 py-1 cursor-pointer transition-colors",
-                          item.is_active !== false ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                          "font-black text-[9px] uppercase px-4 py-1 cursor-pointer transition-all border shadow-sm",
+                          item.is_active !== false ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100" : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
                         )}
                       >
-                        {item.is_active !== false ? "Active" : "Hidden"}
+                        {item.is_active !== false ? (
+                            <span className="flex items-center gap-1.5"><Eye className="h-3 w-3" /> ONLINE</span>
+                        ) : (
+                            <span className="flex items-center gap-1.5"><EyeOff className="h-3 w-3" /> HIDDEN</span>
+                        )}
                       </Badge>
                     </button>
                   </TableCell>
                   <TableCell className="p-6 text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-3">
                       <Button 
                         variant="outline" 
                         size="icon" 
-                        className="rounded-full h-10 w-10 border-2"
+                        className="rounded-full h-10 w-10 border-2 transition-all hover:border-primary hover:text-primary"
                         onClick={() => openEdit(item)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        className="rounded-full h-10 w-10 border-2 text-destructive hover:bg-destructive/10"
-                        onClick={() => { setSelected(item); setDeleteOpen(true); }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <Button 
+                            asChild
+                            variant="outline" 
+                            size="icon" 
+                            className="rounded-full h-10 w-10 border-2 text-destructive hover:bg-destructive hover:text-white hover:border-destructive transition-all"
+                        >
+                            <button onClick={() => setSelected(item)}><Trash2 className="h-4 w-4" /></button>
+                        </Button>
+                        <AlertDialogContent className="rounded-[2rem] border-none shadow-2xl">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tighter">Remove platform?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently remove <strong>{item.platform}</strong> from the public site links.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel className="rounded-full">Abort</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={handleDelete} 
+                              className="bg-destructive text-white rounded-full font-black uppercase tracking-widest"
+                            >
+                              Execute Purge
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -254,25 +284,25 @@ export function ManageSocialLinks() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] rounded-[2rem] border-none shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tighter">
-              {selected ? 'Modify Link' : 'Register Link'}
+        <DialogContent className="sm:max-w-[500px] rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden">
+          <DialogHeader className="p-8 bg-primary/5 border-b">
+            <DialogTitle className="text-3xl font-black uppercase tracking-tighter">
+              {selected ? 'Modify Entry' : 'New Platform'}
             </DialogTitle>
-            <DialogDescription>Enter platform details for the public directory.</DialogDescription>
+            <DialogDescription className="font-medium">Define platform routing and display hierarchy.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-6 py-4">
+          <div className="p-8 space-y-6">
             <div className="space-y-2">
-              <Label className="text-xs font-black uppercase opacity-60">Platform Name</Label>
+              <Label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Platform Label</Label>
               <Input 
                 value={form.platform} 
                 onChange={(e) => setForm({ ...form, platform: e.target.value })} 
-                placeholder="Facebook, Instagram, etc." 
-                className="h-12 border-2 rounded-xl" 
+                placeholder="e.g. YouTube, Instagram..." 
+                className="h-12 border-2 rounded-xl text-lg font-bold" 
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-black uppercase opacity-60">Redirect URL</Label>
+              <Label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Full Redirect URL</Label>
               <Input 
                 value={form.url} 
                 onChange={(e) => setForm({ ...form, url: e.target.value })} 
@@ -280,63 +310,43 @@ export function ManageSocialLinks() {
                 className="h-12 border-2 rounded-xl font-mono text-sm" 
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label className="text-xs font-black uppercase opacity-60">Display Order</Label>
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Display Order</Label>
                 <Input 
                   type="number" 
                   value={form.sort_order} 
                   onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })} 
-                  className="h-12 border-2 rounded-xl" 
+                  className="h-12 border-2 rounded-xl font-bold" 
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-black uppercase opacity-60">Visibility</Label>
-                <div className="flex items-center h-12 gap-2 px-4 border-2 rounded-xl bg-muted/10">
+                <Label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Visibility</Label>
+                <div className="flex items-center h-12 gap-3 px-4 border-2 rounded-xl bg-muted/5">
                   <input 
                     type="checkbox" 
                     id="is_active"
                     checked={form.is_active} 
                     onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                    className="h-5 w-5 rounded border-primary accent-primary"
+                    className="h-5 w-5 rounded border-primary accent-primary cursor-pointer"
                   />
-                  <Label htmlFor="is_active" className="font-bold cursor-pointer">Live on Website</Label>
+                  <Label htmlFor="is_active" className="font-black text-xs uppercase cursor-pointer">Live</Label>
                 </div>
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="p-8 bg-muted/5 border-t">
             <Button 
               onClick={handleSave} 
               disabled={saving} 
-              className="w-full h-14 rounded-full font-black uppercase tracking-widest shadow-xl"
+              className="w-full h-14 rounded-full font-black uppercase tracking-widest shadow-xl transition-all active:scale-95"
             >
               {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-              {selected ? 'Commit Adjustments' : 'Add to Directory'}
+              {selected ? 'Commit Adjustments' : 'Commit to Registry'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tighter">Registry Purge</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove the <strong>{selected?.platform}</strong> link? This action is final.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-full">Abort</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDelete} 
-              className="bg-destructive text-white rounded-full font-bold"
-            >
-              Confirm Purge
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

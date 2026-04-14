@@ -6,11 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, ArrowLeft } from 'lucide-react';
+import { Loader2, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { useAuth } from '@/firebase';
 
+/**
+ * Enhanced Password Recovery Form.
+ * Handles the "Email Sent" success state locally to prevent premature redirection.
+ */
 export function PasswordRecoveryForm() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -18,7 +22,7 @@ export function PasswordRecoveryForm() {
   const [error, setError] = useState('');
   const { toast } = useToast();
   const router = useRouter();
-  const auth = useAuth();
+  const { auth } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,11 +40,13 @@ export function PasswordRecoveryForm() {
     try {
       // Send password reset email using Firebase
       await sendPasswordResetEmail(auth, email, {
-        url: `${window.location.origin}/auth/sign-in`,
+        url: `${window.location.origin}/login`,
         handleCodeInApp: true,
       });
 
+      // DO NOT REDIRECT. Set local state to show success screen.
       setEmailSent(true);
+      
       toast({
         title: "Reset Link Sent",
         description: "Check your inbox for password reset instructions.",
@@ -48,18 +54,18 @@ export function PasswordRecoveryForm() {
     } catch (err: any) {
       console.error("Password reset error:", err);
       
+      let message = 'Failed to send reset link. Please try again.';
       if (err.code === 'auth/user-not-found') {
-        setError('No account found with this email address');
+        message = 'No account found with this email address';
       } else if (err.code === 'auth/invalid-email') {
-        setError('Please enter a valid email address');
-      } else {
-        setError('Failed to send reset link. Please try again.');
+        message = 'Please enter a valid email address';
       }
 
+      setError(message);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error || 'Failed to send reset link',
+        description: message,
       });
     } finally {
       setIsLoading(false);
@@ -67,44 +73,45 @@ export function PasswordRecoveryForm() {
   };
 
   const handleBackToSignIn = () => {
-    router.push('/auth/sign-in');
+    router.push('/login');
   };
 
   const handleBackToHome = () => {
     router.push('/');
   };
 
-  // Email Sent State
+  // Email Sent Success State
   if (emailSent) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="bg-green-100 text-green-600 rounded-full p-3">
-                <Mail className="h-8 w-8" />
+      <div className="w-full max-w-md animate-in fade-in zoom-in duration-500">
+        <Card className="border-none shadow-2xl rounded-3xl overflow-hidden">
+          <CardHeader className="text-center p-8 bg-green-50/50 border-b border-green-100">
+            <div className="flex justify-center mb-6">
+              <div className="bg-green-100 text-green-600 rounded-full p-4 shadow-inner">
+                <CheckCircle2 className="h-10 w-10" />
               </div>
             </div>
-            <CardTitle className="text-2xl">Reset Email Sent!</CardTitle>
-            <CardDescription className="mt-2">
-              Check your inbox at <span className="font-semibold text-foreground">{email}</span> for instructions to reset your password.
+            <CardTitle className="text-3xl font-black uppercase tracking-tighter text-green-900">Email Dispatched</CardTitle>
+            <CardDescription className="mt-4 text-base font-medium">
+              We've sent a secure recovery link to <br/>
+              <span className="font-bold text-green-700 block mt-1">{email}</span>
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              The reset link will expire in 1 hour. If you don't see the email, check your spam folder.
+          <CardContent className="p-8 space-y-6">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              The reset link will expire in 1 hour. If you don't see the email within a few minutes, please check your spam or junk folder.
             </p>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Button 
                 onClick={handleBackToSignIn}
-                className="w-full"
+                className="w-full h-12 rounded-full font-bold shadow-lg"
               >
                 Return to Login
               </Button>
               <Button 
                 onClick={handleBackToHome}
-                variant="outline"
-                className="w-full"
+                variant="ghost"
+                className="w-full h-12 rounded-full font-bold"
               >
                 Back to Homepage
               </Button>
@@ -115,46 +122,49 @@ export function PasswordRecoveryForm() {
     );
   }
 
-  // Password Recovery Form
+  // Initial Request Form
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Recover Password</CardTitle>
-          <CardDescription>
-            Enter your email address and we'll send you a recovery link
+    <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <Card className="border-none shadow-2xl rounded-3xl overflow-hidden">
+        <CardHeader className="text-center p-8 bg-primary/5 border-b border-primary/10">
+          <CardTitle className="text-3xl font-black uppercase tracking-tighter">Recover Access</CardTitle>
+          <CardDescription className="mt-2 font-medium">
+            Enter your email and we'll send you a secure link to reset your password.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="p-8">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="email">Registered Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="kimaniemma20@gmail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
-                className="h-11"
-              />
+              <Label htmlFor="email" className="text-xs font-black uppercase tracking-widest opacity-60">Registered Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                    id="email"
+                    type="email"
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                    className="h-12 pl-10 border-2 rounded-xl focus-visible:ring-primary"
+                />
+              </div>
               {error && (
-                <p className="text-sm text-destructive mt-1">{error}</p>
+                <p className="text-xs font-bold text-destructive animate-in slide-in-from-top-1">{error}</p>
               )}
             </div>
 
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-11"
+              className="w-full h-14 rounded-full font-black uppercase tracking-widest shadow-xl transition-all active:scale-95"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Sending...
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Requesting Link...
                 </>
               ) : (
-                'Send Reset Link'
+                'Send Recovery Link'
               )}
             </Button>
 
@@ -162,7 +172,7 @@ export function PasswordRecoveryForm() {
               type="button"
               onClick={handleBackToSignIn}
               variant="outline"
-              className="w-full h-11"
+              className="w-full h-12 rounded-full font-bold border-2"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Sign In
