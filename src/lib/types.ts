@@ -105,7 +105,7 @@ export type RegisteredUser = {
   name: string;
   email: string;
   photoURL?: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'chairman' | 'tech_dev' | 'treasurer' | 'secretary';
   isAdmin?: boolean;
   isVerified?: boolean;
   customTitle?: string;
@@ -259,6 +259,7 @@ export type BulletinPost = {
   category: string;
   authorId: string;
   authorName: string;
+  authorRole?: string; // Captures role-based title at time of posting
   createdAt: Timestamp;
   updatedAt: Timestamp;
   reactions: { [userId: string]: ReactionType };

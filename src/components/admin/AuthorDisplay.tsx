@@ -6,6 +6,7 @@ import type { RegisteredUser } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { getDisplayNameFromRole } from "@/lib/roleMapping";
 
 interface AuthorDisplayProps {
     authorId: string;
@@ -14,14 +15,6 @@ interface AuthorDisplayProps {
     showAvatar?: boolean;
     avatarSize?: string;
 }
-
-const roleMapping: Record<string, string> = {
-    admin: "St. Martin De Porres Admin",
-    chairman: "St. Martin De Porres Chairman",
-    tech_dev: "St. Martin De Porres Tech/Dev",
-    treasurer: "St. Martin De Porres Treasurer",
-    secretary: "St. Martin De Porres Secretary",
-};
 
 /**
  * AuthorDisplay: Strictly enforces role-based naming and avatars for administrators.
@@ -41,19 +34,20 @@ export function AuthorDisplay({
 
     if (isLoading) return <Skeleton className="h-4 w-24 rounded" />;
 
-    // Use fetched data or fallback to generic admin if user record is missing
-    const isAdmin = user ? (user.isAdmin === true || user.role !== 'user') : true;
-    
-    const displayName = isAdmin 
-        ? (user?.role ? (roleMapping[user.role] || "St. Martin De Porres Admin") : "St. Martin De Porres Admin")
-        : (user?.name || fallbackName || 'Parish Member');
+    // Logic: Use the stored role or resolve from current user record.
+    // If user is admin but has no specific role, default to 'admin' mapping.
+    const effectiveRole = user?.role || (user?.isAdmin ? 'admin' : 'member');
+    const displayName = getDisplayNameFromRole(effectiveRole);
 
     // Force "S" for all official roles (all start with "St. Martin...")
     const initial = displayName.charAt(0).toUpperCase();
 
-    if (showAvatar) {
-        return (
-            <div className="flex items-center gap-2">
+    // Check if we should show a personal photo or the official avatar
+    const isAdmin = user?.isAdmin === true || (user?.role && user.role !== 'user');
+
+    return (
+        <div className="flex items-center gap-2">
+            {showAvatar && (
                 <Avatar className={cn(avatarSize, "border-2 border-white shadow-sm shrink-0")}>
                     {/* Security Guard: Never show personal photos for admins */}
                     {!isAdmin && user?.photoURL && (
@@ -66,10 +60,8 @@ export function AuthorDisplay({
                         {initial}
                     </AvatarFallback>
                 </Avatar>
-                <span className={className}>{displayName}</span>
-            </div>
-        );
-    }
-
-    return <span className={className}>{displayName}</span>;
+            )}
+            <span className={className}>{displayName}</span>
+        </div>
+    );
 }

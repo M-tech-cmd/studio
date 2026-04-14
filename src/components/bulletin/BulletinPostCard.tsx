@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { resolveMediaUrl } from '@/lib/upload-utils';
 import { AuthorDisplay } from '@/components/admin/AuthorDisplay';
+import { getDisplayNameFromRole } from '@/lib/roleMapping';
 
 /**
  * Extracts the first media source from HTML content.

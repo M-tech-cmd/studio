@@ -5,11 +5,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Loader2 } from 'lucide-react';
-import { useFirestore, useUser } from '@/firebase';
+import { useFirestore, useUser, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadMultipleFiles } from '@/lib/upload-utils';
 
-import type { BulletinPost, CloudinaryAsset } from '@/lib/types';
+import type { BulletinPost, RegisteredUser } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -53,6 +53,10 @@ export function BulletinPostForm({ post, onClose }: BulletinPostFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
 
+  // Fetch author profile to get current role for metadata storage
+  const authorRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: authorProfile } = useDoc<RegisteredUser>(authorRef);
+
   const form = useForm<z.infer<typeof postSchema>>({
     resolver: zodResolver(postSchema),
     defaultValues: {
@@ -72,7 +76,7 @@ export function BulletinPostForm({ post, onClose }: BulletinPostFormProps) {
     setIsSaving(true);
 
     try {
-        // 1. Upload new files and get their Asset objects (containing public_id)
+        // 1. Upload new files and get their Asset objects
         const newAssets = (galleryFiles && galleryFiles.length > 0) 
             ? await uploadMultipleFiles(null, 'bulletins', galleryFiles) 
             : [];
@@ -85,6 +89,7 @@ export function BulletinPostForm({ post, onClose }: BulletinPostFormProps) {
             content: values.content,
             category: values.category,
             galleryImages: finalGallery,
+            authorRole: authorProfile?.role || 'member', // Save the role for title display
             updatedAt: serverTimestamp(),
         };
 
@@ -116,7 +121,7 @@ export function BulletinPostForm({ post, onClose }: BulletinPostFormProps) {
   
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-3xl h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
+      <DialogContent className="sm:max-w-[800px] h-[90vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl rounded-3xl">
         <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
           <DialogTitle className="text-2xl font-black uppercase tracking-tighter">
             {post ? 'Modify Post' : 'Compose Bulletin'}
