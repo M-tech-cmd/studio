@@ -14,6 +14,7 @@ import type { FinancialEntry, SiteSettings } from '@/lib/types';
 import { format } from 'date-fns';
 import { useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
+import Link from 'next/link';
 
 const AMOUNTS = [100, 500, 1000, 2000, 5000];
 

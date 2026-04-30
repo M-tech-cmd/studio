@@ -2,7 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper to check if user is the super admin
     function isSuperAdmin() {
       return request.auth != null && 
              (request.auth.token.email == 'kimaniemma20@gmail.com' || 
@@ -10,7 +9,6 @@ service cloud.firestore {
               request.auth.uid == 'sxiZRGIEshOkSROfqOFb3UcvP6g1');
     }
 
-    // Simplified admin check - rely on super admin identity
     function isAdmin() {
       return isSuperAdmin();
     }
@@ -30,55 +28,16 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
-    match /masses/{id} { 
-      allow read: if true; 
-      allow write: if isAdmin(); 
-    }
-    
-    match /community_groups/{id} { 
-      allow read: if true; 
-      allow write: if isAdmin(); 
-    }
-    
-    match /bulletins/{id} { 
-      allow read: if true; 
-      allow write: if isAdmin(); 
-    }
-    
-    match /events/{id} { 
-      allow read: if true; 
-      allow write: if isAdmin(); 
-    }
-    
-    match /development_projects/{id} { 
-      allow read: if true; 
-      allow write: if isAdmin(); 
-    }
-    
-    match /documents/{id} { 
-      allow read: if true; 
-      allow write: if isAdmin(); 
-    }
-    
-    match /profiles/{id} { 
-      allow read: if true; 
-      allow write: if isAdmin(); 
-    }
-    
-    match /bible_readings/{id} { 
-      allow read: if true; 
-      allow write: if isAdmin(); 
-    }
-    
-    match /site_content/{id} { 
-      allow read: if true; 
-      allow write: if isAdmin(); 
-    }
-
-    match /social_links/{id} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
-    }
+    match /masses/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /community_groups/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /bulletins/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /events/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /development_projects/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /documents/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /profiles/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /bible_readings/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /site_content/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /social_links/{id} { allow read: if true; allow create, update, delete: if isAdmin(); }
 
     match /users/{userId} {
       allow read: if true;
@@ -117,6 +76,40 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow update, delete: if isAdmin() || 
                              (request.auth != null && request.auth.uid == resource.data.authorId);
+    }
+
+    // ✅ NEW - Prayer Requests
+    match /prayer_requests/{id} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // ✅ NEW - Volunteer Slots
+    match /volunteer_slots/{id} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+
+      match /signups/{userId} {
+        allow read: if true;
+        allow create: if request.auth != null && request.auth.uid == userId;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // ✅ NEW - Announcements
+    match /announcements/{id} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ✅ NEW - Giving/Donations
+    match /giving/{id} {
+      allow create: if request.auth != null;
+      allow read: if isAdmin() || 
+                   (request.auth != null && request.auth.uid == resource.data.userId);
+      allow update, delete: if isAdmin();
     }
   }
 }

@@ -21,8 +21,9 @@ import { formatDistanceToNow } from 'date-fns';
 
 const prayerSchema = z.object({
     name: z.string().optional(),
+    phone: z.string().optional(),
     request: z.string().min(10, 'Prayer request must be at least 10 characters.'),
-    category: z.enum(['Health', 'Family', 'Gratitude', 'General']),
+    category: z.string().min(2, 'Please enter a category'),
     anonymous: z.boolean().default(false),
 });
 
@@ -46,8 +47,9 @@ export default function PrayerRequestsPage() {
         resolver: zodResolver(prayerSchema),
         defaultValues: {
             name: '',
+            phone: '',
             request: '',
-            category: 'General',
+            category: '',
             anonymous: false,
         }
     });
@@ -58,8 +60,11 @@ export default function PrayerRequestsPage() {
 
         try {
             await addDoc(collection(firestore, 'prayer_requests'), {
-                ...values,
                 name: values.anonymous ? 'Anonymous' : (values.name || 'Member'),
+                phone: values.anonymous ? null : (values.phone || null),
+                request: values.request || '',
+                category: values.category || 'General',
+                anonymous: values.anonymous || false,
                 status: 'pending',
                 createdAt: serverTimestamp(),
                 prayerCount: 0,
@@ -108,32 +113,31 @@ export default function PrayerRequestsPage() {
                                 <Form {...form}>
                                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                                         {!form.watch('anonymous') && (
-                                            <FormField control={form.control} name="name" render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel className="font-bold">Your Name</FormLabel>
-                                                    <FormControl><Input placeholder="E.g., John Doe" {...field} /></FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )} />
+                                            <>
+                                                <FormField control={form.control} name="name" render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel className="font-bold">Your Name</FormLabel>
+                                                        <FormControl><Input placeholder="E.g., John Doe" {...field} /></FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )} />
+                                                <FormField control={form.control} name="phone" render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel className="font-bold">Phone Number</FormLabel>
+                                                        <FormControl><Input placeholder="e.g. 0712 345 678" {...field} /></FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )} />
+                                            </>
                                         )}
 
                                         <FormField control={form.control} name="category" render={({ field }) => (
                                             <FormItem>
-                                                <FormLabel className="font-bold">Category</FormLabel>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {['Health', 'Family', 'Gratitude', 'General'].map((cat) => (
-                                                        <Button 
-                                                            key={cat} 
-                                                            type="button" 
-                                                            variant={field.value === cat ? 'default' : 'outline'}
-                                                            size="sm"
-                                                            className="rounded-full"
-                                                            onClick={() => field.onChange(cat)}
-                                                        >
-                                                            {cat}
-                                                        </Button>
-                                                    ))}
-                                                </div>
+                                                <FormLabel className="font-bold">Prayer Category</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g. Health, Marriage, Business, Studies..." {...field} />
+                                                </FormControl>
+                                                <FormDescription className="text-[10px]">Type your own category</FormDescription>
                                                 <FormMessage />
                                             </FormItem>
                                         )} />
