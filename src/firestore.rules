@@ -78,38 +78,23 @@ service cloud.firestore {
                              (request.auth != null && request.auth.uid == resource.data.authorId);
     }
 
-    // ✅ NEW - Prayer Requests
+    // FEATURE 1: PRAYER REQUESTS
     match /prayer_requests/{id} {
-      allow read: if true;
       allow create: if true;
-      allow update: if true;
+      allow read: if true;
+      allow update: if true; // allow incrementing prayerCount
       allow delete: if isAdmin();
     }
 
-    // ✅ NEW - Volunteer Slots
+    // FEATURE 2: VOLUNTEER SLOTS
     match /volunteer_slots/{id} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
-
+      allow write: if isAdmin();
+      
       match /signups/{userId} {
         allow read: if true;
-        allow create: if request.auth != null && request.auth.uid == userId;
-        allow delete: if request.auth != null && request.auth.uid == userId;
+        allow create, delete: if request.auth != null && request.auth.uid == userId;
       }
-    }
-
-    // ✅ NEW - Announcements
-    match /announcements/{id} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
-    }
-
-    // ✅ NEW - Giving/Donations
-    match /giving/{id} {
-      allow create: if request.auth != null;
-      allow read: if isAdmin() || 
-                   (request.auth != null && request.auth.uid == resource.data.userId);
-      allow update, delete: if isAdmin();
     }
   }
 }

@@ -11,10 +11,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Calendar, Info, ShieldCheck, Share2, Facebook, MessageCircle, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Calendar, Info, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
-import { useToast } from '@/hooks/use-toast';
 
 const roleMapping: Record<string, string> = {
     admin: "St. Martin De Porres Admin",
@@ -49,8 +48,6 @@ export default function BulletinPostPage() {
   const params = useParams();
   const id = params?.id as string;
   const firestore = useFirestore();
-  const { toast } = useToast();
-  const [copied, setCopied] = useState(false);
   
   const postRef = useMemoFirebase(() => {
     if (!firestore || !id) return null;
@@ -77,23 +74,6 @@ export default function BulletinPostPage() {
     }
     return author.name || "Parish Member";
   }, [author, authorLoading]);
-
-  const shareOnWhatsApp = () => {
-    const url = window.location.href;
-    window.open(`https://wa.me/?text=${encodeURIComponent(`${post?.title} - ${url}`)}`, '_blank');
-  };
-
-  const shareOnFacebook = () => {
-    const url = window.location.href;
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
-  };
-
-  const copyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    toast({ title: 'Link Copied!' });
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   if (isLoading) {
     return (
@@ -159,20 +139,6 @@ export default function BulletinPostPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-8 md:p-12">
-                    {/* Feature 5: Social Sharing Bar */}
-                    <div className="flex items-center gap-3 mb-10 pb-6 border-b border-dashed">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mr-4">Share This Update:</span>
-                        <Button variant="outline" size="icon" className="rounded-full h-10 w-10 border-2 hover:bg-green-500 hover:text-white hover:border-green-500" onClick={shareOnWhatsApp}>
-                            <MessageCircle className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" className="rounded-full h-10 w-10 border-2 hover:bg-blue-600 hover:text-white hover:border-blue-600" onClick={shareOnFacebook}>
-                            <Facebook className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" className="rounded-full h-10 w-10 border-2" onClick={copyLink}>
-                            {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
-                        </Button>
-                    </div>
-
                     <div 
                         className="prose prose-lg md:prose-xl dark:prose-invert max-w-none text-foreground/90 leading-relaxed" 
                         dangerouslySetInnerHTML={{ __html: post.content }} 

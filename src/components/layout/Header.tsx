@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, User, Shield, LogOut, MessageCircle, Bell } from 'lucide-react';
+import { Menu, User, Shield, LogOut, MessageCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { signOut as firebaseSignOut } from 'firebase/auth';
-import { useAuth, useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, query, orderBy, limit } from 'firebase/firestore';
-import type { SiteSettings, RegisteredUser, Announcement } from '@/lib/types';
+import { useAuth, useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import type { SiteSettings, RegisteredUser } from '@/lib/types';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -30,8 +30,6 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-
 
 const navLinks = [
     { href: '/', label: 'Home' },
@@ -45,7 +43,6 @@ const navLinks = [
     { href: '/volunteer', label: 'Volunteer' },
     { href: '/bible-readings', label: 'Bible Readings' },
     { href: '/documents', label: 'Documents' },
-    { href: '/give', label: 'Give' },
     { href: '/contact', label: 'Contact' },
   ];
 
@@ -64,14 +61,9 @@ export function Header() {
   const userDocRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<RegisteredUser>(userDocRef);
 
-  // Notifications logic
-  const announcementsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'announcements'), orderBy('createdAt', 'desc'), limit(5)) : null, [firestore]);
-  const { data: recentAnnouncements } = useCollection<Announcement>(announcementsQuery);
-
   useEffect(() => {
     setIsClient(true);
   }, []);
-
 
   const handleLogout = async () => {
     if (!auth) return;
@@ -85,48 +77,12 @@ export function Header() {
 
   const isRealUser = user && !user.isAnonymous;
 
-  // Identity logic: Use masked name if hideRealName is true
   const displayIdentity = userProfile?.hideRealName 
     ? `St. Martin De Porres ${userProfile.customTitle || 'Admin'}`
     : (userProfile?.name || user?.displayName || user?.email?.split('@')[0] || 'Member');
 
   const userNavigation = (
     <div className="flex items-center gap-4">
-      {/* Feature 4: Notification Bell */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full">
-            <Bell className="h-5 w-5" />
-            {recentAnnouncements && recentAnnouncements.length > 0 && (
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full border-2 border-white" />
-            )}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-80">
-          <DropdownMenuLabel>Recent Announcements</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <ScrollArea className="h-64">
-            {recentAnnouncements?.length === 0 ? (
-              <div className="p-4 text-center text-xs text-muted-foreground">No recent announcements</div>
-            ) : (
-              recentAnnouncements?.map((a) => (
-                <DropdownMenuItem key={a.id} className="flex flex-col items-start p-3 gap-1" onClick={() => router.push('/notifications')}>
-                  <div className="flex items-center justify-between w-full">
-                    <span className="font-bold text-sm truncate">{a.title}</span>
-                    <Badge variant="outline" className="text-[9px] uppercase h-4">{a.category}</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">{a.message}</p>
-                </DropdownMenuItem>
-              ))
-            )}
-          </ScrollArea>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem className="justify-center font-bold text-xs" onClick={() => router.push('/notifications')}>
-            View All History
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
       <TooltipProvider>
         <DropdownMenu>
           <Tooltip>
@@ -279,7 +235,6 @@ export function Header() {
                             </div>
                           </div>
                           <div className="flex flex-col gap-2">
-                            <Button variant="outline" asChild><Link href="/notifications" onClick={() => setSheetOpen(false)}>Announcements</Link></Button>
                             <Button variant="outline" asChild><Link href="/register-profile" onClick={() => setSheetOpen(false)}>My Profile</Link></Button>
                             <Button variant="outline" asChild><Link href="/chat" onClick={() => setSheetOpen(false)}>Private Chat</Link></Button>
                             <Button variant="outline" asChild><Link href="/admin" onClick={() => setSheetOpen(false)}>Admin Portal</Link></Button>
@@ -293,9 +248,6 @@ export function Header() {
                         </div>
                       )}
                     </div>
-                    <Link href="/give" passHref>
-                        <Button className="w-full" variant="default" onClick={() => setSheetOpen(false)}>Give Online</Button>
-                    </Link>
                   </div>
                 </ScrollArea>
               </SheetContent>
