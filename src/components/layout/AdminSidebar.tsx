@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Calendar, Users, FileText, Church, Briefcase, BookOpen, LogOut, Menu, CreditCard, UserCheck, Newspaper, Clock, MapPin, Palette, DollarSign, MessageSquare, Mail, Share2 } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, FileText, Church, Briefcase, BookOpen, LogOut, Menu, CreditCard, UserCheck, Newspaper, Clock, MapPin, Palette, DollarSign, MessageSquare, Mail, Share2, Heart, Bell } from 'lucide-react';
 import { useState } from 'react';
 import { useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
@@ -16,6 +16,9 @@ const adminNavLinks = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/messages', label: 'Messages', icon: MessageSquare },
   { href: '/admin/inquiries', label: 'Inquiries', icon: Mail },
+  { href: '/admin/prayer-requests', label: 'Prayer Requests', icon: Heart },
+  { href: '/admin/volunteers', label: 'Volunteers', icon: Users },
+  { href: '/admin/notifications', label: 'Notifications', icon: Bell },
   { href: '/admin/financials', label: 'Financial Ledger', icon: DollarSign },
   { href: '/admin/events', label: 'Events', icon: Calendar },
   { href: '/admin/bulletin', label: 'Bulletin', icon: Newspaper },

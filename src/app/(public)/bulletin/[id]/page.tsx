@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
@@ -11,9 +11,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Calendar, Info, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Calendar, Info, ShieldCheck, Share2, Facebook, MessageCircle, Copy, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 const roleMapping: Record<string, string> = {
     admin: "St. Martin De Porres Admin",
@@ -48,6 +49,8 @@ export default function BulletinPostPage() {
   const params = useParams();
   const id = params?.id as string;
   const firestore = useFirestore();
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
   
   const postRef = useMemoFirebase(() => {
     if (!firestore || !id) return null;
@@ -64,9 +67,6 @@ export default function BulletinPostPage() {
 
   const { data: author, isLoading: authorLoading } = useDoc<RegisteredUser>(authorRef);
 
-  /**
-   * Title Case Role Mapping
-   */
   const displayAuthorTitle = useMemo(() => {
     if (authorLoading) return "Loading...";
     if (!author) return "St. Martin De Porres Admin";
@@ -77,6 +77,23 @@ export default function BulletinPostPage() {
     }
     return author.name || "Parish Member";
   }, [author, authorLoading]);
+
+  const shareOnWhatsApp = () => {
+    const url = window.location.href;
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${post?.title} - ${url}`)}`, '_blank');
+  };
+
+  const shareOnFacebook = () => {
+    const url = window.location.href;
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    toast({ title: 'Link Copied!' });
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   if (isLoading) {
     return (
@@ -110,7 +127,7 @@ export default function BulletinPostPage() {
     <div className="bg-transparent pb-20 animate-in fade-in duration-700">
       <PageHeader title={post.title} subtitle={`Community Update`} />
       <section className="py-8">
-        <div className="container max-w-24xl mx-auto px-4 space-y-10">
+        <div className="container max-w-4xl mx-auto px-4 space-y-10">
             <Button asChild variant="ghost" className="hover:bg-primary/10 rounded-full group">
                 <Link href="/bulletin">
                     <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1"/> 
@@ -123,7 +140,6 @@ export default function BulletinPostPage() {
                     <Badge variant="secondary" className="w-fit mb-6 px-4 py-1 uppercase tracking-widest text-[10px] font-black">{post.category}</Badge>
                     <CardTitle className="text-4xl lg:text-6xl font-black tracking-tight !mt-0 leading-[1.1]">{post.title}</CardTitle>
                     <div className="flex flex-wrap items-center gap-6 mt-10">
-                        {/* Refined Official Author Display */}
                         <div className="flex items-center gap-3 bg-white/50 px-4 py-2 rounded-full border border-primary/10 shadow-sm transition-all hover:bg-white hover:shadow-md">
                             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
                                 <ShieldCheck className="h-5 w-5" />
@@ -143,7 +159,20 @@ export default function BulletinPostPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-8 md:p-12">
-                    {/* Content Area - Images embedded here will be the only ones shown */}
+                    {/* Feature 5: Social Sharing Bar */}
+                    <div className="flex items-center gap-3 mb-10 pb-6 border-b border-dashed">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mr-4">Share This Update:</span>
+                        <Button variant="outline" size="icon" className="rounded-full h-10 w-10 border-2 hover:bg-green-500 hover:text-white hover:border-green-500" onClick={shareOnWhatsApp}>
+                            <MessageCircle className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="icon" className="rounded-full h-10 w-10 border-2 hover:bg-blue-600 hover:text-white hover:border-blue-600" onClick={shareOnFacebook}>
+                            <Facebook className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="icon" className="rounded-full h-10 w-10 border-2" onClick={copyLink}>
+                            {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                    </div>
+
                     <div 
                         className="prose prose-lg md:prose-xl dark:prose-invert max-w-none text-foreground/90 leading-relaxed" 
                         dangerouslySetInnerHTML={{ __html: post.content }} 

@@ -118,5 +118,30 @@ service cloud.firestore {
       allow update, delete: if isAdmin() || 
                              (request.auth != null && request.auth.uid == resource.data.authorId);
     }
+
+    // FEATURE 1: PRAYER REQUESTS
+    match /prayer_requests/{id} {
+      allow create: if true;
+      allow read: if true;
+      allow update: if true; // allow incrementing prayerCount
+      allow delete: if isAdmin();
+    }
+
+    // FEATURE 2: VOLUNTEER SLOTS
+    match /volunteer_slots/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+      
+      match /signups/{userId} {
+        allow read: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+        allow create, delete: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // FEATURE 4: ANNOUNCEMENTS
+    match /announcements/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }

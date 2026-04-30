@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, User, Shield, LogOut, MessageCircle } from 'lucide-react';
+import { Menu, User, Shield, LogOut, MessageCircle, Bell } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { signOut as firebaseSignOut, User as FirebaseUser } from 'firebase/auth';
-import { useAuth, useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import type { SiteSettings, RegisteredUser } from '@/lib/types';
+import { signOut as firebaseSignOut } from 'firebase/auth';
+import { useAuth, useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, query, orderBy, limit } from 'firebase/firestore';
+import type { SiteSettings, RegisteredUser, Announcement } from '@/lib/types';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 
 
 const navLinks = [
@@ -40,9 +41,11 @@ const navLinks = [
     { href: '/community', label: 'Community' },
     { href: '/ministries', label: 'Ministries' },
     { href: '/development', label: 'Development' },
+    { href: '/prayer-requests', label: 'Prayer' },
+    { href: '/volunteer', label: 'Volunteer' },
     { href: '/bible-readings', label: 'Bible Readings' },
     { href: '/documents', label: 'Documents' },
-    { href: '/payments', label: 'Payments' },
+    { href: '/give', label: 'Give' },
     { href: '/contact', label: 'Contact' },
   ];
 
@@ -60,6 +63,10 @@ export function Header() {
 
   const userDocRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<RegisteredUser>(userDocRef);
+
+  // Notifications logic
+  const announcementsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'announcements'), orderBy('createdAt', 'desc'), limit(5)) : null, [firestore]);
+  const { data: recentAnnouncements } = useCollection<Announcement>(announcementsQuery);
 
   useEffect(() => {
     setIsClient(true);
@@ -84,74 +91,111 @@ export function Header() {
     : (userProfile?.name || user?.displayName || user?.email?.split('@')[0] || 'Member');
 
   const userNavigation = (
-    <TooltipProvider>
+    <div className="flex items-center gap-4">
+      {/* Feature 4: Notification Bell */}
       <DropdownMenu>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0 overflow-hidden border-2 border-primary/10">
-                <Avatar className="h-full w-full">
-                  <AvatarImage 
-                    src={user?.photoURL || userProfile?.photoURL || undefined} 
-                    alt={displayIdentity} 
-                    className="object-cover"
-                  />
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
-                    {displayIdentity.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-          </TooltipTrigger>
-          {isRealUser && (
-            <TooltipContent>
-              <p>{displayIdentity}</p>
-            </TooltipContent>
-          )}
-        </Tooltip>
-        <DropdownMenuContent className="w-56" align="end" forceMount>
-          {isRealUser ? (
-            <>
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{displayIdentity}</p>
-                  {user.email && <p className="text-xs leading-none text-muted-foreground">
-                    {user.email}
-                  </p>}
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-               <DropdownMenuItem onSelect={() => router.push('/register-profile')}>
-                <User className="mr-2 h-4 w-4" />
-                <span>My Profile</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => router.push('/chat')}>
-                <MessageCircle className="mr-2 h-4 w-4" />
-                <span>Private Chat</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => router.push('/admin')}>
-                <Shield className="mr-2 h-4 w-4" />
-                <span>Admin</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
-              </DropdownMenuItem>
-            </>
-          ) : (
-            <>
-              <DropdownMenuItem onSelect={() => router.push('/login')}>
-                Sign In
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => router.push('/signup')}>
-                Sign Up
-              </DropdownMenuItem>
-            </>
-          )}
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full">
+            <Bell className="h-5 w-5" />
+            {recentAnnouncements && recentAnnouncements.length > 0 && (
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full border-2 border-white" />
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-80">
+          <DropdownMenuLabel>Recent Announcements</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <ScrollArea className="h-64">
+            {recentAnnouncements?.length === 0 ? (
+              <div className="p-4 text-center text-xs text-muted-foreground">No recent announcements</div>
+            ) : (
+              recentAnnouncements?.map((a) => (
+                <DropdownMenuItem key={a.id} className="flex flex-col items-start p-3 gap-1" onClick={() => router.push('/notifications')}>
+                  <div className="flex items-center justify-between w-full">
+                    <span className="font-bold text-sm truncate">{a.title}</span>
+                    <Badge variant="outline" className="text-[9px] uppercase h-4">{a.category}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{a.message}</p>
+                </DropdownMenuItem>
+              ))
+            )}
+          </ScrollArea>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="justify-center font-bold text-xs" onClick={() => router.push('/notifications')}>
+            View All History
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </TooltipProvider>
+
+      <TooltipProvider>
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0 overflow-hidden border-2 border-primary/10">
+                  <Avatar className="h-full w-full">
+                    <AvatarImage 
+                      src={user?.photoURL || userProfile?.photoURL || undefined} 
+                      alt={displayIdentity} 
+                      className="object-cover"
+                    />
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                      {displayIdentity.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            {isRealUser && (
+              <TooltipContent>
+                <p>{displayIdentity}</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+          <DropdownMenuContent className="w-56" align="end" forceMount>
+            {isRealUser ? (
+              <>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{displayIdentity}</p>
+                    {user.email && <p className="text-xs leading-none text-muted-foreground">
+                      {user.email}
+                    </p>}
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                 <DropdownMenuItem onSelect={() => router.push('/register-profile')}>
+                  <User className="mr-2 h-4 w-4" />
+                  <span>My Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push('/chat')}>
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  <span>Private Chat</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push('/admin')}>
+                  <Shield className="mr-2 h-4 w-4" />
+                  <span>Admin</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem onSelect={() => router.push('/login')}>
+                  Sign In
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push('/signup')}>
+                  Sign Up
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TooltipProvider>
+    </div>
   );
   
   return (
@@ -166,7 +210,7 @@ export function Header() {
             {settings?.brandName || 'St. Martin De Porres'}
           </span>
         </Link>
-        <nav className="hidden lg:flex gap-6 overflow-x-auto no-scrollbar">
+        <nav className="hidden xl:flex gap-6 overflow-x-auto no-scrollbar">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -187,7 +231,7 @@ export function Header() {
           {isClient ? (
             <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden text-[#1e3a5f]">
+                <Button variant="ghost" size="icon" className="xl:hidden text-[#1e3a5f]">
                   <Menu className="h-6 w-6" />
                   <span className="sr-only">Open menu</span>
                 </Button>
@@ -235,6 +279,7 @@ export function Header() {
                             </div>
                           </div>
                           <div className="flex flex-col gap-2">
+                            <Button variant="outline" asChild><Link href="/notifications" onClick={() => setSheetOpen(false)}>Announcements</Link></Button>
                             <Button variant="outline" asChild><Link href="/register-profile" onClick={() => setSheetOpen(false)}>My Profile</Link></Button>
                             <Button variant="outline" asChild><Link href="/chat" onClick={() => setSheetOpen(false)}>Private Chat</Link></Button>
                             <Button variant="outline" asChild><Link href="/admin" onClick={() => setSheetOpen(false)}>Admin Portal</Link></Button>
@@ -248,15 +293,15 @@ export function Header() {
                         </div>
                       )}
                     </div>
-                    <Link href="/payments" passHref>
-                        <Button className="w-full" variant="default" onClick={() => setSheetOpen(false)}>Donate Now</Button>
+                    <Link href="/give" passHref>
+                        <Button className="w-full" variant="default" onClick={() => setSheetOpen(false)}>Give Online</Button>
                     </Link>
                   </div>
                 </ScrollArea>
               </SheetContent>
             </Sheet>
           ) : (
-            <Button variant="ghost" size="icon" className="lg:hidden">
+            <Button variant="ghost" size="icon" className="xl:hidden">
               <Menu className="h-6 w-6" />
               <span className="sr-only">Open menu</span>
             </Button>

@@ -8,10 +8,13 @@ import {
     Clock, 
     ChevronRight, 
     Users, 
+    X,
+    Megaphone,
+    Bell
 } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, limit, doc, where } from 'firebase/firestore';
-import type { Event, BulletinPost, Profile, CommunityGroup, DevelopmentProject, SiteSettings, Mass } from '@/lib/types';
+import type { Event, BulletinPost, Profile, CommunityGroup, DevelopmentProject, SiteSettings, Mass, Announcement } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +24,47 @@ import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDistanceToNow } from 'date-fns';
 import { resolveMediaUrl } from '@/lib/upload-utils';
 import { getDisplayNameFromRole } from '@/lib/roleMapping';
+import { useState } from 'react';
+
+function AnnouncementBanner() {
+    const firestore = useFirestore();
+    const [dismissed, setDismissed] = useState(false);
+    
+    const announcementsQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'announcements'), orderBy('createdAt', 'desc'), limit(1));
+    }, [firestore]);
+
+    const { data: latestAnnouncement } = useCollection<Announcement>(announcementsQuery);
+
+    if (dismissed || !latestAnnouncement || latestAnnouncement.length === 0) return null;
+
+    const announcement = latestAnnouncement[0];
+
+    return (
+        <div className="bg-primary text-white py-4 px-6 relative animate-in slide-in-from-top duration-500">
+            <div className="container max-w-7xl mx-auto flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <Megaphone className="h-6 w-6 flex-shrink-0 animate-bounce" />
+                    <div>
+                        <p className="text-xs font-black uppercase tracking-[0.2em] opacity-80">{announcement.category}</p>
+                        <p className="font-bold text-sm sm:text-lg leading-tight">
+                            {announcement.title}: <span className="font-medium opacity-90">{announcement.message}</span>
+                        </p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button asChild size="sm" variant="secondary" className="h-8 rounded-full font-bold text-[10px]">
+                        <Link href="/notifications">HISTORY</Link>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 rounded-full" onClick={() => setDismissed(true)}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 function HeroSection() {
     const firestore = useFirestore();
@@ -374,6 +418,7 @@ export default function HomePage() {
 
     return (
         <div className="flex flex-col bg-transparent">
+            <AnnouncementBanner />
             <HeroSection />
             <MassScheduleSection settings={settings || undefined} isLoading={isLoading} />
             <UpcomingEvents settings={settings || undefined} isLoading={isLoading} />
@@ -396,7 +441,7 @@ export default function HomePage() {
                                 <Link href="/signup">{settings?.parishCtaButton1 || 'Become a Member'}</Link>
                             </Button>
                             <Button asChild size="lg" variant="outline" className="rounded-full px-12 h-16 text-lg font-black border-2 hover:bg-muted transition-all">
-                                <Link href="/payments">{settings?.parishCtaButton2 || 'Support Our Mission'}</Link>
+                                <Link href="/give">{settings?.parishCtaButton2 || 'Give Online'}</Link>
                             </Button>
                         </div>
                     </div>

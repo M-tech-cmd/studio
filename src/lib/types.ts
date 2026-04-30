@@ -177,6 +177,45 @@ export type Inquiry = {
   replyMessage?: string | null;
 };
 
+export type PrayerRequest = {
+  id: string;
+  name?: string;
+  request: string;
+  category: 'Health' | 'Family' | 'Gratitude' | 'General';
+  anonymous: boolean;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: Timestamp;
+  prayerCount: number;
+};
+
+export type VolunteerSlot = {
+  id: string;
+  title: string;
+  description: string;
+  date: Timestamp | Date;
+  time: string;
+  location: string;
+  spotsAvailable: number;
+  category: string;
+  createdAt: Timestamp;
+};
+
+export type VolunteerSignup = {
+  id: string; // userId
+  name: string;
+  email: string;
+  timestamp: Timestamp;
+};
+
+export type Announcement = {
+  id: string;
+  title: string;
+  message: string;
+  category: 'Alert' | 'News' | 'Service';
+  targetAudience: 'all' | 'members';
+  createdAt: Timestamp;
+};
+
 export type SiteSettings = {
   id: string;
   brandName?: string;
@@ -248,6 +287,12 @@ export type SiteSettings = {
 
   // Map settings
   googleMapsEmbedUrl?: string;
+
+  // Feature 5: Social URLs
+  facebookUrl?: string;
+  twitterUrl?: string;
+  youtubeUrl?: string;
+  instagramUrl?: string;
 };
 
 export type ReactionType = 'amen' | 'blessed' | 'hallelujah';

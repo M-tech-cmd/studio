@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { RotateCcw, Palette as PaletteIcon, Loader2, Zap } from 'lucide-react';
+import { RotateCcw, Palette as PaletteIcon, Loader2, Zap, Share2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { useRouter } from 'next/navigation';
@@ -81,6 +81,12 @@ const brandingSchema = z.object({
   paymentsTitle: z.string().optional(), paymentsDescription: z.string().optional(), paymentsTitleColor: z.string().optional(), paymentsDescriptionColor: z.string().optional(), paymentsBoxColor: z.string().optional(),
   contactTitle: z.string().optional(), contactDescription: z.string().optional(), contactTitleColor: z.string().optional(), contactDescriptionColor: z.string().optional(), contactBoxColor: z.string().optional(),
   aboutUsTitle: z.string().optional(), aboutUsDescription: z.string().optional(), aboutUsTitleColor: z.string().optional(), aboutUsDescriptionColor: z.string().optional(), aboutUsBoxColor: z.string().optional(),
+
+  // Feature 5: Social URLs
+  facebookUrl: z.string().url().optional().or(z.literal('')),
+  twitterUrl: z.string().url().optional().or(z.literal('')),
+  youtubeUrl: z.string().url().optional().or(z.literal('')),
+  instagramUrl: z.string().url().optional().or(z.literal('')),
 });
 
 const contentSchema = z.object({
@@ -218,6 +224,10 @@ export default function BrandingPage() {
             paymentsBoxColor: '',
             contactBoxColor: '',
             aboutUsBoxColor: '',
+            facebookUrl: '',
+            twitterUrl: '',
+            youtubeUrl: '',
+            instagramUrl: '',
         }
     });
 
@@ -256,6 +266,10 @@ export default function BrandingPage() {
                 paymentsBoxColor: settings.paymentsBoxColor || '',
                 contactBoxColor: settings.contactBoxColor || '',
                 aboutUsBoxColor: settings.aboutUsBoxColor || '',
+                facebookUrl: settings.facebookUrl || '',
+                twitterUrl: settings.twitterUrl || '',
+                youtubeUrl: settings.youtubeUrl || '',
+                instagramUrl: settings.instagramUrl || '',
             });
         }
     }, [settings, form]);
@@ -525,6 +539,20 @@ export default function BrandingPage() {
                                         <div className="grid md:grid-cols-2 gap-6">
                                             <FormField control={form.control} name="parishCtaButton1" render={({field}) => <FormItem><FormLabel>Button 1 Label</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Become a Member" /></FormControl></FormItem>} />
                                             <FormField control={form.control} name="parishCtaButton2" render={({field}) => <FormItem><FormLabel>Button 2 Label</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Support Our Mission" /></FormControl></FormItem>} />
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Feature 5: Social Media Links */}
+                                    <div className="pt-10 border-t-4 border-primary/10 space-y-6">
+                                        <div className="mb-4"><h3 className="text-xl font-black uppercase tracking-tighter text-primary flex items-center gap-2">
+                                            <Share2 className="h-5 w-5" />
+                                            Official Social Links
+                                        </h3></div>
+                                        <div className="grid md:grid-cols-2 gap-6">
+                                            <FormField control={form.control} name="facebookUrl" render={({field}) => <FormItem><FormLabel>Facebook URL</FormLabel><FormControl><Input {...field} placeholder="https://facebook.com/parish" /></FormControl></FormItem>} />
+                                            <FormField control={form.control} name="twitterUrl" render={({field}) => <FormItem><FormLabel>Twitter URL</FormLabel><FormControl><Input {...field} placeholder="https://twitter.com/parish" /></FormControl></FormItem>} />
+                                            <FormField control={form.control} name="youtubeUrl" render={({field}) => <FormItem><FormLabel>YouTube URL</FormLabel><FormControl><Input {...field} placeholder="https://youtube.com/@parish" /></FormControl></FormItem>} />
+                                            <FormField control={form.control} name="instagramUrl" render={({field}) => <FormItem><FormLabel>Instagram URL</FormLabel><FormControl><Input {...field} placeholder="https://instagram.com/parish" /></FormControl></FormItem>} />
                                         </div>
                                     </div>
                                 </CardContent>
