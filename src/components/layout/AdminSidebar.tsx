@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Calendar, Users, FileText, Church, Briefcase, BookOpen, LogOut, Menu, CreditCard, UserCheck, Newspaper, Clock, MapPin, Palette, DollarSign, MessageSquare, Mail, Share2, Heart } from 'lucide-react';
+import { LayoutDashboard, Calendar, Users, FileText, Church, Briefcase, BookOpen, LogOut, Menu, CreditCard, UserCheck, Newspaper, Clock, MapPin, Palette, DollarSign, MessageSquare, Mail, Share2, Heart, Bell } from 'lucide-react';
 import { useState } from 'react';
 import { useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, collection, query, where } from 'firebase/firestore';
@@ -49,6 +49,22 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void; }) {
   const { data: unreadInquiries } = useCollection(unreadInquiriesQuery);
   const unreadCount = unreadInquiries?.length || 0;
 
+  // Pending Prayer Requests Badge Logic
+  const pendingPrayersQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'prayer_requests'), where('status', '==', 'pending'));
+  }, [firestore]);
+  const { data: pendingPrayers } = useCollection(pendingPrayersQuery);
+  const pendingPrayerCount = pendingPrayers?.length || 0;
+
+  // Volunteer Opportunities Badge Logic
+  const volunteerSlotsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'volunteer_slots');
+  }, [firestore]);
+  const { data: volunteerSlots } = useCollection(volunteerSlotsQuery);
+  const volunteerCount = volunteerSlots?.length || 0;
+
   return (
     <>
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 md:hidden">
@@ -72,7 +88,12 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void; }) {
                     <SidebarLink 
                       key={link.href + link.label} 
                       {...link} 
-                      badge={link.label === 'Inquiries' ? unreadCount : 0}
+                      badge={
+                        link.label === 'Inquiries' ? unreadCount : 
+                        link.label === 'Prayer Requests' ? pendingPrayerCount :
+                        link.label === 'Volunteers' ? volunteerCount :
+                        0
+                      }
                       onClick={() => isSheetOpen && setSheetOpen(false)} 
                     />
                 ))}
@@ -98,7 +119,12 @@ export function AdminSidebar({ onLogout }: { onLogout: () => void; }) {
                     <SidebarLink 
                       key={link.href + link.label} 
                       {...link} 
-                      badge={link.label === 'Inquiries' ? unreadCount : 0}
+                      badge={
+                        link.label === 'Inquiries' ? unreadCount : 
+                        link.label === 'Prayer Requests' ? pendingPrayerCount :
+                        link.label === 'Volunteers' ? volunteerCount :
+                        0
+                      }
                     />
                 ))}
             </nav>

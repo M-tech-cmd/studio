@@ -119,11 +119,11 @@ service cloud.firestore {
                              (request.auth != null && request.auth.uid == resource.data.authorId);
     }
 
-    // FEATURE 1: PRAYER REQUESTS
+    // FEATURE 1: PRAYER REQUESTS (User Owned / Admin Controlled)
     match /prayer_requests/{id} {
       allow create: if true;
-      allow read: if true;
-      allow update: if true; // allow incrementing prayerCount
+      allow read: if true; // Temporarily open for migration fallback
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
@@ -136,12 +136,6 @@ service cloud.firestore {
         allow read: if isAdmin() || (request.auth != null && request.auth.uid == userId);
         allow create, delete: if request.auth != null && request.auth.uid == userId;
       }
-    }
-
-    // FEATURE 4: ANNOUNCEMENTS
-    match /announcements/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
     }
   }
 }

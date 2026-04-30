@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Heart, User, Send, Loader2, Info, Clock, CheckCircle2, XCircle, LogIn } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase, useAuth } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query, where, orderBy } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import type { PrayerRequest } from '@/lib/types';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -35,17 +35,21 @@ export default function PrayerRequestsPage() {
     const { user } = useAuth();
     const [isSubmitting, setIsSaving] = useState(false);
 
-    // Only fetch current user's prayers
+    // Fetch all prayers and filter in code to support legacy data without userId
     const prayerQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
+        if (!firestore) return null;
         return query(
             collection(firestore, 'prayer_requests'),
-            where('userId', '==', user.uid),
             orderBy('createdAt', 'desc')
         );
-    }, [firestore, user]);
+    }, [firestore]);
 
-    const { data: myPrayers, isLoading } = useCollection<PrayerRequest>(prayerQuery);
+    const { data: prayers, isLoading } = useCollection<PrayerRequest>(prayerQuery);
+
+    const myPrayers = prayers?.filter(p => 
+      p.userId === user?.uid || 
+      (p as any).email === user?.email
+    );
 
     const form = useForm<z.infer<typeof prayerSchema>>({
         resolver: zodResolver(prayerSchema),
@@ -70,6 +74,7 @@ export default function PrayerRequestsPage() {
                 category: values.category || 'General',
                 anonymous: values.anonymous || false,
                 userId: user?.uid || null,
+                email: user?.email || null, // Storing email for legacy matching fallback
                 status: 'pending',
                 createdAt: serverTimestamp(),
                 prayerCount: 0,

@@ -30,7 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, query, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
-import type { Event, RegisteredUser, FinancialEntry, SiteSettings, DevelopmentProject, MemberProfile, CommunityGroup } from '@/lib/types';
+import type { Event, RegisteredUser, FinancialEntry, SiteSettings, DevelopmentProject, MemberProfile, CommunityGroup, PrayerRequest, VolunteerSlot } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { GrowthChart } from '@/components/admin/GrowthChart';
@@ -72,6 +72,9 @@ function DashboardContent() {
     const financialQuery = useMemoFirebase(() => firestore ? collection(firestore, 'financial_ledger') : null, [firestore]);
     const membersQuery = useMemoFirebase(() => firestore ? collection(firestore, 'members') : null, [firestore]);
     const recentEventsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'events'), orderBy('date', 'desc'), limit(3)) : null, [firestore]);
+    
+    const prayerQuery = useMemoFirebase(() => firestore ? collection(firestore, 'prayer_requests') : null, [firestore]);
+    const volunteerQuery = useMemoFirebase(() => firestore ? collection(firestore, 'volunteer_slots') : null, [firestore]);
 
     const { data: events, isLoading: eventsLoading } = useCollection(eventsQuery);
     const { data: communityGroups, isLoading: communityGroupsLoading } = useCollection<CommunityGroup>(communityGroupsQuery);
@@ -80,6 +83,8 @@ function DashboardContent() {
     const { data: financials, isLoading: financialLoading } = useCollection<FinancialEntry>(financialQuery);
     const { data: members, isLoading: membersLoading } = useCollection<MemberProfile>(membersQuery);
     const { data: recentEvents, isLoading: recentEventsLoading } = useCollection<Event>(recentEventsQuery);
+    const { data: prayers, isLoading: prayersLoading } = useCollection<PrayerRequest>(prayerQuery);
+    const { data: volunteers, isLoading: volunteersLoading } = useCollection<VolunteerSlot>(volunteerQuery);
 
     // Dynamic Financial Calculations
     const financialsSummary = useMemo(() => {
@@ -94,6 +99,9 @@ function DashboardContent() {
         });
         return summary;
     }, [financials]);
+
+    const pendingPrayers = prayers?.filter(p => p.status === 'pending')?.length || 0;
+    const openVolunteers = volunteers?.length || 0;
 
     // Demographic Calculations (Updated for Group Affiliation Mapping)
     const demographics = useMemo(() => {
@@ -145,7 +153,7 @@ function DashboardContent() {
             .finally(() => setIsSavingStatus(false));
     }
 
-    const loading = userIsLoading || eventsLoading || communityGroupsLoading || devProjectsLoading || usersLoading || financialLoading || settingsLoading || membersLoading;
+    const loading = userIsLoading || eventsLoading || communityGroupsLoading || devProjectsLoading || usersLoading || financialLoading || settingsLoading || membersLoading || prayersLoading || volunteersLoading;
 
     const stats = [
         { title: 'Total Revenue', value: formatCurrency(financialsSummary.total), icon: DollarSign, href: '/admin/financials', color: 'bg-emerald-600' },
@@ -179,12 +187,14 @@ function DashboardContent() {
                                 <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-primary/20">
                                     <UserIcon className="h-8 w-8" />
                                 </div>
-                                <div>
-                                    <p className="font-black text-2xl tracking-tighter leading-none">{displayIdentity}</p>
-                                    <Badge variant={isAdmin ? "destructive" : "secondary"} className="mt-2 uppercase font-black text-[9px] tracking-widest">
-                                        {isAdmin ? (userData?.role || 'Administrator').toUpperCase() : 'Staff User'}
-                                    </Badge>
-                                </div>
+                                {userIsLoading ? <Skeleton className="h-12 w-48" /> : (
+                                    <div>
+                                        <p className="font-black text-2xl tracking-tighter leading-none">{displayIdentity}</p>
+                                        <Badge variant={isAdmin ? "destructive" : "secondary"} className="mt-2 uppercase font-black text-[9px] tracking-widest">
+                                            {isAdmin ? (userData?.role || 'Administrator').toUpperCase() : 'Staff User'}
+                                        </Badge>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </CardContent>
@@ -226,8 +236,8 @@ function DashboardContent() {
                 </Card>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {stats.map((stat) => (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {stats.slice(0, 3).map((stat) => (
                     <Card key={stat.title} className={`${stat.color} text-white border-none shadow-lg rounded-2xl`}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-xs font-black uppercase tracking-widest opacity-80">{stat.title}</CardTitle>
@@ -241,6 +251,48 @@ function DashboardContent() {
                         </CardContent>
                     </Card>
                 ))}
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center justify-between">
+                      Prayer Requests
+                      <Heart className="h-4 w-4 text-primary" />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-black">
+                      {loading ? <Skeleton className="h-10 w-12" /> : pendingPrayers}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Awaiting approval
+                    </p>
+                    <Button asChild variant="outline" size="sm" className="mt-4 w-full rounded-full font-bold">
+                        <Link href="/admin/prayer-requests">Moderate Requests</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center justify-between">
+                      Volunteer Slots
+                      <Users className="h-4 w-4 text-primary" />
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-black">
+                      {loading ? <Skeleton className="h-10 w-12" /> : openVolunteers}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Open opportunities
+                    </p>
+                    <Button asChild variant="outline" size="sm" className="mt-4 w-full rounded-full font-bold">
+                        <Link href="/admin/volunteers">Manage Opportunities</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
