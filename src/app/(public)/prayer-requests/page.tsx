@@ -34,14 +34,17 @@ export default function PrayerRequestsPage() {
 
     const prayerQuery = useMemoFirebase(() => {
         if (!firestore) return null;
+        // Removed status filter from query to avoid composite index requirement
         return query(
             collection(firestore, 'prayer_requests'),
-            where('status', '==', 'approved'),
             orderBy('createdAt', 'desc')
         );
     }, [firestore]);
 
     const { data: prayers, isLoading } = useCollection<PrayerRequest>(prayerQuery);
+    
+    // Filter approved prayers in code to avoid Firestore Index requirement
+    const approvedPrayers = prayers?.filter(p => p.status === 'approved');
 
     const form = useForm<z.infer<typeof prayerSchema>>({
         resolver: zodResolver(prayerSchema),
@@ -173,21 +176,21 @@ export default function PrayerRequestsPage() {
                     <div className="lg:col-span-2 space-y-8">
                         <div className="flex items-center justify-between border-b pb-4">
                             <h2 className="text-3xl font-black uppercase tracking-tighter">Community Wall</h2>
-                            <Badge variant="outline" className="font-bold">{prayers?.length || 0} Petitions</Badge>
+                            <Badge variant="outline" className="font-bold">{approvedPrayers?.length || 0} Petitions</Badge>
                         </div>
 
                         {isLoading ? (
                             <div className="space-y-4">
                                 {[1, 2, 3].map(i => <Card key={i} className="h-40 animate-pulse bg-muted/20 rounded-3xl" />)}
                             </div>
-                        ) : prayers?.length === 0 ? (
+                        ) : approvedPrayers?.length === 0 ? (
                             <div className="text-center py-20 bg-muted/5 rounded-[3rem] border-2 border-dashed">
                                 <Info className="h-12 w-12 mx-auto text-muted-foreground opacity-20 mb-4" />
                                 <p className="text-muted-foreground font-medium">No public petitions yet. Be the first to share.</p>
                             </div>
                         ) : (
                             <div className="grid gap-6">
-                                {prayers?.map((prayer) => (
+                                {approvedPrayers?.map((prayer) => (
                                     <Card key={prayer.id} className="border-none shadow-lg rounded-3xl overflow-hidden hover:shadow-xl transition-all">
                                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                                             <div className="flex items-center gap-3">

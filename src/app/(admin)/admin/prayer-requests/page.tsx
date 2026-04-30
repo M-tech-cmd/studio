@@ -8,8 +8,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Check, X, Trash2, Heart } from 'lucide-react';
+import { Check, X, Trash2, Heart, Phone, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { 
+    Dialog, 
+    DialogContent, 
+    DialogHeader, 
+    DialogTitle, 
+    DialogTrigger,
+    DialogDescription
+} from '@/components/ui/dialog';
 
 export default function AdminPrayerRequestsPage() {
     const firestore = useFirestore();
@@ -64,15 +72,16 @@ export default function AdminPrayerRequestsPage() {
                             <TableRow>
                                 <TableHead>Date</TableHead>
                                 <TableHead>Sender</TableHead>
+                                <TableHead>Phone</TableHead>
                                 <TableHead>Category</TableHead>
-                                <TableHead className="w-[40%]">Intention</TableHead>
+                                <TableHead className="w-[30%]">Intention</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                <TableRow><TableCell colSpan={6} className="text-center py-20 animate-pulse">Syncing registry...</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={7} className="text-center py-20 animate-pulse">Syncing registry...</TableCell></TableRow>
                             ) : (
                                 prayers?.map((p) => (
                                     <TableRow key={p.id}>
@@ -80,7 +89,22 @@ export default function AdminPrayerRequestsPage() {
                                             {p.createdAt ? format(p.createdAt.toDate(), 'MMM dd, p') : 'recent'}
                                         </TableCell>
                                         <TableCell className="font-bold">{p.name}</TableCell>
-                                        <TableCell><Badge variant="outline" className="text-[10px] uppercase font-black">{p.category}</Badge></TableCell>
+                                        <TableCell>
+                                            {(p as any).phone ? (
+                                                <a 
+                                                    href={`tel:${(p as any).phone}`}
+                                                    className="flex items-center gap-2 text-primary font-bold hover:underline"
+                                                >
+                                                    <Phone className="h-4 w-4" />
+                                                    {(p as any).phone}
+                                                </a>
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs italic">
+                                                    Not provided
+                                                </span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell><Badge variant="outline" className="text-[10px] uppercase font-black">{(p as any).category}</Badge></TableCell>
                                         <TableCell className="text-sm italic line-clamp-2">"{p.request}"</TableCell>
                                         <TableCell>
                                             <Badge variant={p.status === 'approved' ? 'default' : p.status === 'rejected' ? 'destructive' : 'secondary'} className="uppercase font-black text-[9px]">
@@ -89,6 +113,37 @@ export default function AdminPrayerRequestsPage() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-2">
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button size="icon" variant="outline" className="h-8 w-8 text-primary">
+                                                            <Eye className="h-4 w-4" />
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="rounded-3xl border-none shadow-2xl">
+                                                        <DialogHeader>
+                                                            <DialogTitle className="text-2xl font-black uppercase tracking-tighter">Prayer Details</DialogTitle>
+                                                            <DialogDescription>From {p.name || 'Anonymous'}</DialogDescription>
+                                                        </DialogHeader>
+                                                        <div className="space-y-4 py-4">
+                                                            <div className="bg-muted/20 p-6 rounded-2xl border-l-4 border-primary">
+                                                                <p className="italic text-lg">"{p.request}"</p>
+                                                            </div>
+                                                            {(p as any).phone && (
+                                                                <div className="flex justify-center pt-4">
+                                                                    <a href={`tel:${(p as any).phone}`}>
+                                                                        <Button 
+                                                                            variant="outline" 
+                                                                            className="gap-2 rounded-full font-bold border-2 border-primary text-primary hover:bg-primary hover:text-white"
+                                                                        >
+                                                                            <Phone className="h-4 w-4" />
+                                                                            Call {p.name}
+                                                                        </Button>
+                                                                    </a>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </DialogContent>
+                                                </Dialog>
                                                 {p.status !== 'approved' && (
                                                     <Button size="icon" variant="outline" className="h-8 w-8 text-green-600" onClick={() => handleUpdateStatus(p.id, 'approved')}>
                                                         <Check className="h-4 w-4" />
