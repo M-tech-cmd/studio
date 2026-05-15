@@ -8,11 +8,12 @@ import {
     Clock, 
     ChevronRight, 
     Users, 
-    X
+    X,
+    Heart
 } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, limit, doc, where } from 'firebase/firestore';
-import type { Event, BulletinPost, Profile, CommunityGroup, DevelopmentProject, SiteSettings, Mass } from '@/lib/types';
+import type { Event, BulletinPost, Profile, CommunityGroup, DevelopmentProject, SiteSettings, Mass, PrayerRequest, VolunteerSlot } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -28,14 +29,20 @@ function HeroSection() {
     const settingsRef = useMemoFirebase(() => firestore ? doc(firestore, 'site_settings', 'main') : null, [firestore]);
     const { data: settings, isLoading } = useDoc<SiteSettings>(settingsRef);
 
+    const heroImageUrl = resolveMediaUrl(settings?.heroImageUrl);
+
     return (
         <section className="relative w-full min-h-[90vh] flex items-center justify-center overflow-hidden isolate">
-            {isLoading ? (
-                <Skeleton className="absolute inset-0 z-0" />
-            ) : (
+            {/* Base layer / Loading gradient */}
+            <div className="absolute inset-0 bg-primary/20 z-0">
+                <div className="absolute inset-0 bg-gradient-to-b from-primary/30 to-primary/10" />
+            </div>
+
+            {/* Actual Hero Image - Only rendered when loaded */}
+            {!isLoading && heroImageUrl && (
                 <>
                     <Image 
-                        src={resolveMediaUrl(settings?.heroImageUrl) || 'https://picsum.photos/seed/church-hero/1920/1080'} 
+                        src={heroImageUrl} 
                         alt="Church Hero" 
                         fill 
                         priority
