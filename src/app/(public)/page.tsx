@@ -8,12 +8,10 @@ import {
     Clock, 
     ChevronRight, 
     Users, 
-    X,
-    Heart
 } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, orderBy, limit, doc, where } from 'firebase/firestore';
-import type { Event, BulletinPost, Profile, CommunityGroup, DevelopmentProject, SiteSettings, Mass, PrayerRequest, VolunteerSlot } from '@/lib/types';
+import type { Event, BulletinPost, Profile, CommunityGroup, DevelopmentProject, SiteSettings, Mass } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +21,7 @@ import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDistanceToNow } from 'date-fns';
 import { resolveMediaUrl } from '@/lib/upload-utils';
 import { getDisplayNameFromRole } from '@/lib/roleMapping';
+import { BulletinPostCard } from '@/components/bulletin/BulletinPostCard';
 
 function HeroSection() {
     const firestore = useFirestore();
@@ -38,7 +37,7 @@ function HeroSection() {
                 <div className="absolute inset-0 bg-gradient-to-b from-primary/30 to-primary/10" />
             </div>
 
-            {/* Actual Hero Image - Only rendered when loaded */}
+            {/* Actual Hero Image - Only rendered when loaded and url exists */}
             {!isLoading && heroImageUrl && (
                 <>
                     <Image 
@@ -65,7 +64,7 @@ function HeroSection() {
                     <Button asChild size="lg" className="h-14 px-10 rounded-full font-bold text-lg shadow-2xl hover:scale-105 transition-all">
                         <Link href="/about">Discover Our History</Link>
                     </Button>
-                    <Button asChild size="lg" variant="outline" className="h-14 px-10 rounded-full font-bold text-lg border-2  hover:bg-white/10 backdrop-blur-sm transition-all">
+                    <Button asChild size="lg" variant="outline" className="h-14 px-10 rounded-full font-bold text-lg border-2 hover:bg-white/10 backdrop-blur-sm transition-all">
                         <Link href="/events">Upcoming Events</Link>
                     </Button>
                 </div>
@@ -303,20 +302,7 @@ function LatestBulletins({ settings, isLoading }: { settings?: SiteSettings, isL
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {bulletins?.map((post) => (
-                            <Card key={post.id} className="flex flex-col h-full bg-card shadow-md transition-all hover:shadow-xl rounded-2xl border-none">
-                                <CardHeader className="p-6 pb-2">
-                                    <Badge variant="secondary" className="w-fit mb-4 uppercase text-[10px] font-black tracking-widest">{post.category}</Badge>
-                                    <CardTitle className="text-xl font-bold line-clamp-2 min-h-[3.5rem] leading-tight text-[#1e3a5f]">{post.title}</CardTitle>
-                                    <CardDescription className="text-xs mt-4 font-medium italic opacity-70">
-                                        by {getDisplayNameFromRole(post.authorRole)} • {post.createdAt && typeof post.createdAt.toDate === 'function' ? formatDistanceToNow(post.createdAt.toDate(), { addSuffix: true }) : 'recent'}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardFooter className="mt-auto p-6 pt-0">
-                                    <Button asChild variant="link" className="p-0 h-auto font-black uppercase text-xs tracking-widest text-primary">
-                                        <Link href={`/bulletin/${post.id}`}>Read Full Update <ArrowRight className="ml-2 h-3 w-3" /></Link>
-                                    </Button>
-                                </CardFooter>
-                            </Card>
+                            <BulletinPostCard key={post.id} post={post} />
                         ))}
                     </div>
                 )}
@@ -352,7 +338,20 @@ function ParishProjects({ settings, isLoading }: { settings?: SiteSettings, isLo
                         {projects?.map(project => (
                             <Link key={project.id} href={`/development/${project.id}`}>
                                 <Card className="h-full hover:shadow-xl transition-all bg-card overflow-hidden hover:-translate-y-1 rounded-2xl border-none shadow-md">
-                                    <CardHeader className="p-6 pb-2">
+                                    <div className="relative h-64 w-full overflow-hidden bg-slate-100">
+                                        {project.imageUrl ? (
+                                            <Image
+                                                src={resolveMediaUrl(project.imageUrl)}
+                                                alt={project.title}
+                                                fill
+                                                className="object-cover"
+                                                unoptimized
+                                            />
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full text-sm text-muted-foreground">No image available</div>
+                                        )}
+                                    </div>
+                                    <CardHeader className="p-6 pb-2 pt-4">
                                         <CardTitle className="text-xl font-black text-[#1e3a5f]">{project.title}</CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-6 p-6 pt-0">
@@ -401,7 +400,10 @@ export default function HomePage() {
                         </p>
                         <div className="mt-12 flex flex-col sm:flex-row justify-center gap-6">
                             <Button asChild size="lg" className="rounded-full px-12 h-16 text-lg font-black shadow-2xl hover:scale-105 transition-all">
-                                <Link href="/signup">{settings?.parishCtaButton1 || 'Become a Member'}</Link>
+                                <Link href="/register-profile">{settings?.parishCtaButton1 || 'Become a Member'}</Link>
+                            </Button>
+                            <Button asChild size="lg" variant="outline" className="rounded-full px-12 h-16 text-lg font-black border-2 hover:bg-muted transition-all">
+                                <Link href="/volunteer">{settings?.parishCtaButton2 || 'Support Our Mission'}</Link>
                             </Button>
                         </div>
                     </div>
