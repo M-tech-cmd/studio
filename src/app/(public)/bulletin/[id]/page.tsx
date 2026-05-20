@@ -23,11 +23,6 @@ const roleMapping: Record<string, string> = {
     tech_dev: "St. Martin De Porres Tech/Dev",
 };
 
-const PhotoGallery = dynamic(() => import('@/components/shared/PhotoGallery').then(mod => mod.PhotoGallery), {
-  ssr: false,
-  loading: () => <div className="h-48 w-full animate-pulse bg-muted rounded-2xl" />
-});
-
 const CommentSection = dynamic(
   () => import('@/components/bulletin/CommentSection').then(
     m => m.CommentSection
@@ -144,8 +139,27 @@ export default function BulletinPostPage() {
                         dangerouslySetInnerHTML={{ __html: post.content }} 
                     />
                     
-                    <div className="mt-12 pt-12 border-t border-dashed">
-                        <PhotoGallery photos={post.galleryImages} title={post.title} />
+                    <div className="mt-12 pt-12 border-t border-dashed grid gap-8">
+                        {post.galleryImages?.map((asset: any, index: number) => {
+                          const url = typeof asset === 'string' ? asset : asset.secure_url;
+                          const type = typeof asset === 'string' ? 'image' : asset.resource_type || 'image';
+
+                          if (type === 'video') {
+                            return (
+                              <video key={index} src={url} controls
+                                className="w-full rounded-2xl max-h-[500px]"
+                                preload="metadata" />
+                            );
+                          }
+                          if (url?.includes('.mp3') || url?.includes('.wav') ||
+                              url?.includes('.ogg') || url?.includes('.m4a')) {
+                            return <audio key={index} src={url} controls className="w-full" />;
+                          }
+                          return (
+                            <img key={index} src={url} alt={`Media ${index + 1}`}
+                              className="w-full rounded-2xl object-cover" />
+                          );
+                        })}
                     </div>
                 </CardContent>
                 <CardFooter className="p-8 md:p-12 bg-muted/5 border-t">   

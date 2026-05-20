@@ -3,11 +3,9 @@
 import Image from 'next/image';
 import { X, Play, Video, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { resolveMediaUrl } from '@/lib/upload-utils';
-import type { CloudinaryAsset } from '@/lib/types';
 
 interface MediaItemProps {
-  url: string | CloudinaryAsset;
+  url: any;
   onRemove?: () => void;
   className?: string;
   showIconOverlay?: boolean;
@@ -19,20 +17,23 @@ interface MediaItemProps {
  * Optimized for compact display in grids and lists.
  */
 export function MediaItem({ 
-  url: asset, 
+  url, 
   onRemove, 
   className,
   showIconOverlay = true
 }: MediaItemProps) {
 
-  const url = resolveMediaUrl(asset);
-  if (!url || url === 'undefined' || url === 'null') return null;
+  const mediaUrl = typeof url === 'string' ? url : 
+    (url as any)?.secure_url || '';
 
-  const isVideo = (typeof asset !== 'string' && asset.resource_type === 'video') || 
-                  (typeof asset === 'string' && url.toLowerCase().match(/\.(mp4|webm|mov|video)/)) || 
-                  (typeof asset === 'string' && url.startsWith('data:video'));
+  if (!mediaUrl || mediaUrl === 'undefined' || mediaUrl === 'null') return null;
 
-  const isAudio = (typeof asset === 'string' && (url.toLowerCase().match(/\.(mp3|wav|ogg|audio)/) || url.startsWith('data:audio')));
+  const resourceType = typeof url === 'string' ? 
+    (url.includes('.mp3') || url.includes('.wav') || 
+     url.includes('.ogg') || url.includes('.m4a') ? 'audio' :
+     url.includes('.mp4') || url.includes('.mov') || 
+     url.includes('.webm') ? 'video' : 'image') :
+    (url as any)?.resource_type || 'image';
 
   return (
     <div className={cn(
@@ -40,15 +41,15 @@ export function MediaItem({
       className
     )}>
       
-      {isAudio ? (
+      {resourceType === 'audio' ? (
         <div className="h-full w-full flex flex-col items-center justify-center bg-slate-100 gap-2">
           <Mic className="h-8 w-8 text-primary/40" />
           <span className="text-[8px] font-black uppercase tracking-widest text-primary/60">Voice/Audio</span>
           {showIconOverlay && (
-              <audio src={url} controls className="absolute bottom-2 scale-[0.65] w-full opacity-0 group-hover:opacity-100 transition-opacity" />
+              <audio src={mediaUrl} controls className="absolute bottom-2 scale-[0.65] w-full opacity-0 group-hover:opacity-100 transition-opacity" />
           )}
         </div>
-      ) : isVideo ? (
+      ) : resourceType === 'video' ? (
         <div className="h-full w-full bg-slate-900 flex items-center justify-center">
           <Video className="h-10 w-10 text-white/20" />
           {showIconOverlay && (
@@ -60,13 +61,15 @@ export function MediaItem({
           )}
         </div>
       ) : (
-        <Image
-          src={url}
-          alt="Media item"
-          fill
-          className="object-cover transition-transform duration-700 group-hover:scale-110"
-          unoptimized
-        />
+        <div className="relative w-full h-full">
+            <Image
+              src={mediaUrl}
+              alt="Media item"
+              fill
+              className="object-cover transition-transform duration-700 group-hover:scale-110"
+              unoptimized
+            />
+        </div>
       )}
 
       {onRemove && (

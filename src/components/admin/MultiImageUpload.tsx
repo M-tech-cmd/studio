@@ -82,10 +82,10 @@ export function MultiImageUpload({ existingImages = [], newFiles = [], onChange,
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-        {(existingImages || []).map((asset, index) => (
+        {(existingImages || []).map((asset: any, index: number) => (
           <MediaItem 
             key={`existing-${index}`} 
-            url={asset} 
+            url={typeof asset === 'string' ? asset : asset.secure_url} 
             onRemove={() => removeExisting(index)} 
           />
         ))}
