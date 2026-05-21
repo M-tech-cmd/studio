@@ -45,6 +45,14 @@ type BulletinPostFormProps = {
   onClose: () => void;
 };
 
+/**
+ * Strips temporary blob URLs from HTML content to prevent broken images on refresh.
+ */
+const sanitizeContent = (html: string): string => {
+  if (!html) return '';
+  return html.replace(/<img[^>]+src=["']blob:[^"']*["'][^>]*>/gi, '');
+};
+
 export function BulletinPostForm({ post, onClose }: BulletinPostFormProps) {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -77,19 +85,24 @@ export function BulletinPostForm({ post, onClose }: BulletinPostFormProps) {
 
     try {
         // 1. Upload new files and get their Asset objects
+        console.log('[Bulletin] Detected gallery files for upload:', galleryFiles.length);
+        
         const newAssets = (galleryFiles && galleryFiles.length > 0) 
             ? await uploadMultipleFiles(null, 'bulletins', galleryFiles) 
             : [];
         
+        console.log('[Bulletin] Cloudinary upload results:', newAssets);
+        
         // 2. Combine existing assets with new ones
         const finalGallery = [...(values.galleryImages || []), ...newAssets];
+        console.log('[Bulletin] Final gallery array to save:', finalGallery);
 
         const postData = {
             title: values.title,
-            content: values.content,
+            content: sanitizeContent(values.content), // Sanitized to remove blob URLs
             category: values.category,
             galleryImages: finalGallery,
-            authorRole: authorProfile?.role || 'member', // Save the role for title display
+            authorRole: authorProfile?.role || 'member',
             updatedAt: serverTimestamp(),
         };
 
@@ -112,7 +125,7 @@ export function BulletinPostForm({ post, onClose }: BulletinPostFormProps) {
         toast({ 
             variant: 'destructive', 
             title: 'Sync Failed', 
-            description: 'Could not commit assets to registry. Check your connection.' 
+            description: error.message || 'Could not commit assets to registry.' 
         });
     } finally {
         setIsSaving(false);
